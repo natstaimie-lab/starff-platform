@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { AppBar, ScreenScroll } from '@/components/Screen';
-import { Card, Pill, Muted, SecHead, Button, LoadingState, ErrorState, EmptyState } from '@/components/ui';
+import { Card, Pill, Muted, Button, LoadingState, ErrorState, EmptyState } from '@/components/ui';
 import { colors } from '@/theme/tokens';
 import { useApi } from '@/lib/useApi';
 import { candidateApi } from '@/lib/endpoints';
@@ -21,6 +21,7 @@ export function CandidateBookingsScreen() {
   const nav = useNavigation<any>();
   const { data: me, loading, error, refreshing, refresh, reload } = useApi<CandidateProfile>(() => candidateApi.me(), []);
   const [busy, setBusy] = useState<string | null>(null);
+  const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
 
   const act = async (id: string, action: 'ack' | 'in' | 'out' | 'late') => {
     setBusy(id + action);
@@ -51,18 +52,22 @@ export function CandidateBookingsScreen() {
           <EmptyState icon="briefcase" title="No shifts yet" subtitle="When Starff confirms a booking for you, it'll appear here." />
         ) : (
           <>
-            <SecHead title={`Upcoming (${upcoming.length})`} />
-            {upcoming.length === 0 ? (
-              <Muted style={{ marginBottom: 8 }}>No upcoming shifts booked.</Muted>
-            ) : (
-              upcoming.map((s) => <ShiftRow key={s.id} s={s} busy={busy} onAct={act} />)
-            )}
+            <View style={styles.segment}>
+              {(['upcoming', 'past'] as const).map((t) => {
+                const on = tab === t;
+                const count = t === 'upcoming' ? upcoming.length : past.length;
+                return (
+                  <TouchableOpacity key={t} onPress={() => setTab(t)} activeOpacity={0.8} style={[styles.seg, on && styles.segOn]}>
+                    <Text style={[styles.segTxt, on && styles.segTxtOn]}>{t === 'upcoming' ? 'Upcoming' : 'Past'} ({count})</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
-            {past.length > 0 && (
-              <>
-                <SecHead title="Past shifts" />
-                {past.map((s) => <ShiftRow key={s.id} s={s} busy={busy} onAct={act} />)}
-              </>
+            {(tab === 'upcoming' ? upcoming : past).length === 0 ? (
+              <Muted style={{ marginTop: 8 }}>{tab === 'upcoming' ? 'No upcoming shifts booked.' : 'No past shifts yet.'}</Muted>
+            ) : (
+              (tab === 'upcoming' ? upcoming : past).map((s) => <ShiftRow key={s.id} s={s} busy={busy} onAct={act} />)
             )}
           </>
         )}
@@ -141,6 +146,11 @@ function DetailRow({ k, v }: { k: string; v: string }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  segment: { flexDirection: 'row', backgroundColor: colors.surfaceAlt, borderRadius: 12, padding: 4, gap: 4, marginBottom: 12 },
+  seg: { flex: 1, paddingVertical: 9, alignItems: 'center', borderRadius: 9 },
+  segOn: { backgroundColor: colors.surface, shadowColor: '#0B1F3A', shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  segTxt: { fontSize: 13.5, fontWeight: '700', color: colors.textMuted },
+  segTxtOn: { color: colors.text },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   title: { fontSize: 15, fontWeight: '700', color: colors.text },
   meta: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },

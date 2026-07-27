@@ -30,6 +30,7 @@ export default function BookingsPage() {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
 
   const load = () => apiFetch<{ shifts: Shift[] }>('/me').then((me) => setShifts(me.shifts ?? [])).catch(() => {}).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
@@ -43,9 +44,28 @@ export default function BookingsPage() {
   if (loading) return <p className="mut">Loading…</p>;
   if (shifts.length === 0) return <Card><p className="mut" style={{ padding: 8 }}>You have no bookings yet. Accept a shift offer from your dashboard to get started.</p></Card>;
 
+  const now = Date.now();
+  const upcoming = shifts.filter((s) => new Date(s.startAt).getTime() >= now && s.status !== 'CANCELLED');
+  const past = shifts.filter((s) => new Date(s.startAt).getTime() < now || s.status === 'CANCELLED');
+  const list = tab === 'upcoming' ? upcoming : past;
+  const segBtn = (t: 'upcoming' | 'past'): React.CSSProperties => ({
+    flex: 1, padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13.5, fontWeight: 700,
+    background: tab === t ? 'var(--surface-card)' : 'transparent', color: tab === t ? 'var(--text-primary)' : 'var(--text-secondary)',
+    boxShadow: tab === t ? '0 1px 3px rgba(11,31,58,.08)' : 'none',
+  });
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
-      {shifts.map((s) => {
+    <>
+      <div style={{ display: 'inline-flex', gap: 4, background: 'var(--surface-sunken)', padding: 4, borderRadius: 10, marginBottom: 16 }}>
+        <button onClick={() => setTab('upcoming')} style={segBtn('upcoming')}>Upcoming ({upcoming.length})</button>
+        <button onClick={() => setTab('past')} style={segBtn('past')}>Past ({past.length})</button>
+      </div>
+
+      {list.length === 0 ? (
+        <Card><p className="mut" style={{ padding: 8 }}>{tab === 'upcoming' ? 'No upcoming shifts booked.' : 'No past shifts yet.'}</p></Card>
+      ) : (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+      {list.map((s) => {
         const d = new Date(s.startAt);
         return (
           <div key={s.id} className="card card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -95,7 +115,9 @@ export default function BookingsPage() {
           </div>
         );
       })}
-    </div>
+      </div>
+      )}
+    </>
   );
 }
 
