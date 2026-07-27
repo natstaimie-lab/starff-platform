@@ -17,7 +17,8 @@
     "db:push": "prisma db push --schema=database/prisma/schema.prisma",
     "promote-admin": "node --env-file=.env scripts/promote-admin.mjs",
     "seed": "node --env-file=.env scripts/seed.mjs",
-    "setup-storage": "node --env-file=.env scripts/setup-storage.mjs"
+    "setup-storage": "node --env-file=.env scripts/setup-storage.mjs",
+    "test:e2e": "node --env-file=.env scripts/e2e/run.mjs"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.45.4",
