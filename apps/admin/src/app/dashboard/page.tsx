@@ -29,18 +29,6 @@ const num = (n?: number) => (n === undefined ? '—' : n.toLocaleString());
 const jobTone: Record<string, string> = { FILLED: 'success', OPEN: 'warning', DRAFT: 'neutral', CLOSED: 'neutral', CANCELLED: 'error' };
 const jobLabel: Record<string, string> = { FILLED: 'Confirmed', OPEN: 'Open', DRAFT: 'Draft', CLOSED: 'Closed', CANCELLED: 'Cancelled' };
 
-// The job lifecycle as a 6-stage pipeline. Each stage groups the underlying job
-// statuses; clicking it opens the bookings list filtered to those statuses.
-type Stage = { statuses: string[]; label: string; hint: string; color: string };
-const PIPELINE: Stage[] = [
-  { statuses: ['SUBMITTED', 'UNDER_REVIEW'], label: 'New requests', hint: 'Submitted — needs review', color: 'var(--orange-500)' },
-  { statuses: ['APPROVED'], label: 'Approved', hint: 'Ready to start matching', color: 'var(--blue-500)' },
-  { statuses: ['RECRUITING', 'OFFERS_SENT'], label: 'Finding workers', hint: 'Matching, inviting & offering', color: 'var(--blue-500)' },
-  { statuses: ['CANDIDATES_SUBMITTED'], label: 'With client', hint: 'Awaiting client decision', color: 'var(--blue-500)' },
-  { statuses: ['PARTIALLY_FILLED', 'FILLED', 'CONFIRMED'], label: 'Booking', hint: 'Filling & confirming workers', color: 'var(--warning-500)' },
-  { statuses: ['IN_PROGRESS', 'COMPLETED'], label: 'On shift & done', hint: 'Working and completed', color: 'var(--success-500)' },
-];
-
 export default function DashboardHome() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [cands, setCands] = useState<Cand[]>([]);
@@ -72,11 +60,23 @@ export default function DashboardHome() {
   const areaSeries = trends ? trends.series.map((s, i) => ({ ...s, color: SERIES_COLORS[i % SERIES_COLORS.length] })) : [];
 
   const recentJobs = jobs.slice(0, 5);
-  // Count jobs by status → sum into each pipeline stage's grouped statuses.
-  const jobCounts = jobs.reduce<Record<string, number>>((acc, j) => { acc[j.status] = (acc[j.status] ?? 0) + 1; return acc; }, {});
-  const stages = PIPELINE.map((s) => ({ ...s, count: s.statuses.reduce((n, st) => n + (jobCounts[st] ?? 0), 0) }));
-  const pipelineMax = Math.max(1, ...stages.map((s) => s.count));
-  const activeJobs = stages.reduce((n, s) => n + s.count, 0);
+
+  // ── Needs attention: everything waiting on the admin, newest-action first ──
+  const pl = (n: number) => (n === 1 ? '' : 's');
+  const attention: { icon: string; text: string; href: string; action: string; urgent?: boolean }[] = [];
+  if (wf) {
+    const c = wf.counts;
+    if (c.awaitingApproval) attention.push({ icon: '📋', text: `${c.awaitingApproval} job request${pl(c.awaitingApproval)} to review`, href: '/dashboard/bookings?status=SUBMITTED,UNDER_REVIEW', action: 'Review', urgent: true });
+    if (c.clientAccepted) attention.push({ icon: '✅', text: `${c.clientAccepted} client-accepted candidate${pl(c.clientAccepted)} to confirm`, href: '/dashboard/bookings?status=CANDIDATES_SUBMITTED', action: 'Confirm', urgent: true });
+    if (c.readyToSubmit) attention.push({ icon: '📤', text: `${c.readyToSubmit} interested candidate${pl(c.readyToSubmit)} ready to submit to client`, href: '/dashboard/bookings?status=RECRUITING,OFFERS_SENT', action: 'Submit' });
+    if (c.alternativesRequested) attention.push({ icon: '🔄', text: `${c.alternativesRequested} alternative${pl(c.alternativesRequested)} requested by clients`, href: '/dashboard/bookings', action: 'Review' });
+    if (c.toRefill) attention.push({ icon: '🔁', text: `${c.toRefill} replacement${pl(c.toRefill)} to fill`, href: '/dashboard/bookings', action: 'Fill' });
+    if (c.reliabilityConcerns) attention.push({ icon: '⚠️', text: `${c.reliabilityConcerns} worker${pl(c.reliabilityConcerns)} with reliability concerns`, href: '/dashboard/candidates', action: 'Review' });
+  }
+  if (stats) {
+    if (stats.pendingTimesheets) attention.push({ icon: '⏱️', text: `${stats.pendingTimesheets} timesheet${pl(stats.pendingTimesheets)} to approve`, href: '/dashboard/timesheets', action: 'Approve' });
+    if (stats.newEnquiries) attention.push({ icon: '📨', text: `${stats.newEnquiries} new website enquir${stats.newEnquiries === 1 ? 'y' : 'ies'}`, href: '/dashboard/enquiries', action: 'View' });
+  }
   const ALERT_ICON: Record<string, React.ReactNode> = {
     RUNNING_LATE: <Ic.Clock width={18} />, REPORTED_ABSENT: <Ic.AlertCircle width={18} />,
     NOT_ACKNOWLEDGED: <Ic.User width={18} />, NO_CHECK_IN: <Ic.AlertCircle width={18} />,
@@ -126,35 +126,26 @@ export default function DashboardHome() {
         ))}
       </div>
 
-      {/* Recruitment pipeline — where every live job sits, in order. Each stage
-          links straight to that filtered list of bookings. */}
-      <div className="fx ac jb" style={{ margin: '26px 0 12px' }}>
-        <h2 style={{ fontSize: 15, fontWeight: 800 }}>Recruitment pipeline</h2>
-        <Link href="/dashboard/bookings" className="link" style={{ fontSize: 13 }}>All bookings →</Link>
-      </div>
-      <Card>
-        <p className="dim" style={{ fontSize: 13, marginTop: -2, marginBottom: 14 }}>{activeJobs} live job{activeJobs === 1 ? '' : 's'} in the pipeline. Click a stage to see those jobs.</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
-          {stages.map((s, i) => (
-            <Link key={s.label} href={`/dashboard/bookings?status=${s.statuses.join(',')}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-              <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '12px 13px', height: '100%', display: 'flex', flexDirection: 'column', gap: 6, transition: 'border-color .15s', background: s.count > 0 ? 'var(--surface-card)' : 'transparent' }}>
-                <div className="fx ac" style={{ gap: 7 }}>
-                  <span style={{ width: 18, height: 18, borderRadius: 999, background: s.color, color: '#fff', fontSize: 10.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
-                  <span style={{ fontSize: 12.5, fontWeight: 700 }}>{s.label}</span>
-                </div>
-                <div style={{ fontSize: 24, fontWeight: 800, lineHeight: 1, color: s.count > 0 ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>{s.count}</div>
-                <div style={{ height: 4, borderRadius: 999, background: 'var(--surface-sunken)' }}>
-                  <div style={{ height: 4, borderRadius: 999, width: `${Math.round((s.count / pipelineMax) * 100)}%`, background: s.color }} />
-                </div>
-                <div className="dim" style={{ fontSize: 11, lineHeight: 1.3 }}>{s.hint}</div>
+      {/* Needs your attention — the compact action list (mirrors the worker/client dashboards). */}
+      <div style={{ marginTop: 20 }}>
+        <Card title="Needs your attention" action={<Link href="/dashboard/bookings" className="link">All bookings →</Link>}>
+          {!wf ? <p className="dim">Loading…</p>
+            : attention.length === 0 ? <p className="dim" style={{ fontSize: 13.5 }}>You&apos;re all caught up — nothing needs your attention right now. ✓</p>
+            : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {attention.map((a, i) => (
+                  <div key={i} className="fx ac jb" style={{ gap: 10 }}>
+                    <span className="fx ac" style={{ gap: 9, fontSize: 13.5 }}><span style={{ fontSize: 16 }}>{a.icon}</span>{a.text}</span>
+                    <Link href={a.href} style={{ textDecoration: 'none', height: 30, display: 'inline-flex', alignItems: 'center', padding: '0 13px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', background: a.urgent ? 'var(--blue-500)' : 'var(--surface-card)', color: a.urgent ? '#fff' : 'var(--text-secondary)', border: a.urgent ? 'none' : '1px solid var(--border-subtle)' }}>{a.action}</Link>
+                  </div>
+                ))}
               </div>
-            </Link>
-          ))}
-        </div>
-      </Card>
+            )}
+        </Card>
+      </div>
 
-      {/* Two action queues + concerns — the "what needs me now" lists. */}
-      <h2 style={{ fontSize: 15, fontWeight: 800, margin: '26px 0 12px' }}>Needs your attention</h2>
+      {/* Action queues — the drill-down lists behind the summary above. */}
+      <h2 style={{ fontSize: 15, fontWeight: 800, margin: '26px 0 12px' }}>Action queues</h2>
       <div className="gbot">
         <Card title="Awaiting approval" subtitle="New client requests to review" action={<Link href="/dashboard/bookings?status=SUBMITTED" className="link">View all</Link>}>
           {!wf ? <p className="dim">Loading…</p>
