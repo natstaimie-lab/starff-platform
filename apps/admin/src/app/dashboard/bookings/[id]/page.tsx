@@ -158,6 +158,18 @@ export default function JobDetail() {
     } catch (e: any) { alert(e.message); } finally { setExtending(false); }
   }
 
+  const [ending, setEnding] = useState(false);
+  async function endJob() {
+    if (!j) return;
+    if (!confirm('End this recurring job? Upcoming shifts will be cancelled (workers notified) and the job closed. Completed shifts and timesheets are kept.')) return;
+    setEnding(true);
+    try {
+      const r = await apiFetch<{ cancelledShifts: number }>(`/jobs/${j.id}/end`, { method: 'POST' });
+      alert(`Job ended. ${r.cancelledShifts} upcoming shift${r.cancelledShifts === 1 ? '' : 's'} cancelled.`);
+      await load();
+    } catch (e: any) { alert(e.message); } finally { setEnding(false); }
+  }
+
   function openEdit() {
     if (!j) return;
     const days = j.recurrenceDays ?? [];
@@ -434,6 +446,9 @@ export default function JobDetail() {
                 <Badge tone={(tone[j.status] ?? 'neutral') as any}>{label[j.status] ?? j.status}</Badge>
                 {j.openEnded && ['PARTIALLY_FILLED', 'FILLED', 'CONFIRMED', 'IN_PROGRESS'].includes(j.status) && (
                   <button onClick={extendSchedule} disabled={extending} className="aibtn" style={{ border: 'none', background: 'var(--orange-100)', color: 'var(--orange-600)', fontWeight: 700 }}>{extending ? 'Extending…' : 'Extend schedule'}</button>
+                )}
+                {(j.recurrenceDays?.length ?? 0) > 0 && !['CLOSED', 'CANCELLED', 'COMPLETED'].includes(j.status) && (
+                  <button onClick={endJob} disabled={ending} className="aibtn" style={{ border: 'none', background: 'var(--error-100)', color: 'var(--error-600)', fontWeight: 700 }}>{ending ? 'Ending…' : 'End job'}</button>
                 )}
                 {j.status !== 'CANCELLED' && j.status !== 'COMPLETED' && (
                   <button onClick={openEdit} className="aibtn" style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700 }}>Edit</button>

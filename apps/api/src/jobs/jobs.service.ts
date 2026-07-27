@@ -300,6 +300,47 @@ export class JobsService {
     return { submitted };
   }
 
+  /** End a recurring / ongoing job: stop generating shifts, cancel any not-yet-
+   *  started shifts (kept as CANCELLED history), keep completed shifts + their
+   *  timesheets, and close the job. Notifies affected workers. */
+  async endRecurring(id: string, actorId?: string) {
+    const job = await this.requireJob(id);
+    if (job.recurrenceDays.length === 0) {
+      throw new BadRequestException('This is not a recurring job');
+    }
+    const now = new Date();
+    // Workers who still have upcoming shifts on this job (to notify).
+    const upcoming = await this.prisma.shift.findMany({
+      where: { jobId: id, startAt: { gt: now }, status: { in: ['ASSIGNED', 'CONFIRMED'] }, candidateId: { not: null } },
+      select: { candidateId: true, candidate: { select: { user: { select: { id: true, email: true } } } } },
+    });
+    const cancelled = await this.prisma.shift.updateMany({
+      where: { jobId: id, startAt: { gt: now }, status: { in: ['ASSIGNED', 'CONFIRMED'] } },
+      data: { status: 'CANCELLED', notes: 'Recurring booking ended by Starff' },
+    });
+    await this.prisma.job.update({ where: { id }, data: { status: JobStatus.CLOSED, openEnded: false } });
+
+    await this.audit.log({
+      actorId, action: 'job.recurring_ended', entity: 'Job', entityId: id,
+      meta: { cancelledShifts: cancelled.count, workersAffected: new Set(upcoming.map((s) => s.candidateId)).size },
+    });
+
+    // Tell each affected worker their upcoming shifts are cancelled.
+    const seen = new Set<string>();
+    for (const s of upcoming) {
+      const u = s.candidate?.user;
+      if (!u || seen.has(u.id)) continue;
+      seen.add(u.id);
+      await this.notifications.send({
+        to: u.email, kind: 'SHIFT_CHANGED',
+        subject: `Your ${job.title} shifts have ended`,
+        body: `The ongoing ${job.title} booking has been ended. Your upcoming shifts for it have been cancelled.`,
+        userId: u.id,
+      });
+    }
+    return { cancelledShifts: cancelled.count, status: 'CLOSED' };
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────
 
   private async requireJob(id: string) {

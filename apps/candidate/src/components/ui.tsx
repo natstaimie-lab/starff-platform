@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react';
+'use client';
+
+import { useState, type ReactNode } from 'react';
 
 // ---------- Card ----------
 export function Card({
@@ -108,29 +110,52 @@ export type Column<T> = {
   align?: 'left' | 'right';
   render: (row: T) => ReactNode;
 };
-export function DataTable<T>({ columns, rows }: { columns: Column<T>[]; rows: T[] }) {
+export function DataTable<T>({ columns, rows, pageSize = 12 }: { columns: Column<T>[]; rows: T[]; pageSize?: number }) {
+  const [page, setPage] = useState(0);
+  const total = rows.length;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const current = Math.min(page, pageCount - 1);
+  const paged = total > pageSize;
+  const start = current * pageSize;
+  const visible = paged ? rows.slice(start, start + pageSize) : rows;
+  const pagerBtn = (disabled: boolean): React.CSSProperties => ({
+    height: 28, padding: '0 10px', borderRadius: 7, fontSize: 12.5, fontWeight: 600, cursor: disabled ? 'default' : 'pointer',
+    border: '1px solid var(--border-strong)', background: 'var(--surface-card)', color: disabled ? 'var(--text-tertiary)' : 'var(--text-secondary)', opacity: disabled ? 0.6 : 1,
+  });
   return (
-    <table className="tbl">
-      <thead>
-        <tr>
-          {columns.map((c) => (
-            <th key={c.key} style={{ textAlign: c.align ?? 'left' }}>
-              {c.header}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, i) => (
-          <tr key={i}>
+    <>
+      <table className="tbl">
+        <thead>
+          <tr>
             {columns.map((c) => (
-              <td key={c.key} style={{ textAlign: c.align ?? 'left' }}>
-                {c.render(row)}
-              </td>
+              <th key={c.key} style={{ textAlign: c.align ?? 'left' }}>
+                {c.header}
+              </th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {visible.map((row, i) => (
+            <tr key={i}>
+              {columns.map((c) => (
+                <td key={c.key} style={{ textAlign: c.align ?? 'left' }}>
+                  {c.render(row)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {paged && (
+        <div className="fx ac jb" style={{ marginTop: 12 }}>
+          <span className="dim" style={{ fontSize: 12.5 }}>Showing {start + 1}–{Math.min(start + pageSize, total)} of {total}</span>
+          <div className="fx ac" style={{ gap: 8 }}>
+            <button onClick={() => setPage(current - 1)} disabled={current === 0} style={pagerBtn(current === 0)}>← Prev</button>
+            <span className="dim" style={{ fontSize: 12.5 }}>Page {current + 1} / {pageCount}</span>
+            <button onClick={() => setPage(current + 1)} disabled={current >= pageCount - 1} style={pagerBtn(current >= pageCount - 1)}>Next →</button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

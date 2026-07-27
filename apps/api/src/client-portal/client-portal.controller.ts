@@ -116,6 +116,11 @@ export class ClientPortalController {
     return this.svc.updateJob(u.id, id, dto);
   }
 
+  @Post('jobs/:id/request-change')
+  requestChange(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: { note: string }) {
+    return this.svc.requestChange(u.id, id, dto?.note ?? '');
+  }
+
   // ── Candidate submissions from Starff + the client's decision ──
   @Get('submissions')
   submissions(@CurrentUser() u: AuthUser) {

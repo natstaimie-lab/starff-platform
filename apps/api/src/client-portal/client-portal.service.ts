@@ -274,6 +274,31 @@ export class ClientPortalService {
     return job;
   }
 
+  /** Client asks Starff to change a booking that's already past review (e.g.
+   *  confirmed). It doesn't edit the job — it notifies staff to action it,
+   *  audited, so bookings with workers already assigned change under control. */
+  async requestChange(userId: string, id: string, note: string) {
+    const { client, contact } = await this.clientFor(userId);
+    const job = await this.prisma.job.findFirst({ where: { id, clientId: client.id }, select: { id: true, title: true } });
+    if (!job) throw new NotFoundException('Job not found');
+    if (!note?.trim()) throw new BadRequestException('Describe the change you need');
+
+    await this.audit.log({ actorId: userId, action: 'job.change_requested', entity: 'Job', entityId: id, meta: { note } });
+    const staff = await this.prisma.user.findMany({
+      where: { role: { in: [Role.ADMIN, Role.RECRUITER] }, isActive: true }, select: { id: true, email: true },
+    });
+    const who = `${contact.firstName} ${contact.lastName}`.trim() || client.name;
+    await Promise.all(
+      staff.map((s) => this.notifications.send({
+        to: s.email, kind: 'JOB_SUBMITTED',
+        subject: `Change requested — ${job.title} (${client.name})`,
+        body: `${who} requested a change to their ${job.title} booking: ${note}`,
+        userId: s.id,
+      })),
+    );
+    return { ok: true };
+  }
+
   async timesheets(userId: string) {
     const { client } = await this.clientFor(userId);
     return this.prisma.timesheet.findMany({

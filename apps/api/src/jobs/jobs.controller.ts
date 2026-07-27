@@ -56,6 +56,11 @@ export class JobsController {
     return this.jobs.requestInfo(id, dto, u.id);
   }
 
+  @Post(':id/end')
+  endRecurring(@CurrentUser() u: AuthUser, @Param('id') id: string) {
+    return this.jobs.endRecurring(id, u.id);
+  }
+
   @Post(':id/invite')
   invite(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: InviteCandidatesDto) {
     return this.jobs.invite(id, dto.candidateIds, dto.responseDeadline, u.id);

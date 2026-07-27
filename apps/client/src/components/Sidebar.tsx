@@ -68,7 +68,7 @@ export function Sidebar() {
     });
   }, [pathname]);
 
-  const isActive = (href: string) => (href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href));
+  const isActive = (href: string) => (href === '/dashboard' ? pathname === '/dashboard' : (pathname === href || pathname.startsWith(href + '/')));
 
   async function signOut() {
     await supabase.auth.signOut();

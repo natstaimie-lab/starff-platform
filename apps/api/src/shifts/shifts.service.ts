@@ -26,7 +26,7 @@ export class ShiftsService {
 
   findAll() {
     return this.prisma.shift.findMany({
-      orderBy: { startAt: 'asc' },
+      orderBy: { startAt: 'desc' },
       include: {
         job: { select: { id: true, title: true, client: { select: { name: true } } } },
         site: { select: { name: true } },

@@ -26,7 +26,6 @@ const sections: Section[] = [
     items: [
       { key: 'bookings', label: 'Job Bookings', href: '/dashboard/bookings', icon: <Ic.Briefcase /> },
       { key: 'shifts', label: 'Shifts', href: '/dashboard/shifts', icon: <Ic.Calendar /> },
-      { key: 'timesheets', label: 'Timesheets', href: '/dashboard/timesheets', icon: <Ic.Clock /> },
     ],
   },
   {
@@ -37,7 +36,7 @@ const sections: Section[] = [
   },
   {
     label: 'Finance',
-    items: [{ key: 'invoices', label: 'Payroll & Invoices', href: '/dashboard/invoices', icon: <Ic.Receipt /> }],
+    items: [{ key: 'timesheets', label: 'Payroll & Invoices', href: '/dashboard/timesheets', icon: <Ic.Receipt /> }],
   },
   {
     label: 'Insights',
@@ -68,7 +67,7 @@ export function Sidebar() {
   }, [pathname]);
 
   const isActive = (href: string) =>
-    href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href);
+    href === '/dashboard' ? pathname === '/dashboard' : (pathname === href || pathname.startsWith(href + '/'));
 
   async function signOut() {
     await supabase.auth.signOut();
