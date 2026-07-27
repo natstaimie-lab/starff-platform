@@ -19,3 +19,6 @@ database/prisma/*.db
 .DS_Store
 *.log
 .expo/
+
+# TypeScript build info
+*.tsbuildinfo

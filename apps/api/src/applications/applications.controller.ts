@@ -29,4 +29,11 @@ export class ApplicationsController {
   withdraw(@CurrentUser() u: AuthUser, @Param('id') id: string) {
     return this.applications.withdrawOffer(id, u.id);
   }
+
+  /** Roll an open-ended recurring job forward — generate the next horizon of
+   *  shifts for every booked worker. */
+  @Post('jobs/:jobId/extend-recurring')
+  extendRecurring(@CurrentUser() u: AuthUser, @Param('jobId') jobId: string) {
+    return this.applications.extendRecurring(jobId, u.id);
+  }
 }

@@ -1,4 +1,4 @@
-import { IsArray, IsDateString, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 /** Amend an existing job's operational details. Every field is optional — only
  *  the ones provided are changed. Status changes go through the status/review
@@ -33,4 +33,5 @@ export class UpdateJobDto {
   @IsOptional() @IsArray() @IsInt({ each: true }) @Min(0, { each: true }) @Max(6, { each: true }) recurrenceDays?: number[];
   @IsOptional() @IsString() shiftStartTime?: string;
   @IsOptional() @IsString() shiftEndTime?: string;
+  @IsOptional() @IsBoolean() openEnded?: boolean;
 }

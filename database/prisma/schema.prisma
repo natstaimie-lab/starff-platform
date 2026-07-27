@@ -453,6 +453,9 @@ model Job {
   recurrenceDays Int[]      @default([])  // weekdays 0=Sun … 6=Sat
   shiftStartTime String?                  // "HH:mm" local, e.g. "08:00"
   shiftEndTime   String?                  // "HH:mm" local, e.g. "16:00"
+  // Open-ended "until further notice": endDate is not fixed. Booking generates a
+  // rolling horizon of shifts; admin extends it forward as needed.
+  openEnded      Boolean    @default(false)
 
   // ── job request operational details (all optional, additive) ──
   sector                 String?

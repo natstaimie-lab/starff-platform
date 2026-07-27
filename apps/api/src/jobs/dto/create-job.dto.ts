@@ -1,4 +1,4 @@
-import { IsArray, IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 import { JobStatus } from '@prisma/client';
 
 export class CreateJobDto {
@@ -55,4 +55,5 @@ export class CreateJobDto {
   @IsOptional() @IsArray() @IsInt({ each: true }) @Min(0, { each: true }) @Max(6, { each: true }) recurrenceDays?: number[];
   @IsOptional() @IsString() shiftStartTime?: string;
   @IsOptional() @IsString() shiftEndTime?: string;
+  @IsOptional() @IsBoolean() openEnded?: boolean;
 }

@@ -40,6 +40,7 @@ export default function BookStaffPage() {
   const [recDays, setRecDays] = useState<number[]>([]);
   const [dailyStart, setDailyStart] = useState('');
   const [dailyEnd, setDailyEnd] = useState('');
+  const [openEnded, setOpenEnded] = useState(false); // until further notice (no end date)
 
   useEffect(() => {
     apiFetch<Loc[]>('/client/locations').then(setLocs).catch(() => {});
@@ -68,6 +69,7 @@ export default function BookStaffPage() {
           setRecDays(days);
           setDailyStart(str(j.shiftStartTime));
           setDailyEnd(str(j.shiftEndTime));
+          setOpenEnded(!!j.openEnded);
         }
       })
       .catch((e) => setError(e.message))
@@ -84,7 +86,12 @@ export default function BookStaffPage() {
       setError('For a recurring shift, pick at least one day and set the daily start and finish time.');
       return;
     }
+    if (recurring && !openEnded && !form.endDate) {
+      setError('Set an end date, or tick "Until further notice" for an ongoing shift.');
+      return;
+    }
     setSaving(true); setError('');
+    const recurringOpenEnded = recurring && openEnded;
     const payload = {
       title: form.title,
       payRate: Number(form.payRate),
@@ -93,10 +100,12 @@ export default function BookStaffPage() {
       siteId: form.siteId || undefined,
       sector: form.sector || undefined,
       startDate: form.startDate || undefined,
-      endDate: form.endDate || undefined,
+      // Open-ended recurring jobs have no fixed end date.
+      endDate: recurringOpenEnded ? undefined : (form.endDate || undefined),
       recurrenceDays: recurring ? recDays : [],
       shiftStartTime: recurring ? dailyStart : undefined,
       shiftEndTime: recurring ? dailyEnd : undefined,
+      openEnded: recurringOpenEnded,
       breakInfo: form.breakInfo || undefined,
       ppe: form.ppe || undefined,
       uniform: form.uniform || undefined,
@@ -197,11 +206,19 @@ export default function BookStaffPage() {
                   <label><span style={label}>Daily start time</span><input type="time" value={dailyStart} onChange={(e) => setDailyStart(e.target.value)} style={input} /></label>
                   <label><span style={label}>Daily finish time</span><input type="time" value={dailyEnd} onChange={(e) => setDailyEnd(e.target.value)} style={input} /></label>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: openEnded ? '1fr' : '1fr 1fr', gap: 12 }}>
                   <label><span style={label}>Runs from</span><input type="date" value={form.startDate.slice(0, 10)} onChange={(e) => setForm({ ...form, startDate: e.target.value })} style={input} /></label>
-                  <label><span style={label}>Runs until</span><input type="date" value={form.endDate.slice(0, 10)} onChange={(e) => setForm({ ...form, endDate: e.target.value })} style={input} /></label>
+                  {!openEnded && <label><span style={label}>Runs until</span><input type="date" value={form.endDate.slice(0, 10)} onChange={(e) => setForm({ ...form, endDate: e.target.value })} style={input} /></label>}
                 </div>
-                <p className="mut" style={{ fontSize: 12, margin: 0, color: 'var(--text-muted)' }}>Starff will create one shift for each selected day between these dates — each with its own check-in and timesheet.</p>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={openEnded} onChange={(e) => setOpenEnded(e.target.checked)} style={{ width: 15, height: 15 }} />
+                  <span style={{ fontSize: 13 }}>Until further notice <span style={{ color: 'var(--text-muted)' }}>— ongoing, no fixed end date</span></span>
+                </label>
+                <p className="mut" style={{ fontSize: 12, margin: 0, color: 'var(--text-muted)' }}>
+                  {openEnded
+                    ? 'Starff books an ongoing placement and keeps generating shifts week by week until you or Starff end it.'
+                    : 'Starff will create one shift for each selected day between these dates — each with its own check-in and timesheet.'}
+                </p>
               </>
             )}
             <label><span style={label}>Breaks</span><input value={form.breakInfo} onChange={(e) => setForm({ ...form, breakInfo: e.target.value })} placeholder="30 min unpaid" style={input} /></label>

@@ -68,6 +68,7 @@ export class ClientPortalController {
       recurrenceDays?: number[];
       shiftStartTime?: string;
       shiftEndTime?: string;
+      openEnded?: boolean;
     },
   ) {
     return this.svc.createJob(u.id, dto);
@@ -108,6 +109,7 @@ export class ClientPortalController {
       recurrenceDays?: number[];
       shiftStartTime?: string | null;
       shiftEndTime?: string | null;
+      openEnded?: boolean;
       responseNote?: string;
     },
   ) {

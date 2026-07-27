@@ -34,13 +34,21 @@ export class ApplicationsService {
       throw new BadRequestException('Only interested / client-accepted candidates can be booked');
     }
     const job = app.job;
-    if (!job.startDate || !job.endDate) {
-      throw new BadRequestException('Set the shift start and finish time on the job before booking');
-    }
     const recurring = job.recurrenceDays.length > 0;
+    if (!job.startDate) {
+      throw new BadRequestException('Set the shift start on the job before booking');
+    }
     if (recurring && (!job.shiftStartTime || !job.shiftEndTime)) {
       throw new BadRequestException('Set the daily start and finish time on the recurring job before booking');
     }
+    // Open-ended jobs have no fixed end — generate a rolling horizon instead.
+    // One-off / fixed-range jobs must have an end date.
+    if (!recurring && !job.endDate) {
+      throw new BadRequestException('Set the shift finish time on the job before booking');
+    }
+    const effectiveEnd = job.openEnded
+      ? ApplicationsService.addDays(job.startDate, ApplicationsService.HORIZON_DAYS)
+      : job.endDate!;
 
     // Openings guard — count distinct workers already booked (one BOOKED
     // application per worker, whether the job is one-off or recurring).
@@ -53,7 +61,7 @@ export class ApplicationsService {
 
     // Expand the pattern into concrete occurrences (a single one for one-off jobs).
     const occurrences = this.buildOccurrences({
-      startDate: job.startDate, endDate: job.endDate,
+      startDate: job.startDate, endDate: effectiveEnd,
       recurrenceDays: job.recurrenceDays, shiftStartTime: job.shiftStartTime, shiftEndTime: job.shiftEndTime,
     });
     if (occurrences.length === 0) {
@@ -110,7 +118,7 @@ export class ApplicationsService {
 
     await this.audit.log({
       actorId, action: 'application.booked', entity: 'Application', entityId: applicationId,
-      meta: { jobId: job.id, candidateId: app.candidateId, shiftId: firstShift.id, shiftCount: created.length, recurring, jobStatus },
+      meta: { jobId: job.id, candidateId: app.candidateId, shiftId: firstShift.id, shiftCount: created.length, recurring, openEnded: job.openEnded, jobStatus },
     });
 
     await this.sendConfirmations(app, job, firstShift, created.length);
@@ -145,6 +153,85 @@ export class ApplicationsService {
       cur.setDate(cur.getDate() + 1);
     }
     return out;
+  }
+
+  /** How far ahead an open-ended ("until further notice") booking generates
+   *  shifts in one go. Admin extends it forward as the horizon approaches. */
+  private static readonly HORIZON_DAYS = 42; // 6 weeks
+  private static addDays(d: Date, days: number): Date {
+    const r = new Date(d);
+    r.setDate(r.getDate() + days);
+    return r;
+  }
+
+  /**
+   * Roll an open-ended recurring job forward: for every currently-booked worker,
+   * generate the next horizon of shifts starting the day after their latest
+   * shift. Skips occurrences that already exist or clash. Admin-triggered so an
+   * "until further notice" placement can continue indefinitely without a cron.
+   */
+  async extendRecurring(jobId: string, actorId?: string) {
+    const job = await this.prisma.job.findUnique({ where: { id: jobId } });
+    if (!job) throw new NotFoundException('Job not found');
+    if (job.recurrenceDays.length === 0 || !job.openEnded) {
+      throw new BadRequestException('This job is not an open-ended recurring booking');
+    }
+    if (!job.shiftStartTime || !job.shiftEndTime) {
+      throw new BadRequestException('This job has no daily shift times set');
+    }
+    const breakMinutes = this.parseBreak(job.breakInfo);
+
+    const booked = await this.prisma.application.findMany({
+      where: { jobId, status: 'BOOKED' },
+      select: { candidateId: true },
+    });
+    let createdTotal = 0;
+    let horizonEnd: Date | null = null;
+
+    for (const b of booked) {
+      const candidateId = b.candidateId;
+      const latest = await this.prisma.shift.findFirst({
+        where: { jobId, candidateId, status: { notIn: [ShiftStatus.CANCELLED] } },
+        orderBy: { startAt: 'desc' },
+        select: { startAt: true },
+      });
+      // Start the day after this worker's last shift (or the job start).
+      const from = latest ? ApplicationsService.addDays(latest.startAt, 1) : job.startDate!;
+      const to = ApplicationsService.addDays(from, ApplicationsService.HORIZON_DAYS);
+      horizonEnd = to;
+
+      const occ = this.buildOccurrences({
+        startDate: from, endDate: to,
+        recurrenceDays: job.recurrenceDays, shiftStartTime: job.shiftStartTime, shiftEndTime: job.shiftEndTime,
+      });
+      for (const o of occ) {
+        // Skip if this candidate already has an overlapping (non-cancelled) shift.
+        const clash = await this.prisma.shift.findFirst({
+          where: {
+            candidateId,
+            status: { notIn: [ShiftStatus.CANCELLED, ShiftStatus.NO_SHOW] },
+            startAt: { lt: o.endAt }, endAt: { gt: o.startAt },
+          },
+          select: { id: true },
+        });
+        if (clash) continue;
+        await this.prisma.shift.create({
+          data: {
+            jobId, siteId: job.siteId ?? undefined, candidateId,
+            status: ShiftStatus.ASSIGNED, startAt: o.startAt, endAt: o.endAt,
+            breakMinutes, payRate: job.payRate, chargeRate: job.chargeRate,
+            notes: job.siteInstructions ?? undefined,
+          },
+        });
+        createdTotal++;
+      }
+    }
+
+    await this.audit.log({
+      actorId, action: 'job.recurring_extended', entity: 'Job', entityId: jobId,
+      meta: { workers: booked.length, shiftsCreated: createdTotal, horizonEnd: horizonEnd?.toISOString() ?? null },
+    });
+    return { workers: booked.length, shiftsCreated: createdTotal, through: horizonEnd };
   }
 
   /**

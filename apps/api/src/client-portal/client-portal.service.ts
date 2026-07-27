@@ -172,6 +172,7 @@ export class ClientPortalService {
       recurrenceDays: job.recurrenceDays,
       shiftStartTime: job.shiftStartTime,
       shiftEndTime: job.shiftEndTime,
+      openEnded: job.openEnded,
     };
   }
 
@@ -207,6 +208,7 @@ export class ClientPortalService {
       recurrenceDays?: number[];
       shiftStartTime?: string | null;
       shiftEndTime?: string | null;
+      openEnded?: boolean;
       responseNote?: string;
     },
   ) {
@@ -235,6 +237,7 @@ export class ClientPortalService {
     if (dto.recurrenceDays !== undefined) data.recurrenceDays = dto.recurrenceDays;
     if (dto.shiftStartTime !== undefined) data.shiftStartTime = dto.shiftStartTime || null;
     if (dto.shiftEndTime !== undefined) data.shiftEndTime = dto.shiftEndTime || null;
+    if (dto.openEnded !== undefined) data.openEnded = dto.openEnded;
 
     // Responding to a request-for-info returns the job to the review queue.
     data.status = JobStatus.SUBMITTED;
@@ -469,6 +472,7 @@ export class ClientPortalService {
       recurrenceDays?: number[];
       shiftStartTime?: string;
       shiftEndTime?: string;
+      openEnded?: boolean;
     },
   ) {
     const { client, contact } = await this.clientFor(userId);
@@ -488,6 +492,7 @@ export class ClientPortalService {
         recurrenceDays: dto.recurrenceDays ?? [],
         shiftStartTime: dto.shiftStartTime,
         shiftEndTime: dto.shiftEndTime,
+        openEnded: dto.openEnded ?? false,
         sector: dto.sector,
         ppe: dto.ppe,
         uniform: dto.uniform,

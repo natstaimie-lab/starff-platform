@@ -50,7 +50,7 @@ type Excluded = { candidateId: string; name: string; headline: string | null; ci
 type Job = {
   id: string; title: string; description?: string | null; status: string; openings: number;
   payRate: string; chargeRate: string; startDate?: string | null; endDate?: string | null;
-  recurrenceDays?: number[]; shiftStartTime?: string | null; shiftEndTime?: string | null;
+  recurrenceDays?: number[]; shiftStartTime?: string | null; shiftEndTime?: string | null; openEnded?: boolean;
   sector?: string | null; ppe?: string | null; uniform?: string | null; siteInstructions?: string | null;
   reportingContact?: string | null; reportingInstructions?: string | null;
   requiredQualifications?: string | null; experienceRequirements?: string | null;
@@ -143,12 +143,27 @@ export default function JobDetail() {
   const [ef, setEf] = useState<Record<string, string>>({});
   const [efRecurring, setEfRecurring] = useState(false);
   const [efDays, setEfDays] = useState<number[]>([]);
+  const [efOpenEnded, setEfOpenEnded] = useState(false);
+  const [extending, setExtending] = useState(false);
+
+  async function extendSchedule() {
+    if (!j) return;
+    setExtending(true);
+    try {
+      const r = await apiFetch<{ shiftsCreated: number; workers: number; through: string | null }>(`/applications/jobs/${j.id}/extend-recurring`, { method: 'POST' });
+      alert(r.shiftsCreated > 0
+        ? `Added ${r.shiftsCreated} shift${r.shiftsCreated === 1 ? '' : 's'} across ${r.workers} worker${r.workers === 1 ? '' : 's'}${r.through ? `, through ${new Date(r.through).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}.`
+        : 'No new shifts needed — the schedule is already generated ahead.');
+      await load();
+    } catch (e: any) { alert(e.message); } finally { setExtending(false); }
+  }
 
   function openEdit() {
     if (!j) return;
     const days = j.recurrenceDays ?? [];
     setEfRecurring(days.length > 0);
     setEfDays(days);
+    setEfOpenEnded(!!j.openEnded);
     setEf({
       title: j.title ?? '', sector: j.sector ?? '', openings: String(j.openings ?? 1),
       payRate: String(j.payRate ?? ''), chargeRate: String(j.chargeRate ?? ''),
@@ -178,10 +193,11 @@ export default function JobDetail() {
           title: ef.title, sector: ef.sector || undefined, openings: Number(ef.openings) || 1,
           payRate: Number(ef.payRate), chargeRate: Number(ef.chargeRate),
           startDate: ef.startDate ? new Date(ef.startDate).toISOString() : undefined,
-          endDate: ef.endDate ? new Date(ef.endDate).toISOString() : undefined,
+          endDate: efRecurring && efOpenEnded ? undefined : (ef.endDate ? new Date(ef.endDate).toISOString() : undefined),
           recurrenceDays: efRecurring ? efDays : [],
           shiftStartTime: efRecurring ? ef.shiftStartTime : null,
           shiftEndTime: efRecurring ? ef.shiftEndTime : null,
+          openEnded: efRecurring ? efOpenEnded : false,
           breakInfo: ef.breakInfo || undefined, requiredQualifications: ef.requiredQualifications || undefined,
           experienceRequirements: ef.experienceRequirements || undefined, bookingUrgency: ef.bookingUrgency || undefined,
           ppe: ef.ppe || undefined, uniform: ef.uniform || undefined,
@@ -365,11 +381,19 @@ export default function JobDetail() {
                 <Field label="Daily start time"><TextInput type="time" value={ef.shiftStartTime} onChange={(e) => setEf({ ...ef, shiftStartTime: e.target.value })} /></Field>
                 <Field label="Daily finish time"><TextInput type="time" value={ef.shiftEndTime} onChange={(e) => setEf({ ...ef, shiftEndTime: e.target.value })} /></Field>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: efOpenEnded ? '1fr' : '1fr 1fr', gap: 12 }}>
                 <Field label="Runs from"><TextInput type="date" value={(ef.startDate || '').slice(0, 10)} onChange={(e) => setEf({ ...ef, startDate: e.target.value })} /></Field>
-                <Field label="Runs until"><TextInput type="date" value={(ef.endDate || '').slice(0, 10)} onChange={(e) => setEf({ ...ef, endDate: e.target.value })} /></Field>
+                {!efOpenEnded && <Field label="Runs until"><TextInput type="date" value={(ef.endDate || '').slice(0, 10)} onChange={(e) => setEf({ ...ef, endDate: e.target.value })} /></Field>}
               </div>
-              <p className="dim" style={{ fontSize: 12, margin: 0 }}>Booking a worker will create {occurrenceCount(ef.startDate, ef.endDate, efDays)} shift(s) — one per selected day in range.</p>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
+                <input type="checkbox" checked={efOpenEnded} onChange={(e) => setEfOpenEnded(e.target.checked)} style={{ width: 15, height: 15 }} />
+                <span style={{ fontSize: 13 }}>Until further notice (ongoing, no end date)</span>
+              </label>
+              <p className="dim" style={{ fontSize: 12, margin: 0 }}>
+                {efOpenEnded
+                  ? 'Ongoing — booking generates 6 weeks of shifts, rolling. Use “Extend schedule” to add more.'
+                  : `Booking a worker will create ${occurrenceCount(ef.startDate, ef.endDate, efDays)} shift(s) — one per selected day in range.`}
+              </p>
             </>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -408,6 +432,9 @@ export default function JobDetail() {
               </div>
               <div className="fx ac" style={{ gap: 10 }}>
                 <Badge tone={(tone[j.status] ?? 'neutral') as any}>{label[j.status] ?? j.status}</Badge>
+                {j.openEnded && ['PARTIALLY_FILLED', 'FILLED', 'CONFIRMED', 'IN_PROGRESS'].includes(j.status) && (
+                  <button onClick={extendSchedule} disabled={extending} className="aibtn" style={{ border: 'none', background: 'var(--orange-100)', color: 'var(--orange-600)', fontWeight: 700 }}>{extending ? 'Extending…' : 'Extend schedule'}</button>
+                )}
                 {j.status !== 'CANCELLED' && j.status !== 'COMPLETED' && (
                   <button onClick={openEdit} className="aibtn" style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700 }}>Edit</button>
                 )}
@@ -433,11 +460,13 @@ export default function JobDetail() {
             <Row k="Workers required" v={j.openings} />
             {j.recurrenceDays && j.recurrenceDays.length > 0 ? (
               <>
-                <Row k="Pattern" v={<Badge tone="info">Recurring</Badge>} />
+                <Row k="Pattern" v={<Badge tone={j.openEnded ? 'warning' : 'info'}>{j.openEnded ? 'Ongoing (until further notice)' : 'Recurring'}</Badge>} />
                 <Row k="Repeats on" v={dayNames(j.recurrenceDays)} />
                 <Row k="Daily time" v={j.shiftStartTime && j.shiftEndTime ? `${j.shiftStartTime}–${j.shiftEndTime}` : '—'} />
-                <Row k="Runs" v={`${dt(j.startDate)} → ${dt(j.endDate)}`} />
-                <Row k="Shifts per worker" v={<b>{occurrenceCount(j.startDate, j.endDate, j.recurrenceDays)}</b>} />
+                <Row k="Runs" v={j.openEnded ? `${dt(j.startDate)} → ongoing` : `${dt(j.startDate)} → ${dt(j.endDate)}`} />
+                {j.openEnded
+                  ? <Row k="Schedule" v={<span className="dim" style={{ fontSize: 12.5 }}>Shifts generated 6 weeks ahead, rolling — use “Extend schedule” to add more.</span>} />
+                  : <Row k="Shifts per worker" v={<b>{occurrenceCount(j.startDate, j.endDate, j.recurrenceDays)}</b>} />}
               </>
             ) : (
               <>
