@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "Starff",
+    "slug": "starff-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "starff",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B1F3A"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "co.uk.starff.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Starff uses the camera so you can photograph and upload compliance documents such as your right-to-work, ID and certificates.",
+        "NSPhotoLibraryUsageDescription": "Starff needs access to your photos so you can upload existing images of your documents and a profile photo.",
+        "NSFaceIDUsageDescription": "Starff uses Face ID to let you sign in quickly and securely after your first login."
+      }
+    },
+    "android": {
+      "package": "co.uk.starff.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B1F3A"
+      },
+      "permissions": [
+        "CAMERA",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT"
+      ]
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-local-authentication",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Starff needs access to your photos so you can upload document images and a profile photo.",
+          "cameraPermission": "Starff uses the camera so you can photograph and upload compliance documents."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#F47A20"
+        }
+      ],
+      "expo-font"
+    ]
+  }
+}

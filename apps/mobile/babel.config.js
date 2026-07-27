@@ -1,0 +1,16 @@
+module.exports = function (api) {
+  api.cache(true);
+  return {
+    presets: ['babel-preset-expo'],
+    plugins: [
+      // Enables the "@/..." import alias used across src/.
+      [
+        'module-resolver',
+        {
+          root: ['./'],
+          alias: { '@': './src' },
+        },
+      ],
+    ],
+  };
+};

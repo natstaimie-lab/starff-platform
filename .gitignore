@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+
+# env / secrets — NEVER commit these
+.env
+.env.local
+.env.*.local
+
+# builds
+dist/
+.next/
+build/
+out/
+
+# prisma
+database/prisma/*.db
+
+# misc
+.DS_Store
+*.log
+.expo/

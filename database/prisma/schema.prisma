@@ -1,0 +1,830 @@
+// ─────────────────────────────────────────────────────────────
+// Starff Platform — shared database schema
+// PostgreSQL (hosted on Supabase), managed with Prisma.
+//
+// This ONE schema is the single source of truth for the whole
+// platform: admin dashboard, candidate portal, client portal,
+// mobile app, and the WordPress forms all read/write these tables
+// through the shared API.
+//
+// Money is stored as Decimal(10,2). Times are stored as DateTime.
+// User identity (login/passwords) is handled by Supabase Auth;
+// the `User` table below mirrors each auth user so we can attach
+// data and relations to them.
+// ─────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ══════════════════════════════════════════════
+// ENUMS  (fixed sets of allowed values)
+// ══════════════════════════════════════════════
+
+enum Role {
+  ADMIN        // your staff — full access
+  RECRUITER    // your consultants — manage candidates/jobs
+  CANDIDATE    // temp workers
+  CLIENT       // hiring companies
+}
+
+enum CandidateStatus {
+  NEW          // just registered / applied
+  SCREENING    // being vetted by a recruiter
+  COMPLIANT    // documents verified — cleared to work
+  ACTIVE       // currently working shifts
+  INACTIVE
+  REJECTED
+}
+
+enum ClientStatus {
+  LEAD         // came in via "Post a Job" form
+  PROSPECT
+  ACTIVE
+  ON_HOLD
+  CLOSED
+}
+
+enum RegistrationSource {
+  WEBSITE      // started on the WordPress site
+  MOBILE       // started in the mobile app
+  PORTAL       // self-registered directly in the portal
+  ADMIN        // created by a staff member
+}
+
+enum DocumentType {
+  RIGHT_TO_WORK
+  DBS_CHECK
+  ID
+  CV
+  CERTIFICATE
+  REFERENCE
+  CONTRACT
+  QUALIFICATION
+  LICENCE
+  OTHER
+}
+
+enum DocumentStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum JobStatus {
+  DRAFT
+  OPEN                    // legacy / directly-published job (pre-workflow)
+  // ── controlled hybrid workflow stages ──
+  SUBMITTED              // client submitted the request, awaiting admin
+  UNDER_REVIEW           // admin is reviewing
+  APPROVED               // admin approved, not yet distributing
+  RECRUITING             // approved + matching candidates ("Matching candidates")
+  OFFERS_SENT            // offers sent to candidates, awaiting responses
+  CANDIDATES_SUBMITTED   // candidates put forward to the client ("Awaiting client approval")
+  PARTIALLY_FILLED       // some but not all openings booked
+  FILLED                 // all openings booked ("Fully filled")
+  CONFIRMED              // all workers confirmed & acknowledged
+  IN_PROGRESS            // shift is underway
+  COMPLETED
+  CLOSED
+  CANCELLED
+}
+
+enum ShiftStatus {
+  OPEN          // needs a worker
+  ASSIGNED      // a candidate is booked
+  CONFIRMED     // candidate confirmed attendance
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SHORTLISTED
+  OFFERED
+  ACCEPTED
+  DECLINED
+  REJECTED
+  WITHDRAWN
+  // ── controlled hybrid workflow pipeline stages ──
+  RECOMMENDED            // matched by the system, not yet actioned
+  INVITED                // admin pushed the job to the candidate
+  INTERESTED             // candidate confirmed available & interested
+  UNAVAILABLE            // candidate not available
+  INFO_REQUESTED         // candidate asked for more information
+  SUBMITTED_TO_CLIENT    // admin put candidate forward to the client
+  CLIENT_ACCEPTED        // client accepted the candidate
+  CLIENT_REJECTED        // client rejected the candidate
+  ALTERNATIVE_REQUESTED  // client asked for an alternative
+  BOOKED                 // admin confirmed the final placement
+  REPLACED               // booking cancelled / replaced (history kept)
+}
+
+enum TimesheetStatus {
+  DRAFT
+  SUBMITTED     // candidate submitted hours
+  APPROVED      // client/recruiter approved
+  REJECTED
+  INVOICED
+  PAID
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum EnquiryType {
+  CONTACT             // "Contact us" form
+  POST_A_JOB          // "For Employers" form
+  CANDIDATE_REGISTER  // "For Candidates" form
+}
+
+enum EnquiryStatus {
+  NEW
+  CONTACTED
+  CONVERTED
+  CLOSED
+}
+
+enum ConversationKind {
+  CANDIDATE
+  CLIENT
+}
+
+// ══════════════════════════════════════════════
+// USERS  (mirrors Supabase Auth users)
+// ══════════════════════════════════════════════
+
+model User {
+  id            String         @id @db.Uuid   // == Supabase auth.users.id
+  email         String         @unique
+  role          Role           @default(CANDIDATE)
+  firstName     String?
+  lastName      String?
+  phone         String?
+  avatarUrl     String?
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  candidate     Candidate?
+  clientContact ClientContact?
+  notifications Notification[]
+  auditLogs     AuditLog[]
+  conversations Conversation[]
+  pushTokens    PushToken[]
+
+  @@index([role])
+}
+
+// ══════════════════════════════════════════════
+// CANDIDATES  (temp workers)
+// ══════════════════════════════════════════════
+
+model Candidate {
+  id                 String              @id @default(cuid())
+  userId             String              @unique @db.Uuid
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  firstName          String
+  lastName           String
+  dateOfBirth        DateTime?
+  phone              String?
+  addressLine1       String?
+  addressLine2       String?
+  city               String?
+  postcode           String?
+  nationalInsurance  String?             // encrypt at app level
+  status             CandidateStatus     @default(NEW)
+  available          Boolean             @default(true)
+  headline           String?             // e.g. "Warehouse Operative, 3yrs"
+  bio                String?
+  rating             Float?              // internal 0–5 rating
+  maxTravelMiles     Int?
+
+  // ── registration / onboarding tracking (additive, all nullable) ──
+  registrationSource RegistrationSource? // where they first registered
+  submittedAt        DateTime?           // set when they submit for review
+  archivedAt         DateTime?           // soft-delete: hidden from lists, recoverable
+
+  // ── Phase 2 onboarding: emergency contact ──
+  emergencyName          String?
+  emergencyPhone         String?
+  emergencyRelationship  String?
+  // ── bank details — SENSITIVE: encrypt at app level before production ──
+  bankAccountName        String?
+  bankSortCode           String?
+  bankAccountNumber      String?
+  // ── work preferences ──
+  shiftPreference        String?         // Days | Nights | Any
+  uniformSize            String?
+  shoeSize               String?
+  rightToWorkType        String?         // British Citizen | Settled | Visa …
+  shareCode              String?         // RTW online share code
+  // ── declarations / consents / agreement / e-signature ──
+  healthDeclaration      Boolean         @default(false)
+  healthNotes            String?
+  consentGdpr            Boolean         @default(false)
+  consentGdprAt          DateTime?
+  agreementAccepted      Boolean         @default(false)
+  agreementAcceptedAt    DateTime?
+  signatureName          String?         // typed e-signature
+  signedAt               DateTime?
+
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  documents          CandidateDocument[]
+  skills             CandidateSkill[]
+  availability       Availability[]
+  applications       Application[]
+  shifts             Shift[]
+  timesheets         Timesheet[]
+  employmentHistory  EmploymentHistory[]
+  references         CandidateReference[]
+  reliabilityIncidents ReliabilityIncident[]
+
+  @@index([status])
+}
+
+// Past jobs the candidate lists during onboarding.
+model EmploymentHistory {
+  id               String    @id @default(cuid())
+  candidateId      String
+  candidate        Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  employer         String
+  jobTitle         String?
+  startDate        DateTime?
+  endDate          DateTime?
+  current          Boolean   @default(false)
+  reasonForLeaving String?
+
+  createdAt        DateTime  @default(now())
+
+  @@index([candidateId])
+}
+
+// Referees the candidate provides during onboarding.
+model CandidateReference {
+  id           String    @id @default(cuid())
+  candidateId  String
+  candidate    Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  name         String
+  relationship String?
+  company      String?
+  email        String?
+  phone        String?
+  status       String    @default("pending") // pending | requested | received
+
+  createdAt    DateTime  @default(now())
+
+  @@index([candidateId])
+}
+
+model CandidateDocument {
+  id           String         @id @default(cuid())
+  candidateId  String
+  candidate    Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  type         DocumentType
+  fileUrl      String         // path in Supabase Storage (private bucket)
+  fileName     String?
+  status       DocumentStatus @default(PENDING)
+  expiryDate   DateTime?      // for RTW / DBS / certificates
+  verifiedById String?        @db.Uuid
+  verifiedAt   DateTime?
+  notes        String?
+
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([candidateId, type])
+  @@index([status])
+}
+
+model Availability {
+  id           String    @id @default(cuid())
+  candidateId  String
+  candidate    Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  dayOfWeek    Int       // 0=Sun … 6=Sat
+  startTime    String    // "HH:MM"
+  endTime      String    // "HH:MM"
+
+  @@unique([candidateId, dayOfWeek, startTime])
+}
+
+// ══════════════════════════════════════════════
+// SKILLS  (shared taxonomy)
+// ══════════════════════════════════════════════
+
+model Skill {
+  id         String           @id @default(cuid())
+  name       String           @unique
+  category   String?
+
+  candidates CandidateSkill[]
+  jobs       JobSkill[]
+}
+
+model CandidateSkill {
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  skillId     String
+  skill       Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  level       Int?      // 1–5 self-assessed / verified
+
+  @@id([candidateId, skillId])
+}
+
+// ══════════════════════════════════════════════
+// CLIENTS  (hiring companies)
+// ══════════════════════════════════════════════
+
+model Client {
+  id            String          @id @default(cuid())
+  name          String
+  industry      String?
+  status        ClientStatus    @default(LEAD)
+  addressLine1  String?
+  city          String?
+  postcode      String?
+  billingEmail  String?
+  paymentTerms  Int?            // days
+  notes         String?
+
+  // ── registration / onboarding tracking (additive, all nullable) ──
+  companyRegNo       String?             // Companies House number, for matching + compliance
+  registrationSource RegistrationSource? // where they first registered
+  submittedAt        DateTime?           // set when they submit onboarding for review
+  archivedAt         DateTime?           // soft-delete: hidden from lists, recoverable
+
+  // ── Phase 2 client onboarding: agreement & e-signature ──
+  agreementAccepted   Boolean         @default(false)
+  agreementAcceptedAt DateTime?
+  signatureName       String?         // typed e-signature (authorised signatory)
+  signedAt            DateTime?
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  contacts      ClientContact[]
+  sites         ClientSite[]
+  jobs          Job[]
+  invoices      Invoice[]
+
+  @@index([status])
+}
+
+model ClientContact {
+  id        String  @id @default(cuid())
+  clientId  String
+  client    Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // optional login for the client portal
+  userId    String? @unique @db.Uuid
+  user      User?   @relation(fields: [userId], references: [id])
+
+  firstName String
+  lastName  String
+  email     String
+  phone     String?
+  jobTitle  String?
+  isPrimary Boolean @default(false)
+
+  @@index([clientId])
+}
+
+model ClientSite {
+  id           String  @id @default(cuid())
+  clientId     String
+  client       Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  name         String  // e.g. "Birmingham Depot"
+  addressLine1 String?
+  city         String?
+  postcode     String?
+
+  jobs         Job[]
+  shifts       Shift[]
+
+  @@index([clientId])
+}
+
+// ══════════════════════════════════════════════
+// JOBS  (vacancies / assignments)
+// ══════════════════════════════════════════════
+
+model Job {
+  id           String        @id @default(cuid())
+  clientId     String
+  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  siteId       String?
+  site         ClientSite?   @relation(fields: [siteId], references: [id])
+
+  title        String
+  description  String?
+  status       JobStatus     @default(DRAFT)
+  openings     Int           @default(1)
+
+  payRate      Decimal       @db.Decimal(10, 2)  // paid to candidate / hour
+  chargeRate   Decimal       @db.Decimal(10, 2)  // charged to client / hour
+  startDate    DateTime?
+  endDate      DateTime?
+
+  // ── recurring / ongoing shifts (additive) ──
+  // When recurrenceDays is non-empty the job is an ongoing pattern: booking a
+  // worker generates one Shift per matching weekday between startDate and
+  // endDate, each at shiftStartTime–shiftEndTime. Empty = a single one-off shift.
+  recurrenceDays Int[]      @default([])  // weekdays 0=Sun … 6=Sat
+  shiftStartTime String?                  // "HH:mm" local, e.g. "08:00"
+  shiftEndTime   String?                  // "HH:mm" local, e.g. "16:00"
+
+  // ── job request operational details (all optional, additive) ──
+  sector                 String?
+  ppe                    String?  // required PPE
+  uniform                String?  // uniform / dress code (separate from PPE)
+  siteInstructions       String?
+  reportingContact       String?
+  reportingInstructions  String?
+  requiredQualifications String?  // free-text quals / licences required
+  experienceRequirements String?  // required experience
+  transportRequirements  String?  // transport / travel requirements
+  clientRequirements     String?  // client-specific requirements
+  bookingUrgency         String?  // "Standard" | "Urgent" | "Emergency"
+  breakInfo              String?
+  notes                  String?  // additional notes from the client
+  distributionMode       String?  // "manual" | "assisted"
+
+  // ── admin review / approval trail ──
+  submittedAt  DateTime?
+  approvedAt   DateTime?
+  approvedById String?       @db.Uuid
+  reviewNote   String?       // admin note on approve / reject / request-info
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  skills       JobSkill[]
+  applications Application[]
+  shifts       Shift[]
+
+  @@index([clientId])
+  @@index([status])
+}
+
+model JobSkill {
+  jobId    String
+  job      Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  skillId  String
+  skill    Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  required Boolean @default(true)
+
+  @@id([jobId, skillId])
+}
+
+model Application {
+  id          String            @id @default(cuid())
+  jobId       String
+  job         Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidateId String
+  candidate   Candidate         @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  status      ApplicationStatus @default(APPLIED)
+  source      String?           // "portal" | "wordpress" | "admin"
+  coverNote   String?
+
+  // ── controlled hybrid workflow pipeline (all optional, additive) ──
+  matchScore            Float?   // 0-100 suitability score from the matcher
+  matchReasons          Json?    // human-readable reasons the candidate matched
+  missingRequirements   Json?    // mandatory requirements the candidate is missing
+
+  invitedAt             DateTime?
+  invitedById           String?  @db.Uuid
+  offerOpenedAt         DateTime? // candidate viewed the offer (delivery tracking)
+  responseDeadline      DateTime?
+  respondedAt           DateTime?
+  candidateResponseNote String?
+
+  submittedToClientAt   DateTime?
+  submittedById         String?  @db.Uuid
+  adminSummary          String?  // curated blurb shown to the client
+
+  clientDecidedAt       DateTime?
+  clientDecisionNote    String?
+
+  bookedAt              DateTime?
+  bookedById            String?  @db.Uuid
+  shiftId               String?  // the Shift created when booked
+  replacesApplicationId String?  // replacement lineage (kept for history)
+
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([jobId, candidateId])
+  @@index([status])
+}
+
+// ══════════════════════════════════════════════
+// SHIFTS  (the core unit of temp work)
+// ══════════════════════════════════════════════
+
+model Shift {
+  id           String      @id @default(cuid())
+  jobId        String
+  job          Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  siteId       String?
+  site         ClientSite? @relation(fields: [siteId], references: [id])
+  candidateId  String?
+  candidate    Candidate?  @relation(fields: [candidateId], references: [id])
+
+  status       ShiftStatus @default(OPEN)
+  startAt      DateTime
+  endAt        DateTime
+  breakMinutes Int         @default(0)
+  payRate      Decimal     @db.Decimal(10, 2)
+  chargeRate   Decimal     @db.Decimal(10, 2)
+  notes        String?
+
+  // ── shift monitoring / check-in (all nullable, additive) ──
+  acknowledgedAt   DateTime?  // worker confirmed they'll attend
+  checkInAt        DateTime?  // worker checked in on the day
+  checkOutAt       DateTime?  // worker checked out
+  lateReportedAt   DateTime?  // worker flagged running late
+  absentReportedAt DateTime?  // client reported the worker absent
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  timesheet    Timesheet?
+
+  @@index([status])
+  @@index([candidateId])
+  @@index([startAt])
+}
+
+// ══════════════════════════════════════════════
+// TIMESHEETS  (hours worked → approval → pay/invoice)
+// ══════════════════════════════════════════════
+
+model Timesheet {
+  id           String          @id @default(cuid())
+  shiftId      String          @unique
+  shift        Shift           @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  candidateId  String
+  candidate    Candidate       @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  status       TimesheetStatus @default(DRAFT)
+  clockIn      DateTime?
+  clockOut     DateTime?
+  breakMinutes Int             @default(0)
+  hoursWorked  Decimal?        @db.Decimal(5, 2)
+  approvedById String?         @db.Uuid
+  approvedAt   DateTime?
+  rejectReason String?
+
+  invoiceLine  InvoiceLine?
+
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([status])
+  @@index([candidateId])
+}
+
+// ══════════════════════════════════════════════
+// INVOICING
+// ══════════════════════════════════════════════
+
+model Invoice {
+  id          String        @id @default(cuid())
+  clientId    String
+  client      Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  number      String        @unique
+  status      InvoiceStatus @default(DRAFT)
+  periodStart DateTime
+  periodEnd   DateTime
+  subtotal    Decimal       @db.Decimal(10, 2) @default(0)
+  vat         Decimal       @db.Decimal(10, 2) @default(0)
+  total       Decimal       @db.Decimal(10, 2) @default(0)
+  dueDate     DateTime?
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  lines       InvoiceLine[]
+
+  @@index([clientId])
+  @@index([status])
+}
+
+model InvoiceLine {
+  id          String     @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice    @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  timesheetId String?    @unique
+  timesheet   Timesheet? @relation(fields: [timesheetId], references: [id])
+
+  description String
+  hours       Decimal    @db.Decimal(5, 2)
+  rate        Decimal    @db.Decimal(10, 2)
+  amount      Decimal    @db.Decimal(10, 2)
+}
+
+// ══════════════════════════════════════════════
+// ENQUIRIES  (raw submissions from WordPress forms)
+// ══════════════════════════════════════════════
+
+model Enquiry {
+  id          String        @id @default(cuid())
+  type        EnquiryType
+  status      EnquiryStatus @default(NEW)
+  source      String        @default("wordpress")
+
+  name        String?
+  email       String?
+  phone       String?
+  company     String?
+  message     String?
+  payload     Json?         // full raw form payload, for anything extra
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([type, status])
+}
+
+// ══════════════════════════════════════════════
+// NOTIFICATIONS + AUDIT
+// ══════════════════════════════════════════════
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      String   // "shift_offered", "timesheet_approved", ...
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, readAt])
+}
+
+// Expo push tokens — one per device a user signs in on. Used to deliver push
+// notifications for the mobile app (additive; safe to drop with no data loss).
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String?  // ios | android
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?  @db.Uuid
+  actor     User?    @relation(fields: [actorId], references: [id])
+
+  action    String   // "candidate.verified", "shift.assigned", ...
+  entity    String   // "Candidate"
+  entityId  String
+  meta      Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+}
+
+// ══════════════════════════════════════════════
+// MESSAGING  (member ↔ agency conversations)
+// ══════════════════════════════════════════════
+
+model Conversation {
+  id            String           @id @default(cuid())
+  kind          ConversationKind
+  // the candidate or client-contact user this thread belongs to
+  memberUserId  String           @db.Uuid
+  member        User             @relation(fields: [memberUserId], references: [id], onDelete: Cascade)
+  subject       String?
+  lastMessageAt DateTime         @default(now())
+  createdAt     DateTime         @default(now())
+
+  messages      Message[]
+
+  @@index([memberUserId])
+  @@index([kind, lastMessageAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  senderUserId   String       @db.Uuid
+  senderIsStaff  Boolean      // true = agency staff, false = the member
+  senderName     String       // denormalised for display
+  body           String
+  readAt         DateTime?    // set when the *recipient* has read it
+
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+// ══════════════════════════════════════════════
+// MATCHING WEIGHTS  (admin-tunable scoring factors — singleton row)
+// ══════════════════════════════════════════════
+
+model MatchWeights {
+  id           String   @id @default("default")
+  skills       Float    @default(35)
+  compliance   Float    @default(15)
+  rightToWork  Float    @default(10)
+  availability Float    @default(15)
+  rating       Float    @default(10)
+  reliability  Float    @default(10)
+  proximity    Float    @default(5)
+
+  updatedById  String?  @db.Uuid
+  updatedAt    DateTime @updatedAt
+}
+
+// ══════════════════════════════════════════════
+// RELIABILITY MONITORING  (internal — never shown to clients)
+// ══════════════════════════════════════════════
+
+enum ReliabilityType {
+  NO_SHOW
+  LATE_CANCELLATION
+  LATENESS
+  MISSED_CHECKIN
+  LEFT_EARLY
+  TIMESHEET_MISSING
+  NO_RESPONSE
+  WITHDREW
+  CLIENT_COMPLAINT
+  NEGATIVE_FEEDBACK
+  POSITIVE_FEEDBACK
+  DISPUTE
+  OTHER
+}
+
+enum ReliabilityStatus {
+  CONFIRMED     // verified — counts toward the concern level
+  UNCONFIRMED   // reported, not yet verified — counts at reduced weight
+  DISPUTED      // candidate disputed / under review — does not count
+  RESOLVED      // dealt with — does not count
+  REMOVED       // incorrect / withdrawn — kept for audit, does not count
+}
+
+model ReliabilityIncident {
+  id             String            @id @default(cuid())
+  candidateId    String
+  candidate      Candidate         @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  type           ReliabilityType
+  severity       Int               @default(3)  // 1 (minor) – 5 (serious)
+  status         ReliabilityStatus @default(UNCONFIRMED)
+  reason         String
+  notes          String?
+  evidenceSource String?           // e.g. "Client report", "System check-in", "Timesheet"
+  shiftId        String?           // related booking / shift
+  jobId          String?
+  occurredAt     DateTime          @default(now())
+  scoreImpact    Float             @default(0)  // concern points (negative = positive feedback)
+  weightFactor   Float             @default(1)  // reduce for older / isolated incidents
+
+  reportedById   String?           @db.Uuid     // administrator responsible
+  reviewDate     DateTime?
+  appealNote     String?           // candidate correction / appeal
+  appealedAt     DateTime?
+
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([candidateId])
+  @@index([status])
+}

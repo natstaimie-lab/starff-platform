@@ -1,0 +1,16 @@
+{
+  // This app is intentionally NOT part of the repo's npm workspaces: it needs
+  // React 19 / React Native 0.81, while the Next.js portals use React 18. Its
+  // dependencies are installed standalone in apps/mobile/node_modules. typeRoots
+  // is pinned here so the workspace root's React 18 types can't leak in.
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": ".",
+    "typeRoots": ["./node_modules/@types"],
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"]
+}

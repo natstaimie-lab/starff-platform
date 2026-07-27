@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="_ds/starff-branding-65a14597-e4ac-4765-b4be-582fbf203fb7/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/starff-branding-65a14597-e4ac-4765-b4be-582fbf203fb7/tokens/colors.css">
+<link rel="stylesheet" href="_ds/starff-branding-65a14597-e4ac-4765-b4be-582fbf203fb7/tokens/typography.css">
+<link rel="stylesheet" href="_ds/starff-branding-65a14597-e4ac-4765-b4be-582fbf203fb7/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/starff-branding-65a14597-e4ac-4765-b4be-582fbf203fb7/tokens/elevation.css">
+<link rel="stylesheet" href="_ds/starff-branding-65a14597-e4ac-4765-b4be-582fbf203fb7/tokens/layout.css">
+<link rel="stylesheet" href="_ds/starff-branding-65a14597-e4ac-4765-b4be-582fbf203fb7/tokens/motion.css">
+<link rel="stylesheet" href="_ds/starff-branding-65a14597-e4ac-4765-b4be-582fbf203fb7/tokens/base.css">
+<link rel="stylesheet" href="_ds/starff-branding-65a14597-e4ac-4765-b4be-582fbf203fb7/styles.css">
+<script src="_ds/starff-branding-65a14597-e4ac-4765-b4be-582fbf203fb7/_ds_bundle.js"></script>
+<script src="assets/starff-icons.js"></script>
+<style>
+html,body{height:100%;margin:0}
+a{color:var(--text-link);text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap}
+a:hover{color:var(--interactive-hover)}
+.app{display:flex;height:100vh;overflow:hidden;background:var(--bg-app);font-family:var(--font-sans);color:var(--text-primary)}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.phead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:20px 28px 6px}
+.ptitle{font-size:23px;font-weight:800;letter-spacing:-0.01em}
+.psub{font-size:13px;color:var(--text-secondary);margin-top:2px}
+.content{flex:1;overflow-y:auto;padding:12px 28px 28px;display:flex;flex-direction:column;gap:18px}
+.g6{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px}
+.g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.gmid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr);gap:16px}
+.gbot{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.gai{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px;align-items:stretch}
+@media(max-width:1180px){.g6{grid-template-columns:repeat(3,minmax(0,1fr))}.gmid,.gbot{grid-template-columns:minmax(0,1fr)}}
+.brand-sub{font-size:10px;font-weight:700;letter-spacing:0.14em;color:#A9B6C9;margin-top:4px}
+.arow{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--border-subtle)}
+.arow:last-child{border-bottom:none}
+.alabel{flex:1;font-size:13.5px}
+.acount{font-size:13px;font-weight:800;color:var(--text-secondary)}
+.tw{color:var(--warning-500);display:flex}
+.te{color:var(--error-500);display:flex}
+.ts{color:var(--success-500);display:flex}
+.ti{color:var(--info-500);display:flex}
+.legdot{width:8px;height:8px;border-radius:50%}
+.legl{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary)}
+.legv{font-size:17px;font-weight:800}
+.tbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px 0;flex-wrap:wrap}
+.twrap{padding:2px 8px 8px}
+.namecell{display:flex;align-items:center;gap:10px}
+.nm{font-weight:600;font-size:13.5px}
+.sub2{font-size:12px;color:var(--text-tertiary)}
+.dim{font-size:13px;color:var(--text-secondary)}
+.mono{font-family:var(--font-mono);font-weight:700}
+.rowacts{display:flex;gap:6px;justify-content:flex-end}
+.scard{background:var(--surface-card);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:16px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:12px}
+.sdate{display:flex;flex-direction:column;align-items:center;justify-content:center;width:52px;height:52px;border-radius:var(--radius-md);background:var(--orange-100);color:var(--orange-600);flex-shrink:0}
+.sdate b{font-size:19px;font-weight:800;line-height:1}
+.sdate span{font-size:10px;font-weight:700;letter-spacing:0.06em}
+.shead{display:flex;gap:12px;align-items:center}
+.smeta{display:flex;gap:16px;font-size:12.5px;color:var(--text-secondary)}
+.smeta span{display:flex;align-items:center;gap:5px}
+.catic{display:inline-flex;width:38px;height:38px;border-radius:var(--radius-md);background:var(--orange-100);color:var(--orange-500);align-items:center;justify-content:center;flex-shrink:0}
+.big{font-size:26px;font-weight:800}
+.fcol{display:flex;flex-direction:column;gap:14px}
+.dcol{display:flex;flex-direction:column}
+.drow{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--border-subtle);font-size:13.5px}
+.drow:last-child{border-bottom:none}
+.dlbl{color:var(--text-secondary)}
+.dval{font-weight:600;text-align:right}
+.toastwrap{position:fixed;top:20px;right:24px;z-index:1000;display:flex;flex-direction:column;gap:10px}
+.chatcard{background:var(--surface-card);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);display:flex;flex-direction:column;overflow:hidden;min-height:520px}
+.chathead{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--border-subtle)}
+.chatlog{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
+.cbub{max-width:78%;padding:11px 14px;border-radius:14px;font-size:13.5px;line-height:1.5}
+.cme{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.cai{align-self:flex-start;background:var(--surface-sunken);color:var(--text-primary);border-bottom-left-radius:4px}
+.chatform{display:flex;gap:10px;padding:14px 16px;border-top:1px solid var(--border-subtle)}
+.chatinput{flex:1;height:42px;padding:0 14px;border:1px solid var(--border-strong);border-radius:var(--radius-pill);font-family:var(--font-sans);font-size:14px;outline:none}
+.chatinput:focus{border-color:var(--border-focus);box-shadow:var(--shadow-focus)}
+.sparkbadge{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--orange-100);color:var(--orange-500)}
+.avatar-fallback{width:38px;height:38px;border-radius:50%;background:var(--navy-800);display:flex;align-items:center;justify-content:center}
+.pill-avail{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600}
+.aibtn{display:flex;align-items:center;gap:8px;height:40px;padding:0 15px;border-radius:var(--radius-pill);border:1px solid color-mix(in srgb,var(--orange-500) 28%,#fff);background:var(--orange-100);color:var(--orange-600);font-family:var(--font-sans);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
+.aibtn:hover{filter:brightness(.97)}
+.aibtn .fx{display:flex}
+.livebtn{display:flex;align-items:center;gap:8px;height:40px;padding:0 15px;border-radius:var(--radius-pill);border:1px solid var(--border-strong);background:var(--surface-card);color:var(--text-secondary);font-family:var(--font-sans);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
+.livebtn:hover{background:var(--surface-sunken)}
+.livebtn.on{background:color-mix(in srgb,var(--success-500) 12%,#fff);border-color:color-mix(in srgb,var(--success-500) 34%,#fff);color:var(--success-500)}
+.ldot{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.45}
+.livebtn.on .ldot{opacity:1;animation:livepulse 1.4s infinite}
+@keyframes livepulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--success-500) 55%,transparent)}70%{box-shadow:0 0 0 6px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.aiscrim{position:fixed;inset:0;background:rgba(11,31,58,.42);backdrop-filter:blur(2px);z-index:900;animation:aifade .16s ease}
+@keyframes aifade{from{opacity:0}to{opacity:1}}
+.aipanel{position:fixed;top:0;right:0;height:100vh;width:400px;max-width:92vw;background:var(--surface-card);border-left:1px solid var(--border-subtle);display:flex;flex-direction:column;z-index:901;box-shadow:-16px 0 48px rgba(11,31,58,.16);animation:aislide .24s ease}
+@keyframes aislide{from{transform:translateX(60px);opacity:.4}to{transform:none;opacity:1}}
+.aiphead{display:flex;align-items:center;gap:11px;padding:16px 18px;border-bottom:1px solid var(--border-subtle)}
+.aipbody{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px;background:var(--bg-app)}
+.aipfoot{padding:12px 16px 16px;border-top:1px solid var(--border-subtle)}
+.aiprompts{display:flex;flex-wrap:wrap;gap:7px;padding-bottom:10px}
+.promptchip{border:1px solid var(--border-subtle);background:var(--surface-card);color:var(--text-secondary);border-radius:var(--radius-pill);padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-sans)}
+.promptchip:hover{border-color:var(--accent);color:var(--accent)}
+.aipclose{margin-left:auto;width:34px;height:34px;border-radius:9px;border:1px solid var(--border-subtle);background:var(--surface-card);color:var(--text-secondary);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.aipclose:hover{background:var(--surface-sunken)}
+.aipdisc{font-size:11px;color:var(--text-tertiary);text-align:center;margin-top:9px}
+.inbox{display:grid;grid-template-columns:320px minmax(0,1fr);gap:0;background:var(--surface-card);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);overflow:hidden;height:calc(100vh - 150px);min-height:520px}
+.convlist{border-right:1px solid var(--border-subtle);display:flex;flex-direction:column;min-width:0}
+.convsearch{padding:14px 14px 10px}
+.convtabs{display:flex;gap:6px;padding:0 14px 12px;border-bottom:1px solid var(--border-subtle)}
+.convtab{flex:1;height:32px;border-radius:var(--radius-pill);border:1px solid var(--border-subtle);background:var(--surface-card);color:var(--text-secondary);font-family:var(--font-sans);font-size:12.5px;font-weight:700;cursor:pointer}
+.convtab.on{background:var(--navy-900);border-color:var(--navy-900);color:#fff}
+.convscroll{flex:1;overflow-y:auto}
+.convitem{display:flex;gap:11px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border-subtle);cursor:pointer;position:relative}
+.convitem:hover{background:var(--surface-sunken)}
+.convitem.on{background:var(--orange-100)}
+.convitem.on:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--orange-500)}
+.convmain{flex:1;min-width:0}
+.convtop{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.convname{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.convtime{font-size:11px;color:var(--text-tertiary);white-space:nowrap}
+.convlast{font-size:12.5px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.convtag{font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.tag-candidate{color:var(--blue-500)}
+.tag-client{color:var(--orange-600)}
+.unreaddot{width:9px;height:9px;border-radius:50%;background:var(--orange-500);flex-shrink:0}
+.thread{display:flex;flex-direction:column;min-width:0}
+.threadhead{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border-subtle)}
+.threadmeta{flex:1;min-width:0}
+.threadname{font-size:15px;font-weight:700}
+.threadsub{font-size:12px;color:var(--text-secondary)}
+.threadacts{display:flex;gap:8px}
+.threadlog{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:10px;background:var(--bg-app)}
+.daysep{align-self:center;font-size:11px;font-weight:700;color:var(--text-tertiary);background:var(--surface-card);border:1px solid var(--border-subtle);border-radius:var(--radius-pill);padding:3px 12px;margin:4px 0}
+.mrow{display:flex;flex-direction:column;max-width:74%}
+.mrow.me{align-self:flex-end;align-items:flex-end}
+.mrow.them{align-self:flex-start;align-items:flex-start}
+.mbub{padding:10px 13px;border-radius:14px;font-size:13.5px;line-height:1.5}
+.me .mbub{background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.them .mbub{background:var(--surface-card);border:1px solid var(--border-subtle);border-bottom-left-radius:4px}
+.mtime{font-size:10.5px;color:var(--text-tertiary);margin-top:3px}
+.threadcompose{display:flex;gap:10px;align-items:center;padding:14px 16px;border-top:1px solid var(--border-subtle)}
+.emptythread{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--text-tertiary);background:var(--bg-app)}
+.emptythread .eic{width:56px;height:56px;border-radius:50%;background:var(--surface-sunken);display:flex;align-items:center;justify-content:center;color:var(--text-tertiary)}
+</style>
+</helmet>
+<div class="app">
+<x-import component-from-global-scope="StarffDesignSystem_65a145.Sidebar" sections="{{sections}}" active-key="{{active}}" on-select="{{go}}" header="{{sbHeader}}" footer="{{sbFooter}}" hint-size="248px,100%"></x-import>
+<div class="main">
+<div class="phead"><div><div class="ptitle">{{title}}</div><div class="psub">{{subtitle}}</div></div><div class="fx ac gap10"><x-import component-from-global-scope="StarffDesignSystem_65a145.SearchBar" value="{{search}}" on-change="{{onSearch}}" placeholder="Search candidates, clients, bookings…" hint-size="280px,40px"></x-import><button class="aibtn" onClick="{{openAI}}"><span class="fx">{{aiTopIcon}}</span>AI Assistant</button><button class="livebtn {{liveCls}}" onClick="{{toggleLive}}"><span class="ldot"></span>{{liveLabel}}</button><span class="posrel"><x-import component-from-global-scope="StarffDesignSystem_65a145.IconButton" label="Notifications" variant="subtle" hint-size="40px,40px"><span class="fx">{{bellIcon}}</span></x-import></span><x-import component-from-global-scope="StarffDesignSystem_65a145.Avatar" name="Sarah Mitchell" size="{{avSize}}" status="online" hint-size="40px,40px"></x-import></div></div>
+<div class="content">
+
+<sc-if value="{{is.dashboard}}" hint-placeholder-val="{{true}}">
+<div class="g6"><sc-for list="{{kpis}}" as="k" hint-placeholder-count="6"><x-import component-from-global-scope="StarffDesignSystem_65a145.KPIStat" label="{{k.label}}" value="{{k.value}}" delta="{{k.delta}}" delta-label="{{k.deltaLabel}}" icon="{{k.icon}}" icon-tone="{{k.iconTone}}" hint-size="100%,118px"></x-import></sc-for></div>
+<div class="gmid">
+<x-import component-from-global-scope="StarffDesignSystem_65a145.Card" title="Overview" hint-size="100%,330px"><div class="fx gap24 wrap" style="margin-bottom:10px"><sc-for list="{{legend}}" as="l" hint-placeholder-count="4"><div class="fx col" style="gap:2px"><span class="legl"><span class="legdot" style="background:{{l.color}}"></span>{{l.label}}</span><span class="legv">{{l.value}}</span></div></sc-for></div><x-import component-from-global-scope="StarffDesignSystem_65a145.AreaChart" height="{{chartH}}" labels="{{weeks}}" series="{{overviewSeries}}" hint-size="100%,220px"></x-import></x-import>
+<x-import component-from-global-scope="StarffDesignSystem_65a145.Card" title="Compliance Overview" hint-size="100%,330px"><x-import component-from-global-scope="StarffDesignSystem_65a145.DonutChart" size="{{donutSize}}" thickness="{{donutThick}}" center-value="82%" center-label="Compliant" segments="{{donutSegs}}" hint-size="100%,220px"></x-import><div class="mt12"><x-import component-from-global-scope="StarffDesignSystem_65a145.Button" variant="outline" size="sm" full-width="{{true}}" on-click="{{goCompliance}}" hint-size="100%,34px">View Compliance Dashboard</x-import></div></x-import>
+<x-import component-from-global-scope="StarffDesignSystem_65a145.Card" title="Alerts &amp; Notifications" action="{{alertsLink}}" hint-size="100%,330px"><sc-for list="{{alerts}}" as="a" hint-placeholder-count="6"><div class="arow"><span class="{{a.cls}}">{{a.icon}}</span><span class="alabel">{{a.label}}</span><span class="acount">{{a.n}}</span></div></sc-for></x-import>
+</div>
+<div class="gbot">
+<x-import component-from-global-scope="StarffDesignSystem_65a145.Card" title="Recent Candidate Registrations" action="{{candLink}}" padding="{{tablePad}}" hint-size="100%,300px"><div class="twrap"><x-import component-from-global-scope="StarffDesignSystem_65a145.DataTable" columns="{{recentCandCols}}" rows="{{recentCandRows}}" hint-size="100%,240px"></x-import></div></x-import>
+<x-import component-from-global-scope="StarffDesignSystem_65a145.Card" title="Recent Job Bookings" action="{{bookLink}}" padding="{{tablePad}}" hint-size="100%,300px"><div class="twrap"><x-import component-from-global-scope="StarffDesignSystem_65a145.DataTable" columns="{{recentBookCols}}" rows="{{recentBookRows}}" hint-size="100%,240px"></x-import></div></x-import>
+<x-import component-from-global-scope="StarffDesignSystem_65a145.AIAssistantPanel" greeting="Hello Sarah, here are today's insights." hint-size="100%,300px"><x-import component-from-global-scope="StarffDesignSystem_65a145.AIInsightCard" tone="match" action-label="View matches" hint-size="100%,72px">12 candidates are a strong match for active bookings.</x-import><x-import component-from-global-scope="StarffDesignSystem_65a145.AIInsightCard" tone="risk" action-label="View details" hint-size="100%,72px">3 workers are at risk of no-show based on history.</x-import><x-import component-from-global-scope="StarffDesignSystem_65a145.AIInsightCard" tone="flag" action-label="Review now" hint-size="100%,72px">4 documents were flagged for review.</x-import></x-import>
+</div>
+</sc-if>
+
+<sc-if value="{{is.candidates}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="StarffDesignSystem_65a145.Card" padding="{{tablePad}}" hint-size="100%,520px"><div class="tbar"><x-import component-from-global-scope="StarffDesignSystem_65a145.Tabs" items="{{candTabItems}}" active-key="{{candTab}}" on-select="{{setCandTab}}" hint-size="360px,44px"></x-import><x-import component-from-global-scope="StarffDesignSystem_65a145.Button" size="sm" leading-icon="{{plusIcon}}" on-click="{{openAddCandidate}}" hint-size="150px,34px">Add Candidate</x-import></div><div class="twrap"><x-import component-from-global-scope="StarffDesignSystem_65a145.DataTable" columns="{{candCols}}" rows="{{candRows}}" hint-size="100%,420px"></x-import></div></x-import>
+</sc-if>
+
+<sc-if value="{{is.workers}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="StarffDesignSystem_65a145.Card" padding="{{tablePad}}" hint-size="100%,520px"><div class="tbar"><x-import component-from-global-scope="StarffDesignSystem_65a145.Tabs" items="{{wkrTabItems}}" active-key="{{wkrTab}}" on-select="{{setWkrTab}}" hint-size="320px,44px"></x-import><span class="dim">Toggle a worker's availability to update their status</span></div><div class="twrap"><x-import component-from-global-scope="StarffDesignSystem_65a145.DataTable" columns="{{wkrCols}}" rows="{{wkrRows}}" hint-size="100%,420px"></x-import></div></x-import>
+</sc-if>
+
+<sc-if value="{{is.clients}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="StarffDesignSystem_65a145.Card" padding="{{tablePad}}" hint-size="100%,520px"><div class="tbar"><div class="fx col" style="gap:2px;padding-top:4px"><span style="font-size:15px;font-weight:700">Client Accounts</span><span class="dim">{{clientCount}} active client organisations</span></div><x-import component-from-global-scope="StarffDesignSystem_65a145.Button" size="sm" leading-icon="{{plusIcon}}" on-click="{{openAddClient}}" hint-size="130px,34px">Add Client</x-import></div><div class="twrap"><x-import component-from-global-scope="StarffDesignSystem_65a145.DataTable" columns="{{clientCols}}" rows="{{clientRows}}" hint-size="100%,420px"></x-import></div></x-import>
+</sc-if>
+
+<sc-if value="{{is.bookings}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="StarffDesignSystem_65a145.Card" padding="{{tablePad}}" hint-size="100%,520px"><div class="tbar"><x-import component-from-global-scope="StarffDesignSystem_65a145.Tabs" items="{{bookTabItems}}" active-key="{{bookTab}}" on-select="{{setBookTab}}" hint-size="320px,44px"></x-import><x-import component-from-global-scope="StarffDesignSystem_65a145.Button" size="sm" leading-icon="{{plusIcon}}" on-click="{{openCreateBooking}}" hint-size="170px,34px">Create Job Booking</x-import></div><div class="twrap"><x-import component-from-global-scope="StarffDesignSystem_65a145.DataTable" columns="{{bookCols}}" rows="{{bookRows}}" hint-size="100%,420px"></x-import></div></x-import>
+</sc-if>
+
+<sc-if value="{{is.shifts}}" hint-placeholder-val="{{false}}">
+<div class="g2"><sc-for list="{{shifts}}" as="s" hint-placeholder-count="4"><div class="scard"><div class="fx jb ac"><div class="shead"><div class="sdate"><b>{{s.d}}</b><span>{{s.m}}</span></div><div><div style="font-size:15px;font-weight:700">{{s.role}}</div><div class="dim">{{s.site}}</div></div></div><x-import component-from-global-scope="StarffDesignSystem_65a145.Badge" tone="{{s.tone}}" size="sm" hint-size="70px,22px">{{s.label}}</x-import></div><div class="smeta"><span>{{clockIcon}} {{s.time}}</span><span>{{usersIcon}} {{s.fillText}}</span><span>{{pinIcon}} {{s.loc}}</span></div><x-import component-from-global-scope="StarffDesignSystem_65a145.ProgressBar" value="{{s.pct}}" tone="{{s.ptone}}" hint-size="100%,8px"></x-import><div class="fx jb ac"><span class="dim">{{s.filled}} of {{s.needed}} workers assigned</span><x-import component-from-global-scope="StarffDesignSystem_65a145.Button" variant="outline" size="sm" on-click="{{s.onManage}}" hint-size="90px,32px">Manage</x-import></div></div></sc-for></div>
+</sc-if>
+
+<sc-if value="{{is.timesheets}}" hint-placeholder-val="{{false}}">
+<div class="g4"><sc-for list="{{tsKpis}}" as="k" hint-placeholder-count="4"><x-import component-from-global-scope="StarffDesignSystem_65a145.KPIStat" label="{{k.label}}" value="{{k.value}}" icon="{{k.icon}}" icon-tone="{{k.iconTone}}" hint-size="100%,110px"></x-import></sc-for></div>
+<x-import component-from-global-scope="StarffDesignSystem_65a145.Card" title="Timesheets Awaiting Approval" padding="{{tablePad}}" hint-size="100%,420px"><div class="twrap"><x-import component-from-global-scope="StarffDesignSystem_65a145.DataTable" columns="{{tsCols}}" rows="{{tsRows}}" hint-size="100%,360px"></x-import></div></x-import>
+</sc-if>
+
+<sc-if value="{{is.compliance}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="StarffDesignSystem_65a145.AlertBanner" tone="warning" title="34 workers have missing or expiring documents" action="{{reviewAllBtn}}" hint-size="100%,80px">Resolve these before their next scheduled shift to stay compliant.</x-import>
+<div class="g4"><sc-for list="{{compCats}}" as="c" hint-placeholder-count="4"><x-import component-from-global-scope="StarffDesignSystem_65a145.Card" hint-size="100%,180px"><div class="fx ac gap10 mb12"><span class="catic">{{c.icon}}</span><span style="font-size:14px;font-weight:700">{{c.label}}</span></div><div class="big">{{c.pct}}%</div><div class="dim" style="margin-bottom:10px">{{c.detail}}</div><x-import component-from-global-scope="StarffDesignSystem_65a145.ProgressBar" value="{{c.pct}}" tone="{{c.tone}}" hint-size="100%,8px"></x-import></x-import></sc-for></div>
+<x-import component-from-global-scope="StarffDesignSystem_65a145.Card" title="Workers Needing Attention" padding="{{tablePad}}" hint-size="100%,340px"><div class="twrap"><x-import component-from-global-scope="StarffDesignSystem_65a145.DataTable" columns="{{compCols}}" rows="{{compRows}}" hint-size="100%,280px"></x-import></div></x-import>
+</sc-if>
+
+<sc-if value="{{is.invoices}}" hint-placeholder-val="{{false}}">
+<div class="g4"><sc-for list="{{invKpis}}" as="k" hint-placeholder-count="4"><x-import component-from-global-scope="StarffDesignSystem_65a145.KPIStat" label="{{k.label}}" value="{{k.value}}" delta="{{k.delta}}" delta-label="{{k.deltaLabel}}" icon="{{k.icon}}" icon-tone="{{k.iconTone}}" hint-size="100%,110px"></x-import></sc-for></div>
+<x-import component-from-global-scope="StarffDesignSystem_65a145.Card" title="Invoices &amp; Payroll" padding="{{tablePad}}" hint-size="100%,420px"><div class="twrap"><x-import component-from-global-scope="StarffDesignSystem_65a145.DataTable" columns="{{invCols}}" rows="{{invRows}}" hint-size="100%,360px"></x-import></div></x-import>
+</sc-if>
+
+<sc-if value="{{is.ai}}" hint-placeholder-val="{{false}}">
+<div class="gai">
+<x-import component-from-global-scope="StarffDesignSystem_65a145.AIAssistantPanel" greeting="Hello Sarah, here are today's insights." hint-size="100%,520px"><x-import component-from-global-scope="StarffDesignSystem_65a145.AIInsightCard" tone="match" action-label="View matches" hint-size="100%,72px">12 candidates are a strong match for active bookings.</x-import><x-import component-from-global-scope="StarffDesignSystem_65a145.AIInsightCard" tone="risk" action-label="View details" hint-size="100%,72px">3 workers are at risk of no-show based on history.</x-import><x-import component-from-global-scope="StarffDesignSystem_65a145.AIInsightCard" tone="flag" action-label="Review now" hint-size="100%,72px">4 documents were flagged for review.</x-import><x-import component-from-global-scope="StarffDesignSystem_65a145.AIInsightCard" tone="match" action-label="Open report" hint-size="100%,72px">Revenue is up 14% month-on-month, driven by logistics clients.</x-import></x-import>
+<div class="chatcard"><div class="chathead"><span class="sparkbadge">{{sparkIcon}}</span><div><div style="font-size:15px;font-weight:700">Starff AI Assistant</div><div class="sub2">Ask about candidates, compliance, bookings or finance</div></div></div><div class="chatlog"><sc-for list="{{chat}}" as="m" hint-placeholder-count="2"><div class="cbub {{m.cls}}">{{m.text}}</div></sc-for></div><form class="chatform" onSubmit="{{sendChat}}"><input class="chatinput" value="{{draft}}" onInput="{{onDraft}}" placeholder="Ask AI Assistant anything…"><x-import component-from-global-scope="StarffDesignSystem_65a145.IconButton" label="Send" variant="primary" type="submit" hint-size="42px,42px">{{sendIcon}}</x-import></form></div>
+</div>
+</sc-if>
+
+<sc-if value="{{is.messages}}" hint-placeholder-val="{{false}}">
+<div class="inbox">
+<div class="convlist"><div class="convsearch"><x-import component-from-global-scope="StarffDesignSystem_65a145.SearchBar" value="{{convSearch}}" on-change="{{onConvSearch}}" placeholder="Search messages…" hint-size="100%,40px"></x-import></div><div class="convtabs"><sc-for list="{{msgTabItems}}" as="t" hint-placeholder-count="3"><button class="convtab {{t.cls}}" onClick="{{t.select}}">{{t.label}}</button></sc-for></div><div class="convscroll"><sc-for list="{{convos}}" as="c" hint-placeholder-count="6"><div class="convitem {{c.cls}}" onClick="{{c.open}}"><x-import component-from-global-scope="StarffDesignSystem_65a145.Avatar" name="{{c.name}}" size="{{avConv}}" status="{{c.status}}" hint-size="42px,42px"></x-import><div class="convmain"><div class="convtop"><span class="convname">{{c.name}}</span><span class="convtime">{{c.time}}</span></div><div class="convtop"><span class="convlast">{{c.last}}</span><sc-if value="{{c.unread}}" hint-placeholder-val="{{false}}"><span class="unreaddot"></span></sc-if></div><span class="convtag {{c.tagcls}}">{{c.tag}}</span></div></div></sc-for></div></div>
+<sc-if value="{{hasThread}}" hint-placeholder-val="{{true}}">
+<div class="thread"><div class="threadhead"><x-import component-from-global-scope="StarffDesignSystem_65a145.Avatar" name="{{thread.name}}" size="{{avConv}}" status="{{thread.status}}" hint-size="42px,42px"></x-import><div class="threadmeta"><div class="threadname">{{thread.name}}</div><div class="threadsub">{{thread.sub}}</div></div><div class="threadacts"><x-import component-from-global-scope="StarffDesignSystem_65a145.Button" variant="outline" size="sm" on-click="{{openThreadProfile}}" hint-size="90px,32px">View profile</x-import></div></div><div class="threadlog"><div class="daysep">{{thread.day}}</div><sc-for list="{{thread.msgs}}" as="m" hint-placeholder-count="4"><div class="mrow {{m.cls}}"><div class="mbub">{{m.text}}</div><div class="mtime">{{m.time}}</div></div></sc-for></div><form class="threadcompose" onSubmit="{{sendMsg}}"><x-import component-from-global-scope="StarffDesignSystem_65a145.IconButton" label="Attach" variant="subtle" hint-size="42px,42px">{{attachIcon}}</x-import><input class="chatinput" value="{{msgDraft}}" onInput="{{onMsgDraft}}" placeholder="Type a message…"><x-import component-from-global-scope="StarffDesignSystem_65a145.IconButton" label="Send" variant="primary" type="submit" hint-size="42px,42px">{{sendIcon}}</x-import></form></div>
+</sc-if>
+<sc-if value="{{noThread}}" hint-placeholder-val="{{false}}">
+<div class="emptythread"><span class="eic">{{msgBigIcon}}</span><div style="font-weight:700;color:var(--text-secondary)">Select a conversation</div><div style="font-size:13px">Choose a candidate or client to view your messages.</div></div>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{is.settings}}" hint-placeholder-val="{{false}}">
+<div class="g2">
+<x-import component-from-global-scope="StarffDesignSystem_65a145.Card" title="Notifications" hint-size="100%,220px"><div class="fcol"><sc-for list="{{settingsToggles}}" as="t" hint-placeholder-count="4"><div class="fx jb ac"><div><div class="nm">{{t.label}}</div><div class="sub2">{{t.desc}}</div></div><x-import component-from-global-scope="StarffDesignSystem_65a145.Switch" checked="{{t.on}}" on-change="{{t.toggle}}" hint-size="46px,26px"></x-import></div></sc-for></div></x-import>
+<x-import component-from-global-scope="StarffDesignSystem_65a145.Card" title="Organisation" hint-size="100%,220px"><div class="dcol"><sc-for list="{{orgFields}}" as="d" hint-placeholder-count="4"><div class="drow"><span class="dlbl">{{d.label}}</span><span class="dval">{{d.value}}</span></div></sc-for></div></x-import>
+</div>
+</sc-if>
+
+</div>
+</div>
+</div>
+
+<sc-if value="{{modalOpen}}" hint-placeholder-val="{{false}}">
+<x-import component-from-global-scope="StarffDesignSystem_65a145.Modal" open="{{true}}" on-close="{{closeModal}}" title="{{modalTitle}}" subtitle="{{modalSubtitle}}" footer="{{modalFooter}}" width="{{modalWidth}}" hint-size="520px,400px">
+<sc-if value="{{isFormModal}}" hint-placeholder-val="{{false}}"><div class="fcol"><sc-for list="{{formFields}}" as="f" hint-placeholder-count="4"><sc-if value="{{f.isSelect}}" hint-placeholder-val="{{false}}"><x-import component-from-global-scope="StarffDesignSystem_65a145.Select" label="{{f.label}}" options="{{f.options}}" placeholder="{{f.placeholder}}" hint-size="100%,66px"></x-import></sc-if><sc-if value="{{f.isInput}}" hint-placeholder-val="{{true}}"><x-import component-from-global-scope="StarffDesignSystem_65a145.Input" label="{{f.label}}" placeholder="{{f.placeholder}}" type="{{f.inputType}}" hint-size="100%,66px"></x-import></sc-if></sc-for></div></sc-if>
+<sc-if value="{{isDetailModal}}" hint-placeholder-val="{{true}}"><div class="dcol"><sc-for list="{{detailFields}}" as="d" hint-placeholder-count="5"><div class="drow"><span class="dlbl">{{d.label}}</span><span class="dval">{{d.value}}</span></div></sc-for></div></sc-if>
+</x-import>
+</sc-if>
+
+<sc-if value="{{aiPanelOpen}}" hint-placeholder-val="{{false}}">
+<div class="aiscrim" onClick="{{closeAI}}"></div>
+<div class="aipanel"><div class="aiphead"><span class="sparkbadge">{{sparkIcon}}</span><div><div style="font-size:15px;font-weight:700">Starff AI Assistant</div><div class="sub2">Suggest-only · you confirm every action</div></div><button class="aipclose" onClick="{{closeAI}}">{{closeIcon}}</button></div><div class="aipbody"><sc-for list="{{chat}}" as="m" hint-placeholder-count="2"><div class="cbub {{m.cls}}">{{m.text}}</div></sc-for></div><div class="aipfoot"><div class="aiprompts"><sc-for list="{{aiPrompts}}" as="p" hint-placeholder-count="3"><button class="promptchip" onClick="{{p.use}}">{{p.label}}</button></sc-for></div><form class="chatform" style="padding:0;border:none" onSubmit="{{sendChat}}"><input class="chatinput" value="{{draft}}" onInput="{{onDraft}}" placeholder="Ask AI Assistant anything…"><x-import component-from-global-scope="StarffDesignSystem_65a145.IconButton" label="Send" variant="primary" type="submit" hint-size="42px,42px">{{sendIcon}}</x-import></form><div class="aipdisc">Starff AI can make mistakes — review before acting.</div></div></div>
+</sc-if>
+
+<div class="toastwrap"><sc-for list="{{toasts}}" as="t" hint-placeholder-count="0"><x-import component-from-global-scope="StarffDesignSystem_65a145.Toast" tone="{{t.tone}}" title="{{t.title}}" message="{{t.message}}" on-dismiss="{{t.onDismiss}}" hint-size="360px,64px"></x-import></sc-for></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      active: 'dashboard', search: '',
+      candTab: 'all', wkrTab: 'all', bookTab: 'all',
+      modal: null, toasts: [], _tid: 0,
+      live: false, aiPanelOpen: false,
+      convSearch: '', msgFilter: 'all', activeConvo: 'c1', msgDraft: '',
+      convos: [
+        { id: 'c1', name: 'Jordan Smith', party: 'candidate', sub: 'Warehouse Operative · Birmingham', status: 'online', day: 'Today', unread: false, msgs: [
+          { from: 'me', text: 'Hi Jordan — good news, you’ve been shortlisted for the Amazon Logistics booking starting 28 Jul.', time: '09:02' },
+          { from: 'them', text: 'That’s brilliant, thank you! What are the shift times?', time: '09:05' },
+          { from: 'me', text: '07:00 - 15:00, Monday to Friday. Rate is £13.50/hr. Are you available?', time: '09:06' },
+          { from: 'them', text: 'Yes I can do that. Do I need my own PPE?', time: '09:11' },
+        ]},
+        { id: 'c2', name: 'Emma Clarke', party: 'client', sub: 'Amazon Logistics · Rugeley', status: 'online', day: 'Today', unread: true, msgs: [
+          { from: 'them', text: 'Hi, can we increase the warehouse booking from 12 to 15 workers for next week?', time: '08:40' },
+          { from: 'me', text: 'Morning Emma — absolutely. I’ll update the booking and confirm the additional 3 by end of day.', time: '08:52' },
+          { from: 'them', text: 'Perfect, thank you.', time: '08:53' },
+        ]},
+        { id: 'c3', name: 'Priya Patel', party: 'candidate', sub: 'Forklift Driver · Coventry', status: 'away', day: 'Today', unread: true, msgs: [
+          { from: 'them', text: 'Just uploaded my updated forklift licence to the portal.', time: '07:58' },
+          { from: 'me', text: 'Thanks Priya, I can see it — running the compliance check now.', time: '08:15' },
+        ]},
+        { id: 'c4', name: 'Raj Sharma', party: 'client', sub: 'DHL Supply Chain · Birmingham', status: 'offline', day: 'Yesterday', unread: false, msgs: [
+          { from: 'them', text: 'Can you send over the timesheets for last week?', time: '16:20' },
+          { from: 'me', text: 'Sent — 8 forklift drivers, 300 hours total. Invoice to follow Monday.', time: '16:44' },
+          { from: 'them', text: 'Great, appreciated.', time: '16:45' },
+        ]},
+        { id: 'c5', name: 'Sophie Williams', party: 'candidate', sub: 'HGV Driver · Birmingham', status: 'online', day: 'Yesterday', unread: false, msgs: [
+          { from: 'me', text: 'Hi Sophie, your CPC card expires in 3 weeks — can you renew before your next shift?', time: '14:10' },
+          { from: 'them', text: 'Booked the course for Saturday, I’ll send the certificate over after.', time: '15:02' },
+        ]},
+        { id: 'c6', name: 'Tom Fisher', party: 'client', sub: 'B&M Retail · Speke', status: 'offline', day: 'Mon', unread: false, msgs: [
+          { from: 'them', text: 'We’d like to set up a regular Friday night shift — 10 general labourers.', time: '11:30' },
+          { from: 'me', text: 'No problem Tom, I’ll raise a recurring booking and share the rate card.', time: '11:48' },
+        ]},
+      ],
+      liveVals: { candidates: 1248, workers: 782, clients: 215, bookings: 356, timesheets: 1843, revenue: 246780 },
+      liveSeries: { Timesheets: [280, 340, 520, 700, 900, 1100, 1300], Assignments: [220, 300, 420, 560, 720, 860, 980], Invoices: [180, 240, 320, 420, 540, 660, 760], Bookings: [90, 140, 200, 280, 360, 440, 520] },
+      draft: '',
+      chat: [{ role: 'ai', text: "Hi Sarah — I can find candidate matches, flag compliance risks and summarise your operations. What would you like to know?" }],
+      settings: { email: true, sms: false, compliance: true, weekly: true },
+      workers: [
+        { name: 'Amara Okafor', role: 'Warehouse Operative', loc: 'Dudley', rate: '£13.50', status: 'compliant', available: true, email: 'amara.o@email.com', phone: '07700 900321' },
+        { name: 'Tomasz Nowak', role: 'Forklift Driver', loc: 'Coventry', rate: '£14.20', status: 'compliant', available: true, email: 'tomasz.n@email.com', phone: '07700 900654' },
+        { name: 'Grace Adeyemi', role: 'Picker/Packer', loc: 'Birmingham', rate: '£12.60', status: 'expiring', available: false, email: 'grace.a@email.com', phone: '07700 900987' },
+        { name: 'Liam Doherty', role: 'HGV Driver', loc: 'Walsall', rate: '£16.80', status: 'compliant', available: true, email: 'liam.d@email.com', phone: '07700 900112' },
+        { name: 'Fatima Hassan', role: 'General Labourer', loc: 'Wolverhampton', rate: '£12.20', status: 'pending', available: false, email: 'fatima.h@email.com', phone: '07700 900443' },
+        { name: 'Karol Lewandowski', role: 'Warehouse Operative', loc: 'Birmingham', rate: '£13.50', status: 'compliant', available: true, email: 'karol.l@email.com', phone: '07700 900778' },
+        { name: 'Chidi Eze', role: 'Van Driver', loc: 'Solihull', rate: '£13.80', status: 'expiring', available: true, email: 'chidi.e@email.com', phone: '07700 900225' },
+      ],
+      timesheets: [
+        { id: 't1', name: 'Jordan Smith', role: 'Warehouse Operative', client: 'Amazon Logistics', date: '05 Jul 2026', hours: 40, rate: 13.5, status: 'pending' },
+        { id: 't2', name: 'Priya Patel', role: 'Forklift Driver', client: 'DHL Supply Chain', date: '05 Jul 2026', hours: 37.5, rate: 14.2, status: 'pending' },
+        { id: 't3', name: 'Sophie Williams', role: 'HGV Driver', client: 'XPO Logistics', date: '04 Jul 2026', hours: 45, rate: 16.8, status: 'pending' },
+        { id: 't4', name: 'Daniel Brown', role: 'Production Operative', client: 'B&M Retail', date: '04 Jul 2026', hours: 42, rate: 12.6, status: 'pending' },
+        { id: 't5', name: 'Amara Okafor', role: 'Warehouse Operative', client: 'Amazon Logistics', date: '03 Jul 2026', hours: 38, rate: 13.5, status: 'pending' },
+        { id: 't6', name: 'Liam Doherty', role: 'HGV Driver', client: 'DPD UK', date: '03 Jul 2026', hours: 40, rate: 16.8, status: 'pending' },
+      ],
+      invoices: [
+        { id: 'INV-1048', client: 'Amazon Logistics', date: '01 Jul 2026', due: '15 Jul 2026', amount: 48250, status: 'paid' },
+        { id: 'INV-1047', client: 'DHL Supply Chain', date: '01 Jul 2026', due: '15 Jul 2026', amount: 32180, status: 'paid' },
+        { id: 'INV-1046', client: 'XPO Logistics', date: '28 Jun 2026', due: '12 Jul 2026', amount: 27640, status: 'overdue' },
+        { id: 'INV-1045', client: 'B&M Retail', date: '26 Jun 2026', due: '10 Jul 2026', amount: 15920, status: 'overdue' },
+        { id: 'INV-1044', client: 'DPD UK', date: '24 Jun 2026', due: '08 Jul 2026', amount: 21300, status: 'pending' },
+        { id: 'INV-1043', client: 'Tesco Distribution', date: '22 Jun 2026', due: '06 Jul 2026', amount: 39870, status: 'paid' },
+      ],
+    };
+  }
+
+  componentDidMount() {
+    if (!(window.StarffIcons && window.StarffDesignSystem_65a145)) {
+      this._t = setInterval(() => {
+        if (window.StarffIcons && window.StarffDesignSystem_65a145) { clearInterval(this._t); this.forceUpdate(); }
+      }, 80);
+    }
+  }
+  componentWillUnmount() { if (this._t) clearInterval(this._t); if (this._ct) clearTimeout(this._ct); if (this._live) clearInterval(this._live); }
+
+  go = (key) => this.setState({ active: key, search: '', modal: null });
+  openAI = () => this.setState({ aiPanelOpen: true });
+  closeAI = () => this.setState({ aiPanelOpen: false });
+  askAI = (text) => { this.setState({ aiPanelOpen: true }); this.pushUser(text); };
+  toggleLive = () => {
+    const live = !this.state.live;
+    this.setState({ live });
+    if (this._live) clearInterval(this._live);
+    if (live) {
+      const pool = [
+        { tone: 'success', title: 'Booking confirmed', message: 'DHL Supply Chain confirmed 8 forklift drivers.' },
+        { tone: 'info', title: 'Timesheet submitted', message: 'Amara Okafor submitted 38h for Amazon Logistics.' },
+        { tone: 'success', title: 'Right to work verified', message: "Karol Lewandowski's RTW check passed." },
+        { tone: 'warning', title: 'Document expiring', message: "Grace Adeyemi's CSCS card expires in 30 days." },
+        { tone: 'info', title: 'New candidate', message: 'Ryan Kelly registered as a Van Driver.' },
+      ];
+      let i = 0;
+      this._live = setInterval(() => {
+        if (i % 2 === 0) this.pushToast(pool[(i / 2) % pool.length]);
+        this.setState((s) => {
+          const v = s.liveVals;
+          const r = (p) => (Math.random() < p ? 1 : 0);
+          const nv = { candidates: v.candidates + Math.floor(Math.random() * 3), workers: v.workers + r(0.5), clients: v.clients + r(0.15), bookings: v.bookings + r(0.5) - r(0.3), timesheets: v.timesheets + Math.floor(Math.random() * 7), revenue: v.revenue + Math.floor(Math.random() * 1200) };
+          const shift = (a) => { const last = a[a.length - 1]; const nx = Math.max(0, Math.round(last * (1 + (Math.random() - 0.35) * 0.07))); return a.slice(1).concat(nx); };
+          const ls = s.liveSeries;
+          const ns = { Timesheets: shift(ls.Timesheets), Assignments: shift(ls.Assignments), Invoices: shift(ls.Invoices), Bookings: shift(ls.Bookings) };
+          return { liveVals: nv, liveSeries: ns };
+        });
+        i++;
+      }, 2000);
+    }
+  };
+  onSearch = (ev) => this.setState({ search: ev.target.value });
+  setCandTab = (k) => this.setState({ candTab: k });
+  setWkrTab = (k) => this.setState({ wkrTab: k });
+  setBookTab = (k) => this.setState({ bookTab: k });
+  closeModal = () => this.setState({ modal: null });
+  openDetail = (kind, row) => this.setState({ modal: { type: 'detail', kind, row } });
+  openForm = (form) => this.setState({ modal: { type: 'form', form } });
+  openAddCandidate = () => this.openForm('candidate');
+  openAddClient = () => this.openForm('client');
+  openCreateBooking = () => this.openForm('booking');
+  goCompliance = () => this.go('compliance');
+
+  pushToast = (t) => {
+    const id = this.state._tid + 1;
+    this.setState((s) => ({ _tid: id, toasts: [...s.toasts, { ...t, id }] }));
+    setTimeout(() => this.setState((s) => ({ toasts: s.toasts.filter((x) => x.id !== id) })), 3800);
+  };
+  dismissToast = (id) => this.setState((s) => ({ toasts: s.toasts.filter((x) => x.id !== id) }));
+
+  submitForm = () => {
+    const f = this.state.modal && this.state.modal.form;
+    const msg = { candidate: ['Candidate added', 'New candidate created and queued for compliance checks.'], client: ['Client added', 'New client organisation created successfully.'], booking: ['Booking created', 'Job booking created and sent for staffing.'] }[f] || ['Saved', 'Changes saved.'];
+    this.closeModal();
+    this.pushToast({ tone: 'success', title: msg[0], message: msg[1] });
+  };
+
+  approveTS = (id) => { this.setState((s) => ({ timesheets: s.timesheets.map((t) => t.id === id ? { ...t, status: 'approved' } : t) })); this.pushToast({ tone: 'success', title: 'Timesheet approved', message: 'The timesheet was approved and sent to payroll.' }); };
+  rejectTS = (id) => { this.setState((s) => ({ timesheets: s.timesheets.map((t) => t.id === id ? { ...t, status: 'rejected' } : t) })); this.pushToast({ tone: 'error', title: 'Timesheet rejected', message: 'The worker has been notified to resubmit.' }); };
+  markPaid = (id) => { this.setState((s) => ({ invoices: s.invoices.map((v) => v.id === id ? { ...v, status: 'paid' } : v) })); this.pushToast({ tone: 'success', title: 'Invoice marked paid', message: 'Payment recorded against the invoice.' }); };
+  toggleWorker = (name) => { this.setState((s) => ({ workers: s.workers.map((w) => w.name === name ? { ...w, available: !w.available } : w) })); this.pushToast({ tone: 'info', title: 'Availability updated', message: name + "'s availability was changed." }); };
+  toggleSetting = (key) => this.setState((s) => ({ settings: { ...s.settings, [key]: !s.settings[key] } }));
+  setMsgFilter = (f) => this.setState({ msgFilter: f });
+  onConvSearch = (ev) => this.setState({ convSearch: ev.target.value });
+  openConvo = (id) => this.setState((s) => ({ activeConvo: id, convos: s.convos.map((c) => c.id === id ? { ...c, unread: false } : c) }));
+  onMsgDraft = (ev) => this.setState({ msgDraft: ev.target.value });
+  openThreadProfile = () => { const c = this.state.convos.find((x) => x.id === this.state.activeConvo); if (c) this.pushToast({ tone: 'info', title: 'Profile', message: 'Opening ' + c.name + "'s " + (c.party === 'client' ? 'client account.' : 'candidate profile.') }); };
+  sendMsg = (ev) => {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    const text = (this.state.msgDraft || '').trim();
+    if (!text) return;
+    const id = this.state.activeConvo;
+    const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    this.setState((s) => ({ msgDraft: '', convos: s.convos.map((c) => c.id === id ? { ...c, day: 'Today', msgs: [...c.msgs, { from: 'me', text, time: now }] } : c) }));
+  };
+
+  onDraft = (ev) => this.setState({ draft: ev.target.value });
+  pushUser = (text) => {
+    this.setState((s) => ({ chat: [...s.chat, { role: 'user', text }] }));
+    const replies = [
+      'Based on current bookings, I found 12 strong candidate matches — 8 are fully compliant and available this week.',
+      '3 workers have documents expiring within 30 days. I can draft reminders for them now if you like.',
+      'Revenue is £246,780 month-to-date, up 14% on last month. Logistics clients account for most of the growth.',
+      '42 timesheets are awaiting approval. The oldest is from 03 Jul — want me to prioritise those?',
+    ];
+    const reply = replies[Math.floor(Math.random() * replies.length)];
+    this._ct = setTimeout(() => this.setState((s) => ({ chat: [...s.chat, { role: 'ai', text: reply }] })), 650);
+  };
+  sendChat = (ev) => {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    const text = (this.state.draft || '').trim();
+    if (!text) return;
+    this.setState((s) => ({ chat: [...s.chat, { role: 'user', text }], draft: '' }));
+    const replies = [
+      'Based on current bookings, I found 12 strong candidate matches — 8 are fully compliant and available this week.',
+      '3 workers have documents expiring within 30 days. I can draft reminders for them now if you like.',
+      'Revenue is £246,780 month-to-date, up 14% on last month. Logistics clients account for most of the growth.',
+      '42 timesheets are awaiting approval. The oldest is from 03 Jul — want me to prioritise those?',
+    ];
+    const reply = replies[Math.floor(Math.random() * replies.length)];
+    this._ct = setTimeout(() => this.setState((s) => ({ chat: [...s.chat, { role: 'ai', text: reply }] })), 650);
+  };
+
+  renderVals() {
+    const e = React.createElement;
+    const Ic = window.StarffIcons || {};
+    const DS = window.StarffDesignSystem_65a145 || {};
+    const ic = (n, p) => Ic[n] ? e(Ic[n], p || {}) : null;
+    const money = (n) => '£' + Number(n).toLocaleString();
+    const st = this.state;
+    const active = st.active;
+    const is = { dashboard: false, candidates: false, workers: false, clients: false, bookings: false, shifts: false, timesheets: false, compliance: false, invoices: false, ai: false, messages: false, settings: false };
+    is[active] = true;
+    const unreadCount = st.convos.filter((c) => c.unread).length;
+
+    const TITLES = {
+      dashboard: ['Dashboard', 'Tuesday 7 July 2026 · Operations overview'],
+      candidates: ['Candidates', 'Manage your candidate pipeline'],
+      workers: ['Workers', 'Active workers and their availability'],
+      clients: ['Clients', 'Client organisations and accounts'],
+      bookings: ['Job Bookings', 'Open and confirmed staffing requests'],
+      shifts: ['Shifts', 'Upcoming shifts and staffing progress'],
+      timesheets: ['Timesheets', 'Review and approve submitted hours'],
+      compliance: ['Compliance Dashboard', 'Right to work, documents, licences & training'],
+      invoices: ['Payroll & Invoices', 'Billing, payments and payroll runs'],
+      ai: ['AI Assistant', 'Insights and answers across your operation'],
+      messages: ['Messages', 'Talk to candidates and clients in one place'],
+      settings: ['Settings', 'Your workspace and notification preferences'],
+    };
+    const [title, subtitle] = TITLES[active] || ['Starff', ''];
+
+    const sections = [
+      { items: [{ key: 'dashboard', label: 'Dashboard', icon: ic('Grid') }] },
+      { label: 'People', items: [
+        { key: 'candidates', label: 'Candidates', icon: ic('Users') },
+        { key: 'workers', label: 'Workers', icon: ic('HardHat') },
+        { key: 'clients', label: 'Clients', icon: ic('Building') },
+      ]},
+      { label: 'Operations', items: [
+        { key: 'bookings', label: 'Job Bookings', icon: ic('Briefcase') },
+        { key: 'shifts', label: 'Shifts', icon: ic('Calendar') },
+        { key: 'timesheets', label: 'Timesheets', icon: ic('Clock'), badge: 42 },
+      ]},
+      { label: 'Compliance', items: [
+        { key: 'compliance', label: 'Compliance', icon: ic('ClipboardCheck'), badge: 34 },
+      ]},
+      { label: 'Finance', items: [
+        { key: 'invoices', label: 'Payroll & Invoices', icon: ic('Receipt') },
+      ]},
+      { label: 'Insights', items: [
+        { key: 'ai', label: 'AI Assistant', icon: ic('Sparkle') },
+        { key: 'messages', label: 'Messages', icon: ic('Message'), badge: unreadCount || undefined },
+      ]},
+      { items: [{ key: 'settings', label: 'Settings', icon: ic('Settings') }] },
+    ];
+    const sbHeader = e('div', null,
+      e('img', { src: 'assets/logos/starff-logo-horizontal-white.png', alt: 'Starff', style: { height: 28, width: 'auto', display: 'block' } }),
+      e('div', { className: 'brand-sub' }, 'ADMIN DASHBOARD'));
+    const sbFooter = e('button', { style: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '10px 12px', border: 'none', background: 'transparent', color: 'var(--sidebar-fg)', fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 500, cursor: 'pointer', borderRadius: 'var(--radius-md)' } }, ic('LogOut'), ' Logout');
+
+    // ---- shared cell renderers ----
+    const cell = (t) => e('span', { className: 'dim' }, t);
+    const nameCell = (r) => e('div', { className: 'namecell' }, DS.Avatar ? e(DS.Avatar, { name: r.name, size: 30 }) : null, e('div', null, e('div', { className: 'nm' }, r.name), e('div', { className: 'sub2' }, r.role)));
+    const compBadge = (s) => DS.ComplianceBadge ? e(DS.ComplianceBadge, { status: s, size: 'sm' }) : null;
+    const matchBadge = (m) => DS.Badge ? e(DS.Badge, { tone: m > 85 ? 'success' : m > 70 ? 'warning' : 'neutral', size: 'sm' }, m + '%') : null;
+    const viewBtn = (kind, r) => DS.Button ? e(DS.Button, { variant: 'ghost', size: 'sm', onClick: () => this.openDetail(kind, r) }, 'View') : null;
+
+    // ================= DASHBOARD =================
+    const lv = st.liveVals;
+    const fmt = (n) => n.toLocaleString();
+    const kpis = [
+      { label: 'Total Candidates', value: fmt(lv.candidates), delta: '12%', icon: ic('Users'), iconTone: 'info' },
+      { label: 'Active Workers', value: fmt(lv.workers), delta: '8%', icon: ic('HardHat'), iconTone: 'accent' },
+      { label: 'Clients', value: fmt(lv.clients), delta: '5%', icon: ic('Building'), iconTone: 'info' },
+      { label: 'Active Bookings', value: fmt(lv.bookings), delta: '15%', icon: ic('Calendar'), iconTone: 'success' },
+      { label: 'Timesheets / wk', value: fmt(lv.timesheets), delta: '18%', deltaLabel: 'vs last week', icon: ic('Clock'), iconTone: 'info' },
+      { label: 'Revenue (MTD)', value: '£' + fmt(lv.revenue), delta: '14%', deltaLabel: 'vs last month', icon: ic('PoundSterling'), iconTone: 'success' },
+    ];
+    const legend = [
+      { label: 'Bookings', value: fmt(lv.bookings), color: 'var(--blue-500)' },
+      { label: 'Assignments', value: '812', color: 'var(--orange-500)' },
+      { label: 'Timesheets', value: fmt(lv.timesheets), color: '#8B5CF6' },
+      { label: 'Invoices', value: '£' + fmt(lv.revenue), color: 'var(--success-500)' },
+    ];
+    const overviewSeries = [
+      { name: 'Timesheets', color: '#8B5CF6', data: st.liveSeries.Timesheets },
+      { name: 'Assignments', color: 'var(--orange-500)', data: st.liveSeries.Assignments },
+      { name: 'Invoices', color: 'var(--success-500)', data: st.liveSeries.Invoices },
+      { name: 'Bookings', color: 'var(--blue-500)', data: st.liveSeries.Bookings },
+    ];
+    const donutSegs = [
+      { label: 'Compliant', value: 1024, color: 'var(--success-500)' },
+      { label: 'Expiring Soon', value: 148, color: 'var(--warning-500)' },
+      { label: 'Missing', value: 64, color: 'var(--error-500)' },
+      { label: 'Expired', value: 12, color: 'var(--grey-400)' },
+    ];
+    const alerts = [
+      { icon: ic('Shield'), cls: 'tw', label: 'Right to work expiring', n: 18 },
+      { icon: ic('FileText'), cls: 'tw', label: 'Documents expiring', n: 26 },
+      { icon: ic('User'), cls: 'te', label: 'Missing documents', n: 34 },
+      { icon: ic('Award'), cls: 'ts', label: 'Licences expiring', n: 11 },
+      { icon: ic('Clock'), cls: 'ti', label: 'Timesheets to approve', n: 42 },
+      { icon: ic('Receipt'), cls: 'te', label: 'Invoices overdue', n: 9 },
+    ];
+    const link = (label, key) => e('a', { href: '#', onClick: (ev) => { ev.preventDefault(); this.go(key); } }, label);
+    const alertsLink = link('View all', 'compliance');
+    const candLink = link('View all', 'candidates');
+    const bookLink = link('View all', 'bookings');
+
+    const recentCandCols = [
+      { key: 'name', header: 'Candidate', render: (r) => e('div', { className: 'namecell' }, DS.Avatar ? e(DS.Avatar, { name: r.name, size: 26 }) : null, e('span', { className: 'nm' }, r.name)) },
+      { key: 'role', header: 'Role', render: (r) => cell(r.role) },
+      { key: 'status', header: 'Status', render: (r) => compBadge(r.status) },
+    ];
+    const recentCandRows = [
+      { name: 'Jordan Smith', role: 'Warehouse Operative', status: 'compliant' },
+      { name: 'Priya Patel', role: 'Forklift Driver', status: 'compliant' },
+      { name: 'Michael Johnson', role: 'General Labourer', status: 'pending' },
+      { name: 'Sophie Williams', role: 'HGV Driver', status: 'compliant' },
+      { name: 'Daniel Brown', role: 'Production Operative', status: 'expiring' },
+    ];
+    const recentBookCols = [
+      { key: 'client', header: 'Client', render: (r) => e('span', { className: 'nm' }, r.client) },
+      { key: 'role', header: 'Role', render: (r) => cell(r.role) },
+      { key: 'status', header: 'Status', render: (r) => DS.Badge ? e(DS.Badge, { tone: r.tone, size: 'sm' }, r.label) : null },
+    ];
+    const recentBookRows = [
+      { client: 'Amazon Logistics', role: 'Warehouse Operative', tone: 'success', label: 'Confirmed' },
+      { client: 'DHL Supply Chain', role: 'Forklift Driver', tone: 'success', label: 'Confirmed' },
+      { client: 'B&M Retail', role: 'General Labourer', tone: 'warning', label: 'Pending' },
+      { client: 'XPO Logistics', role: 'HGV Driver', tone: 'success', label: 'Confirmed' },
+      { client: 'DPD UK', role: 'Van Driver', tone: 'warning', label: 'Pending' },
+    ];
+
+    // ================= CANDIDATES =================
+    const candidates = [
+      { name: 'Jordan Smith', role: 'Warehouse Operative', loc: 'Birmingham', rate: '£13.50', status: 'compliant', match: 96, email: 'jordan.smith@email.com', phone: '07700 900101' },
+      { name: 'Priya Patel', role: 'Forklift Driver', loc: 'Coventry', rate: '£14.00', status: 'compliant', match: 93, email: 'priya.patel@email.com', phone: '07700 900202' },
+      { name: 'Michael Johnson', role: 'General Labourer', loc: 'Wolverhampton', rate: '£12.20', status: 'pending', match: 71, email: 'm.johnson@email.com', phone: '07700 900303' },
+      { name: 'Sophie Williams', role: 'HGV Driver', loc: 'Birmingham', rate: '£16.80', status: 'compliant', match: 88, email: 'sophie.w@email.com', phone: '07700 900404' },
+      { name: 'Daniel Brown', role: 'Production Operative', loc: 'Walsall', rate: '£12.60', status: 'expiring', match: 64, email: 'daniel.b@email.com', phone: '07700 900505' },
+      { name: 'Amara Okafor', role: 'Warehouse Operative', loc: 'Dudley', rate: '£13.50', status: 'compliant', match: 90, email: 'amara.o@email.com', phone: '07700 900606' },
+      { name: 'Ryan Kelly', role: 'Van Driver', loc: 'Solihull', rate: '£13.80', status: 'pending', match: 76, email: 'ryan.k@email.com', phone: '07700 900707' },
+      { name: 'Zara Ahmed', role: 'Picker/Packer', loc: 'Birmingham', rate: '£12.40', status: 'compliant', match: 84, email: 'zara.a@email.com', phone: '07700 900808' },
+    ];
+    const q = st.search.trim().toLowerCase();
+    const matchQ = (...v) => !q || v.some((x) => String(x).toLowerCase().includes(q));
+    const count = (arr, s) => arr.filter((r) => r.status === s).length;
+    const candTabItems = [
+      { key: 'all', label: 'All', badge: candidates.length },
+      { key: 'compliant', label: 'Compliant', badge: count(candidates, 'compliant') },
+      { key: 'pending', label: 'Pending', badge: count(candidates, 'pending') },
+      { key: 'expiring', label: 'Expiring', badge: count(candidates, 'expiring') },
+    ];
+    const candRows = candidates.filter((r) => (st.candTab === 'all' || r.status === st.candTab) && matchQ(r.name, r.role, r.loc));
+    const candCols = [
+      { key: 'name', header: 'Candidate', render: nameCell },
+      { key: 'loc', header: 'Location', render: (r) => cell(r.loc) },
+      { key: 'rate', header: 'Rate / hr', align: 'right', render: (r) => e('span', { className: 'mono' }, r.rate) },
+      { key: 'match', header: 'AI Match', render: (r) => matchBadge(r.match) },
+      { key: 'status', header: 'Compliance', render: (r) => compBadge(r.status) },
+      { key: 'act', header: '', align: 'right', render: (r) => e('div', { className: 'rowacts' }, viewBtn('candidate', r)) },
+    ];
+
+    // ================= WORKERS =================
+    const wkrTabItems = [
+      { key: 'all', label: 'All', badge: st.workers.length },
+      { key: 'available', label: 'Available', badge: st.workers.filter((w) => w.available).length },
+      { key: 'compliant', label: 'Compliant', badge: count(st.workers, 'compliant') },
+    ];
+    const wkrRows = st.workers.filter((w) => (st.wkrTab === 'all' || (st.wkrTab === 'available' ? w.available : w.status === st.wkrTab)) && matchQ(w.name, w.role, w.loc));
+    const wkrCols = [
+      { key: 'name', header: 'Worker', render: nameCell },
+      { key: 'loc', header: 'Location', render: (r) => cell(r.loc) },
+      { key: 'rate', header: 'Rate / hr', align: 'right', render: (r) => e('span', { className: 'mono' }, r.rate) },
+      { key: 'status', header: 'Compliance', render: (r) => compBadge(r.status) },
+      { key: 'avail', header: 'Available', render: (r) => DS.Switch ? e(DS.Switch, { checked: r.available, size: 'sm', onChange: () => this.toggleWorker(r.name) }) : null },
+      { key: 'act', header: '', align: 'right', render: (r) => e('div', { className: 'rowacts' }, viewBtn('worker', r)) },
+    ];
+
+    // ================= CLIENTS =================
+    const clients = [
+      { company: 'Amazon Logistics', industry: 'Logistics', loc: 'Rugeley', contact: 'Emma Clarke', bookings: 42, spend: 486200, status: 'active' },
+      { company: 'DHL Supply Chain', industry: 'Logistics', loc: 'Birmingham', contact: 'Raj Sharma', bookings: 31, spend: 352800, status: 'active' },
+      { company: 'XPO Logistics', industry: 'Logistics', loc: 'Coventry', contact: 'Laura Bennett', bookings: 24, spend: 274600, status: 'active' },
+      { company: 'B&M Retail', industry: 'Retail', loc: 'Speke', contact: 'Tom Fisher', bookings: 18, spend: 159200, status: 'active' },
+      { company: 'DPD UK', industry: 'Logistics', loc: 'Hinckley', contact: 'Aisha Khan', bookings: 15, spend: 213000, status: 'active' },
+      { company: 'Tesco Distribution', industry: 'Retail', loc: 'Lichfield', contact: 'Mark Davies', bookings: 27, spend: 398700, status: 'active' },
+    ];
+    const clientCount = clients.length;
+    const clientRows = clients.filter((r) => matchQ(r.company, r.industry, r.loc, r.contact));
+    const clientCols = [
+      { key: 'company', header: 'Client', render: (r) => e('div', { className: 'namecell' }, DS.Avatar ? e(DS.Avatar, { name: r.company, size: 30 }) : null, e('div', null, e('div', { className: 'nm' }, r.company), e('div', { className: 'sub2' }, r.industry))) },
+      { key: 'loc', header: 'Location', render: (r) => cell(r.loc) },
+      { key: 'contact', header: 'Primary Contact', render: (r) => cell(r.contact) },
+      { key: 'bookings', header: 'Bookings', align: 'right', render: (r) => e('span', { className: 'nm' }, r.bookings) },
+      { key: 'spend', header: 'Total Spend', align: 'right', render: (r) => e('span', { className: 'mono' }, money(r.spend)) },
+      { key: 'act', header: '', align: 'right', render: (r) => e('div', { className: 'rowacts' }, viewBtn('client', r)) },
+    ];
+
+    // ================= BOOKINGS =================
+    const bookings = [
+      { client: 'Amazon Logistics', role: 'Warehouse Operative', date: '28 Jul 2026', workers: 12, rate: '£13.50', state: 'confirmed' },
+      { client: 'DHL Supply Chain', role: 'Forklift Driver', date: '28 Jul 2026', workers: 8, rate: '£14.20', state: 'confirmed' },
+      { client: 'B&M Retail', role: 'General Labourer', date: '29 Jul 2026', workers: 10, rate: '£12.20', state: 'pending' },
+      { client: 'XPO Logistics', role: 'HGV Driver', date: '26 Jul 2026', workers: 6, rate: '£16.80', state: 'confirmed' },
+      { client: 'DPD UK', role: 'Van Driver', date: '30 Jul 2026', workers: 9, rate: '£13.80', state: 'pending' },
+      { client: 'Tesco Distribution', role: 'Picker/Packer', date: '31 Jul 2026', workers: 15, rate: '£12.40', state: 'confirmed' },
+    ];
+    const bkCount = (s) => bookings.filter((b) => b.state === s).length;
+    const bookTabItems = [
+      { key: 'all', label: 'All', badge: bookings.length },
+      { key: 'confirmed', label: 'Confirmed', badge: bkCount('confirmed') },
+      { key: 'pending', label: 'Pending', badge: bkCount('pending') },
+    ];
+    const bookRows = bookings.filter((b) => (st.bookTab === 'all' || b.state === st.bookTab) && matchQ(b.client, b.role));
+    const bookCols = [
+      { key: 'client', header: 'Client', render: (r) => e('span', { className: 'nm' }, r.client) },
+      { key: 'role', header: 'Role', render: (r) => cell(r.role) },
+      { key: 'date', header: 'Start Date', render: (r) => cell(r.date) },
+      { key: 'workers', header: 'Workers', align: 'right', render: (r) => e('span', { className: 'nm' }, r.workers) },
+      { key: 'rate', header: 'Rate / hr', align: 'right', render: (r) => e('span', { className: 'mono' }, r.rate) },
+      { key: 'status', header: 'Status', render: (r) => DS.Badge ? e(DS.Badge, { tone: r.state === 'confirmed' ? 'success' : 'warning', size: 'sm' }, r.state === 'confirmed' ? 'Confirmed' : 'Pending') : null },
+      { key: 'act', header: '', align: 'right', render: (r) => e('div', { className: 'rowacts' }, viewBtn('booking', r)) },
+    ];
+
+    // ================= SHIFTS =================
+    const shiftsRaw = [
+      { d: '28', m: 'JUL', role: 'Warehouse Operative', site: 'Amazon Warehouse', loc: 'Rugeley', time: '07:00 - 15:00', filled: 12, needed: 12, tone: 'success', label: 'Confirmed' },
+      { d: '28', m: 'JUL', role: 'Forklift Driver', site: 'DHL Warehouse', loc: 'Birmingham', time: '15:00 - 23:00', filled: 6, needed: 8, tone: 'warning', label: 'Staffing' },
+      { d: '29', m: 'JUL', role: 'General Labourer', site: 'Construction Site', loc: 'Wolverhampton', time: '08:00 - 16:00', filled: 4, needed: 10, tone: 'warning', label: 'Staffing' },
+      { d: '31', m: 'JUL', role: 'Picker/Packer', site: 'Tesco Distribution', loc: 'Lichfield', time: '06:00 - 14:00', filled: 15, needed: 15, tone: 'success', label: 'Confirmed' },
+    ];
+    const shifts = shiftsRaw.map((s) => { const pct = Math.round((s.filled / s.needed) * 100); return { ...s, pct, ptone: pct >= 100 ? 'success' : 'accent', fillText: s.filled + '/' + s.needed + ' filled', onManage: () => this.openDetail('shift', s) }; });
+
+    // ================= TIMESHEETS =================
+    const tsPending = st.timesheets.filter((t) => t.status === 'pending');
+    const tsApproved = st.timesheets.filter((t) => t.status === 'approved');
+    const tsRejected = st.timesheets.filter((t) => t.status === 'rejected');
+    const tsKpis = [
+      { label: 'Awaiting Approval', value: String(tsPending.length), icon: ic('Clock'), iconTone: 'info' },
+      { label: 'Approved Today', value: String(tsApproved.length), icon: ic('ClipboardCheck'), iconTone: 'success' },
+      { label: 'Rejected', value: String(tsRejected.length), icon: ic('AlertTriangle'), iconTone: 'accent' },
+      { label: 'Total Hours', value: st.timesheets.reduce((a, t) => a + t.hours, 0).toLocaleString(), icon: ic('BarChart'), iconTone: 'info' },
+    ];
+    const tsRows = st.timesheets.filter((t) => matchQ(t.name, t.client, t.role));
+    const tsCols = [
+      { key: 'name', header: 'Worker', render: nameCell },
+      { key: 'client', header: 'Client', render: (r) => cell(r.client) },
+      { key: 'date', header: 'Week Ending', render: (r) => cell(r.date) },
+      { key: 'hours', header: 'Hours', align: 'right', render: (r) => e('span', { className: 'nm' }, r.hours) },
+      { key: 'amount', header: 'Amount', align: 'right', render: (r) => e('span', { className: 'mono' }, money((r.hours * r.rate).toFixed(0))) },
+      { key: 'act', header: 'Action', align: 'right', render: (r) => r.status === 'pending'
+        ? e('div', { className: 'rowacts' }, DS.Button ? e(DS.Button, { variant: 'outline', size: 'sm', onClick: () => this.rejectTS(r.id) }, 'Reject') : null, DS.Button ? e(DS.Button, { size: 'sm', onClick: () => this.approveTS(r.id) }, 'Approve') : null)
+        : (DS.Badge ? e(DS.Badge, { tone: r.status === 'approved' ? 'success' : 'error', size: 'sm' }, r.status === 'approved' ? 'Approved' : 'Rejected') : null) },
+    ];
+
+    // ================= COMPLIANCE =================
+    const reviewAllBtn = DS.Button ? e(DS.Button, { size: 'sm', variant: 'outline', onClick: () => this.go('workers') }, 'Review all') : null;
+    const compCatsRaw = [
+      { label: 'Right to Work', ok: 1024, total: 1248, icon: ic('Shield') },
+      { label: 'Documents', ok: 1180, total: 1248, icon: ic('FileText') },
+      { label: 'Licences', ok: 742, total: 782, icon: ic('Award') },
+      { label: 'Training', ok: 690, total: 782, icon: ic('GraduationCap') },
+    ];
+    const compCats = compCatsRaw.map((c) => { const pct = Math.round((c.ok / c.total) * 100); return { label: c.label, icon: c.icon, pct, tone: pct > 90 ? 'success' : 'accent', detail: c.ok.toLocaleString() + ' of ' + c.total.toLocaleString() + ' valid' }; });
+    const compData = [
+      { name: 'Michael Johnson', role: 'General Labourer', issue: 'Right to Work check pending', due: 'Blocking', status: 'pending' },
+      { name: 'Daniel Brown', role: 'Production Operative', issue: 'Passport expires in 21 days', due: '28 Jul 2026', status: 'expiring' },
+      { name: 'Grace Adeyemi', role: 'Picker/Packer', issue: 'CSCS card expiring', due: '02 Aug 2026', status: 'expiring' },
+      { name: 'Fatima Hassan', role: 'General Labourer', issue: 'Missing proof of address', due: 'Blocking', status: 'missing' },
+      { name: 'Chidi Eze', role: 'Van Driver', issue: 'Licence check due', due: '05 Aug 2026', status: 'expiring' },
+    ];
+    const compRows = compData.filter((r) => matchQ(r.name, r.role, r.issue));
+    const compCols = [
+      { key: 'name', header: 'Worker', render: nameCell },
+      { key: 'issue', header: 'Issue', render: (r) => cell(r.issue) },
+      { key: 'due', header: 'Due', render: (r) => e('span', { className: r.due === 'Blocking' ? 'nm te' : 'nm' }, r.due) },
+      { key: 'status', header: 'Status', render: (r) => compBadge(r.status) },
+    ];
+
+    // ================= INVOICES =================
+    const paidTotal = st.invoices.filter((v) => v.status === 'paid').reduce((a, v) => a + v.amount, 0);
+    const overdueTotal = st.invoices.filter((v) => v.status === 'overdue').reduce((a, v) => a + v.amount, 0);
+    const outstanding = st.invoices.filter((v) => v.status !== 'paid').reduce((a, v) => a + v.amount, 0);
+    const invKpis = [
+      { label: 'Revenue (MTD)', value: '£246,780', delta: '14%', deltaLabel: 'vs last month', icon: ic('PoundSterling'), iconTone: 'success' },
+      { label: 'Paid', value: money(paidTotal), icon: ic('ClipboardCheck'), iconTone: 'success' },
+      { label: 'Outstanding', value: money(outstanding), icon: ic('Receipt'), iconTone: 'info' },
+      { label: 'Overdue', value: money(overdueTotal), icon: ic('AlertTriangle'), iconTone: 'accent' },
+    ];
+    const invRows = st.invoices.filter((v) => matchQ(v.id, v.client));
+    const invCols = [
+      { key: 'id', header: 'Invoice', render: (r) => e('span', { className: 'mono', style: { fontSize: 13 } }, r.id) },
+      { key: 'client', header: 'Client', render: (r) => e('span', { className: 'nm' }, r.client) },
+      { key: 'due', header: 'Due Date', render: (r) => cell(r.due) },
+      { key: 'amount', header: 'Amount', align: 'right', render: (r) => e('span', { className: 'mono' }, money(r.amount)) },
+      { key: 'status', header: 'Status', render: (r) => DS.Badge ? e(DS.Badge, { tone: r.status === 'paid' ? 'success' : r.status === 'overdue' ? 'error' : 'warning', size: 'sm' }, r.status.charAt(0).toUpperCase() + r.status.slice(1)) : null },
+      { key: 'act', header: '', align: 'right', render: (r) => r.status !== 'paid' ? e('div', { className: 'rowacts' }, DS.Button ? e(DS.Button, { size: 'sm', variant: 'outline', onClick: () => this.markPaid(r.id) }, 'Mark Paid') : null) : null },
+    ];
+
+    // ================= AI CHAT =================
+    const chat = st.chat.map((m) => ({ text: m.text, cls: m.role === 'user' ? 'cme' : 'cai' }));
+
+    // ================= MESSAGES =================
+    const mq = st.convSearch.trim().toLowerCase();
+    const partyOf = st.msgFilter;
+    const msgTabItems = [
+      { key: 'all', label: 'All' },
+      { key: 'candidate', label: 'Candidates' },
+      { key: 'client', label: 'Clients' },
+    ].map((t) => ({ label: t.label, cls: partyOf === t.key ? 'on' : '', select: () => this.setMsgFilter(t.key) }));
+    const convos = st.convos
+      .filter((c) => (partyOf === 'all' || c.party === partyOf) && (!mq || c.name.toLowerCase().includes(mq) || c.sub.toLowerCase().includes(mq) || c.msgs.some((m) => m.text.toLowerCase().includes(mq))))
+      .map((c) => ({
+        name: c.name, time: c.msgs[c.msgs.length - 1].time, last: c.msgs[c.msgs.length - 1].text,
+        unread: c.unread, status: c.status, cls: c.id === st.activeConvo ? 'on' : '',
+        tag: c.party === 'client' ? 'Client' : 'Candidate', tagcls: c.party === 'client' ? 'tag-client' : 'tag-candidate',
+        open: () => this.openConvo(c.id),
+      }));
+    const activeC = st.convos.find((c) => c.id === st.activeConvo);
+    const hasThread = !!activeC;
+    const noThread = !activeC;
+    const thread = activeC ? {
+      name: activeC.name, sub: activeC.sub, status: activeC.status, day: activeC.day,
+      msgs: activeC.msgs.map((m) => ({ text: m.text, time: m.time, cls: m.from === 'me' ? 'me' : 'them' })),
+    } : { name: '', sub: '', status: 'offline', day: '', msgs: [] };
+
+    // ================= SETTINGS =================
+    const settingsToggles = [
+      { key: 'email', label: 'Email notifications', desc: 'Daily digest and urgent alerts', on: st.settings.email, toggle: () => this.toggleSetting('email') },
+      { key: 'sms', label: 'SMS alerts', desc: 'Text messages for blocking issues', on: st.settings.sms, toggle: () => this.toggleSetting('sms') },
+      { key: 'compliance', label: 'Compliance warnings', desc: 'Notify when documents are expiring', on: st.settings.compliance, toggle: () => this.toggleSetting('compliance') },
+      { key: 'weekly', label: 'Weekly report', desc: 'Operations summary every Monday', on: st.settings.weekly, toggle: () => this.toggleSetting('weekly') },
+    ];
+    const orgFields = [
+      { label: 'Organisation', value: 'Starff Recruitment Ltd' },
+      { label: 'Region', value: 'West Midlands, UK' },
+      { label: 'Plan', value: 'Enterprise' },
+      { label: 'Admin', value: 'Sarah Mitchell' },
+    ];
+
+    // ================= MODAL =================
+    const modal = st.modal;
+    const modalOpen = !!modal;
+    const isFormModal = modalOpen && modal.type === 'form';
+    const isDetailModal = modalOpen && modal.type === 'detail';
+    let modalTitle = '', modalSubtitle = '', modalWidth = 520, formFields = [], detailFields = [], modalFooter = null;
+    const formMap = {
+      candidate: { title: 'Add Candidate', sub: 'Create a new candidate record', save: 'Add Candidate', fields: [
+        { label: 'Full name', placeholder: 'e.g. Jordan Smith', kind: 'input' },
+        { label: 'Role', placeholder: 'Select role', kind: 'select', options: ['Warehouse Operative', 'Forklift Driver', 'HGV Driver', 'General Labourer', 'Production Operative', 'Van Driver', 'Picker/Packer'] },
+        { label: 'Location', placeholder: 'e.g. Birmingham', kind: 'input' },
+        { label: 'Rate / hr', placeholder: '£13.50', kind: 'input' },
+        { label: 'Email', placeholder: 'name@email.com', kind: 'input', inputType: 'email' },
+      ]},
+      client: { title: 'Add Client', sub: 'Create a new client organisation', save: 'Add Client', fields: [
+        { label: 'Company name', placeholder: 'e.g. Amazon Logistics', kind: 'input' },
+        { label: 'Industry', placeholder: 'Select industry', kind: 'select', options: ['Logistics', 'Retail', 'Manufacturing', 'Construction', 'E-commerce', 'Food & Beverage'] },
+        { label: 'Location', placeholder: 'e.g. Birmingham', kind: 'input' },
+        { label: 'Primary contact', placeholder: 'e.g. Emma Clarke', kind: 'input' },
+        { label: 'Email', placeholder: 'name@company.com', kind: 'input', inputType: 'email' },
+      ]},
+      booking: { title: 'Create Job Booking', sub: 'Raise a new staffing request', save: 'Create Booking', fields: [
+        { label: 'Client', placeholder: 'Select client', kind: 'select', options: clients.map((c) => c.company) },
+        { label: 'Role', placeholder: 'Select role', kind: 'select', options: ['Warehouse Operative', 'Forklift Driver', 'HGV Driver', 'General Labourer', 'Production Operative', 'Van Driver', 'Picker/Packer'] },
+        { label: 'Start date', placeholder: '', kind: 'input', inputType: 'date' },
+        { label: 'Workers needed', placeholder: 'e.g. 10', kind: 'input', inputType: 'number' },
+        { label: 'Rate / hr', placeholder: '£13.50', kind: 'input' },
+      ]},
+    };
+    if (isFormModal) {
+      const cfg = formMap[modal.form];
+      modalTitle = cfg.title; modalSubtitle = cfg.sub;
+      formFields = cfg.fields.map((f) => ({ label: f.label, placeholder: f.placeholder, isSelect: f.kind === 'select', isInput: f.kind !== 'select', options: f.options || [], inputType: f.inputType || 'text' }));
+      modalFooter = e(React.Fragment, null,
+        DS.Button ? e(DS.Button, { variant: 'outline', size: 'sm', onClick: this.closeModal }, 'Cancel') : null,
+        DS.Button ? e(DS.Button, { size: 'sm', onClick: this.submitForm }, cfg.save) : null);
+    } else if (isDetailModal) {
+      const r = modal.row;
+      const map = {
+        candidate: () => { modalTitle = r.name; modalSubtitle = r.role; detailFields = [
+          { label: 'Location', value: r.loc }, { label: 'Rate / hr', value: r.rate }, { label: 'AI Match', value: r.match + '%' },
+          { label: 'Compliance', value: r.status }, { label: 'Email', value: r.email }, { label: 'Phone', value: r.phone } ]; },
+        worker: () => { modalTitle = r.name; modalSubtitle = r.role; detailFields = [
+          { label: 'Location', value: r.loc }, { label: 'Rate / hr', value: r.rate }, { label: 'Available', value: r.available ? 'Yes' : 'No' },
+          { label: 'Compliance', value: r.status }, { label: 'Email', value: r.email }, { label: 'Phone', value: r.phone } ]; },
+        client: () => { modalTitle = r.company; modalSubtitle = r.industry; detailFields = [
+          { label: 'Location', value: r.loc }, { label: 'Primary contact', value: r.contact }, { label: 'Active bookings', value: r.bookings },
+          { label: 'Total spend', value: money(r.spend) }, { label: 'Status', value: 'Active' } ]; },
+        booking: () => { modalTitle = r.client; modalSubtitle = r.role; detailFields = [
+          { label: 'Start date', value: r.date }, { label: 'Workers needed', value: r.workers }, { label: 'Rate / hr', value: r.rate },
+          { label: 'Status', value: r.state === 'confirmed' ? 'Confirmed' : 'Pending' } ]; },
+        shift: () => { modalTitle = r.role; modalSubtitle = r.site; detailFields = [
+          { label: 'Date', value: r.d + ' ' + r.m + ' 2026' }, { label: 'Time', value: r.time }, { label: 'Location', value: r.loc },
+          { label: 'Staffing', value: r.filled + ' of ' + r.needed + ' assigned' }, { label: 'Status', value: r.label } ]; },
+      };
+      (map[modal.kind] || (() => {}))();
+      modalFooter = DS.Button ? e(DS.Button, { variant: 'outline', size: 'sm', onClick: this.closeModal }, 'Close') : null;
+    }
+
+    const toasts = st.toasts.map((t) => ({ tone: t.tone, title: t.title, message: t.message, onDismiss: () => this.dismissToast(t.id) }));
+
+    return {
+      is, active, title, subtitle, sections, sbHeader, sbFooter,
+      search: st.search, onSearch: this.onSearch, bellIcon: ic('Bell'), avSize: 40, go: this.go,
+      openAI: this.openAI, closeAI: this.closeAI, toggleLive: this.toggleLive,
+      aiPanelOpen: st.aiPanelOpen, liveCls: st.live ? 'on' : '', liveLabel: st.live ? 'Live' : 'Go live',
+      aiTopIcon: ic('Sparkle', { size: 16 }), closeIcon: ic('X', { size: 16 }),
+      aiPrompts: ['What needs my attention today?', "Who's ready to place?", 'Match candidates for open bookings', 'Summarise compliance risks'].map((label) => ({ label, use: () => this.askAI(label) })),
+      true: true, false: false, tablePad: 0, chartH: 210, donutSize: 150, donutThick: 20,
+      weeks: ['1 Jun', '8 Jun', '15 Jun', '22 Jun', '29 Jun', '6 Jul'],
+      kpis, legend, overviewSeries, donutSegs, alerts,
+      alertsLink, candLink, bookLink, goCompliance: this.goCompliance,
+      recentCandCols, recentCandRows, recentBookCols, recentBookRows,
+      plusIcon: ic('Plus', { size: 16 }),
+      candTabItems, candTab: st.candTab, setCandTab: this.setCandTab, candCols, candRows, openAddCandidate: this.openAddCandidate,
+      wkrTabItems, wkrTab: st.wkrTab, setWkrTab: this.setWkrTab, wkrCols, wkrRows,
+      clientCount, clientCols, clientRows, openAddClient: this.openAddClient,
+      bookTabItems, bookTab: st.bookTab, setBookTab: this.setBookTab, bookCols, bookRows, openCreateBooking: this.openCreateBooking,
+      shifts, clockIcon: ic('Clock', { size: 15 }), usersIcon: ic('Users', { size: 15 }), pinIcon: ic('MapPin', { size: 15 }),
+      tsKpis, tsCols, tsRows,
+      reviewAllBtn, compCats, compCols, compRows,
+      invKpis, invCols, invRows,
+      chat, draft: st.draft, onDraft: this.onDraft, sendChat: this.sendChat, sparkIcon: ic('Sparkle', { size: 18 }), sendIcon: ic('Send', { size: 18 }),
+      settingsToggles, orgFields,
+      convSearch: st.convSearch, onConvSearch: this.onConvSearch, msgTabItems, convos, avConv: 42,
+      hasThread, noThread, thread, msgDraft: st.msgDraft, onMsgDraft: this.onMsgDraft, sendMsg: this.sendMsg,
+      openThreadProfile: this.openThreadProfile, attachIcon: ic('Paperclip', { size: 18 }) || ic('Upload', { size: 18 }), msgBigIcon: ic('Message', { size: 26 }),
+      modalOpen, isFormModal, isDetailModal, modalTitle, modalSubtitle, modalWidth, formFields, detailFields, modalFooter, closeModal: this.closeModal,
+      toasts,
+    };
+  }
+}
+</script>
+</body>
+</html>
