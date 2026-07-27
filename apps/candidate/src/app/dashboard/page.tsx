@@ -7,8 +7,8 @@ import { Card, ComplianceBadge } from '@/components/ui';
 import { complianceChecks } from '@/lib/compliance';
 
 type Doc = { type: string; status: string };
-type Shift = { id: string; startAt: string; endAt: string; status: string; payRate: string; job: { title: string; client: { name: string } }; site?: { name: string; city?: string } };
-type TS = { id: string; status: string; hoursWorked?: string; shift: { startAt: string; job: { title: string; client: { name: string } } } };
+type Shift = { id: string; startAt: string; endAt: string; status: string; payRate: string; checkInAt?: string | null; job: { title: string; client: { name: string } }; site?: { name: string; city?: string } };
+type TS = { id: string; shiftId?: string; status: string; hoursWorked?: string; shift: { startAt: string; job: { title: string; client: { name: string } } } };
 type Me = { firstName: string; lastName: string; status: string; documents: Doc[]; availability: { dayOfWeek: number }[]; shifts: Shift[]; timesheets: TS[] };
 type Offer = { id: string; status: string; job: { title: string; startDate: string | null; location: string | null; payRate: string | number } };
 
@@ -44,15 +44,35 @@ export default function Dashboard() {
 
   const thisWeekTs = (me?.timesheets ?? []).slice(0, 4);
 
+  // ── Needs attention: things the worker should act on now ──
+  const shifts = me?.shifts ?? [];
+  const submittedShiftIds = new Set((me?.timesheets ?? []).map((t) => t.shiftId));
+  const plural = (n: number) => (n === 1 ? '' : 's');
+  const toConfirm = shifts.filter((s) => s.status === 'ASSIGNED').length;
+  const toCheckIn = shifts.filter((s) => s.status === 'CONFIRMED' && new Date(s.startAt).getTime() <= now && !s.checkInAt).length;
+  const toCheckOut = shifts.filter((s) => s.status === 'IN_PROGRESS').length;
+  const toSubmit = shifts.filter((s) => s.status === 'COMPLETED' && !submittedShiftIds.has(s.id)).length;
+  const attention: { icon: string; text: string; href: string; action: string; urgent?: boolean }[] = [];
+  if (offers.length) attention.push({ icon: '🔔', text: `${offers.length} shift offer${plural(offers.length)} awaiting your response`, href: '/dashboard/offers', action: 'Respond' });
+  if (toCheckIn) attention.push({ icon: '⏱️', text: `${toCheckIn} shift${plural(toCheckIn)} ready to check in`, href: '/dashboard/bookings', action: 'Check in', urgent: true });
+  if (toCheckOut) attention.push({ icon: '⏹️', text: `${toCheckOut} shift${plural(toCheckOut)} in progress — check out when done`, href: '/dashboard/bookings', action: 'Check out', urgent: true });
+  if (toConfirm) attention.push({ icon: '✅', text: `${toConfirm} booking${plural(toConfirm)} to confirm you'll attend`, href: '/dashboard/bookings', action: 'Confirm' });
+  if (toSubmit) attention.push({ icon: '📝', text: `${toSubmit} timesheet${plural(toSubmit)} to submit`, href: '/dashboard/timesheets', action: 'Submit' });
+  if (!cleared && compliancePct < 100) attention.push({ icon: '🛡️', text: `${checksTotal - compliantN} compliance check${plural(checksTotal - compliantN)} to complete`, href: '/dashboard/documents', action: 'Upload' });
+
   return (
     <>
-      {!cleared && compliancePct < 100 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 'var(--radius-lg)', background: 'var(--warning-100)', border: '1px solid #f6dd9e' }}>
-          <div>
-            <div style={{ fontWeight: 700, color: 'var(--warning-600)' }}>Complete your compliance checks</div>
-            <div className="mut" style={{ fontSize: 13 }}>Upload your documents so you can start receiving shift offers without interruption.</div>
+      {attention.length > 0 && (
+        <div className="card card-pad" style={{ borderLeft: '3px solid var(--orange-500)' }}>
+          <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 10 }}>Needs your attention</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {attention.map((a, i) => (
+              <div key={i} className="fx ac" style={{ gap: 10, justifyContent: 'space-between' }}>
+                <span className="fx ac" style={{ gap: 9, fontSize: 13.5 }}><span style={{ fontSize: 16 }}>{a.icon}</span>{a.text}</span>
+                <Link href={a.href} className={a.urgent ? 'btn-primary' : 'btn-outline'} style={{ textDecoration: 'none', height: 30, display: 'inline-flex', alignItems: 'center', padding: '0 12px', fontSize: 12.5, whiteSpace: 'nowrap' }}>{a.action}</Link>
+              </div>
+            ))}
           </div>
-          <Link href="/dashboard/documents" className="btn-outline" style={{ marginLeft: 'auto', textDecoration: 'none' }}>Upload documents</Link>
         </div>
       )}
 

@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { apiFetch } from '@/lib/api';
 import * as Ic from './icons';
 
-type Item = { key: string; label: string; href: string; icon: ReactNode; badge?: number };
+type Item = { key: string; label: string; href: string; icon: ReactNode };
 type Section = { label?: string; items: Item[] };
 
 const sections: Section[] = [
@@ -45,9 +46,28 @@ const sections: Section[] = [
   },
 ];
 
+type Sub = { status: string };
+type Job = { status: string; reviewNote?: string | null };
+type Overview = { timesheetsPending?: number };
+
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  // Live "needs attention" counts for the menu badges.
+  const [badges, setBadges] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    Promise.all([
+      apiFetch<Sub[]>('/client/submissions').catch(() => []),
+      apiFetch<Job[]>('/client/jobs').catch(() => []),
+      apiFetch<Overview>('/client/overview').catch(() => null),
+    ]).then(([subs, jobs, ov]) => {
+      const toReview = (subs ?? []).filter((s) => s.status === 'SUBMITTED_TO_CLIENT').length;
+      const needInfo = (jobs ?? []).filter((j) => j.status === 'UNDER_REVIEW' && j.reviewNote).length;
+      setBadges({ submissions: toReview, bookings: needInfo, timesheets: ov?.timesheetsPending ?? 0 });
+    });
+  }, [pathname]);
+
   const isActive = (href: string) => (href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href));
 
   async function signOut() {
@@ -70,7 +90,7 @@ export function Sidebar() {
               <Link key={it.key} href={it.href} className={`sb-item ${isActive(it.href) ? 'on' : ''}`}>
                 <span className="sb-ic">{it.icon}</span>
                 {it.label}
-                {it.badge ? <span className="sb-badge">{it.badge}</span> : null}
+                {badges[it.key] ? <span className="sb-badge">{badges[it.key]}</span> : null}
               </Link>
             ))}
           </div>

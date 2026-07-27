@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { apiFetch } from '@/lib/api';
+import { complianceChecks } from '@/lib/compliance';
 import * as Ic from './icons';
 
-type Item = { key: string; label: string; href: string; icon: ReactNode; badge?: number };
+type Item = { key: string; label: string; href: string; icon: ReactNode };
 type Section = { label?: string; items: Item[] };
 
 const sections: Section[] = [
@@ -41,9 +43,34 @@ const sections: Section[] = [
   },
 ];
 
+type Doc = { type: string; status: string };
+type Shift = { id: string; status: string; startAt: string; checkInAt?: string | null };
+type Me = { status?: string; documents?: Doc[]; shifts?: Shift[]; timesheets?: { shiftId: string }[] };
+type Inv = { status: string };
+
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  // Live "needs attention" counts for the menu badges.
+  const [badges, setBadges] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    Promise.all([
+      apiFetch<Me>('/me').catch(() => null),
+      apiFetch<Inv[]>('/me/invitations').catch(() => []),
+    ]).then(([me, invs]) => {
+      if (!me) return;
+      const now = Date.now();
+      const shifts = me.shifts ?? [];
+      const submitted = new Set((me.timesheets ?? []).map((t) => t.shiftId));
+      const offers = (invs ?? []).filter((i) => i.status === 'INVITED').length;
+      const toAction = shifts.filter((s) => s.status === 'ASSIGNED' || s.status === 'IN_PROGRESS' || (s.status === 'CONFIRMED' && +new Date(s.startAt) <= now && !s.checkInAt)).length;
+      const toSubmit = shifts.filter((s) => s.status === 'COMPLETED' && !submitted.has(s.id)).length;
+      const { total, done, cleared } = complianceChecks(me.status, me.documents ?? []);
+      setBadges({ offers, bookings: toAction, timesheets: toSubmit, compliance: cleared ? 0 : total - done });
+    });
+  }, [pathname]);
+
   const isActive = (href: string) => (href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href));
 
   async function signOut() {
@@ -66,7 +93,7 @@ export function Sidebar() {
               <Link key={it.key} href={it.href} className={`sb-item ${isActive(it.href) ? 'on' : ''}`}>
                 <span className="sb-ic">{it.icon}</span>
                 {it.label}
-                {it.badge ? <span className="sb-badge">{it.badge}</span> : null}
+                {badges[it.key] ? <span className="sb-badge">{badges[it.key]}</span> : null}
               </Link>
             ))}
           </div>

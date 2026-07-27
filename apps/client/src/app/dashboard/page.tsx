@@ -7,7 +7,8 @@ import { Card, KPIStat, Badge, Avatar, DataTable, type Column } from '@/componen
 import * as Ic from '@/components/icons';
 
 type Overview = { activeBookings: number; workersOnSiteToday: number; timesheetsPending: number; spendMtd: number };
-type Job = { id: string; title: string; status: string; site?: string; filled: number; total: number };
+type Job = { id: string; title: string; status: string; site?: string; filled: number; total: number; reviewNote?: string | null };
+type Sub = { id: string; status: string };
 type TS = { id: string; hoursWorked?: string; candidate: { firstName: string; lastName: string }; shift: { startAt: string; job: { title: string } } };
 type Inv = { id: string; number: string; total: string; status: string; periodEnd: string };
 type Loc = { id: string; name: string; address: string; workers: number };
@@ -21,6 +22,7 @@ const fmt = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: '2-dig
 export default function ClientDashboard() {
   const [ov, setOv] = useState<Overview | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [subs, setSubs] = useState<Sub[]>([]);
   const [ts, setTs] = useState<TS[]>([]);
   const [invs, setInvs] = useState<Inv[]>([]);
   const [locs, setLocs] = useState<Loc[]>([]);
@@ -28,12 +30,23 @@ export default function ClientDashboard() {
 
   const load = () => {
     apiFetch<Overview>('/client/overview').then(setOv).catch(() => {});
-    apiFetch<Job[]>('/client/jobs').then((j) => setJobs(j.slice(0, 5))).catch(() => {});
+    apiFetch<Job[]>('/client/jobs').then(setJobs).catch(() => {});
+    apiFetch<Sub[]>('/client/submissions').then(setSubs).catch(() => {});
     apiFetch<TS[]>('/client/timesheets').then((t) => setTs(t.slice(0, 4))).catch(() => {});
     apiFetch<Inv[]>('/client/invoices').then((i) => setInvs(i.slice(0, 4))).catch(() => {});
     apiFetch<Loc[]>('/client/locations').then(setLocs).catch(() => {});
   };
   useEffect(() => { load(); }, []);
+
+  // ── Needs attention: things this client should act on now ──
+  const plural = (n: number) => (n === 1 ? '' : 's');
+  const toReview = subs.filter((s) => s.status === 'SUBMITTED_TO_CLIENT').length;
+  const needInfo = jobs.filter((j) => j.status === 'UNDER_REVIEW').length;
+  const toApprove = ov?.timesheetsPending ?? 0;
+  const attention: { icon: string; text: string; href: string; action: string; urgent?: boolean }[] = [];
+  if (toReview) attention.push({ icon: '👥', text: `${toReview} candidate${plural(toReview)} ready for you to review`, href: '/dashboard/submissions', action: 'Review', urgent: true });
+  if (needInfo) attention.push({ icon: '💬', text: `${needInfo} request${plural(needInfo)} need more information`, href: '/dashboard/bookings', action: 'Respond' });
+  if (toApprove) attention.push({ icon: '⏱️', text: `${toApprove} timesheet${plural(toApprove)} awaiting your approval`, href: '/dashboard/timesheets', action: 'Approve' });
 
   async function approve(id: string) {
     setBusy(id);
@@ -57,13 +70,27 @@ export default function ClientDashboard() {
 
   return (
     <>
+      {attention.length > 0 && (
+        <div className="card card-pad" style={{ borderLeft: '3px solid var(--orange-500)' }}>
+          <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 10 }}>Needs your attention</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {attention.map((a, i) => (
+              <div key={i} className="fx ac" style={{ gap: 10, justifyContent: 'space-between' }}>
+                <span className="fx ac" style={{ gap: 9, fontSize: 13.5 }}><span style={{ fontSize: 16 }}>{a.icon}</span>{a.text}</span>
+                <Link href={a.href} className={a.urgent ? 'btn-primary' : 'btn-outline'} style={{ textDecoration: 'none', height: 30, display: 'inline-flex', alignItems: 'center', padding: '0 12px', fontSize: 12.5, whiteSpace: 'nowrap' }}>{a.action}</Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="g4">
         {kpis.map((k) => <KPIStat key={k.label} label={k.label} value={k.value} icon={k.icon} tone={k.tone} />)}
       </div>
 
       <div className="gmid">
         <Card title="Active Bookings" action={<Link href="/dashboard/bookings" className="link">View all</Link>}>
-          {jobs.length ? <DataTable columns={bookCols} rows={jobs} /> : <p className="mut" style={{ fontSize: 13.5 }}>No bookings yet. Use “Book Staff” to raise your first request.</p>}
+          {jobs.length ? <DataTable columns={bookCols} rows={jobs.slice(0, 5)} /> : <p className="mut" style={{ fontSize: 13.5 }}>No bookings yet. Use “Book Staff” to raise your first request.</p>}
         </Card>
 
         <Card title="Timesheets to Approve" subtitle={`${ts.length} awaiting your approval`} action={<Link href="/dashboard/timesheets" className="link">View all</Link>}>
