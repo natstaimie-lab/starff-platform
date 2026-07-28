@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { MatchingController } from './matching.controller';
+import { MatchingController, TopMatchesController } from './matching.controller';
 import { MatchingService } from './matching.service';
 import { JobAnalysisService } from './job-analysis.service';
 import { MatchWeightsService } from './match-weights.service';
@@ -8,7 +8,7 @@ import { ReliabilityModule } from '../reliability/reliability.module';
 
 @Module({
   imports: [ReliabilityModule],
-  controllers: [MatchingController, MatchWeightsController],
+  controllers: [MatchingController, TopMatchesController, MatchWeightsController],
   providers: [MatchingService, JobAnalysisService, MatchWeightsService],
   exports: [MatchingService],
 })

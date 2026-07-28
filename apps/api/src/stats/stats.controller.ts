@@ -35,6 +35,11 @@ export class StatsController {
     return this.stats.trends();
   }
 
+  @Get('reliability')
+  reliability() {
+    return this.stats.reliability();
+  }
+
   @Get('alerts')
   alertsList() {
     return this.alerts.getAlerts();

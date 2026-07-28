@@ -116,7 +116,7 @@ export default function ClientDashboard() {
       </div>
 
       {/* Main: live bookings | recommended | right rail */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(0, 1.2fr) minmax(0, 1fr)', gap: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(0, 1.2fr) minmax(0, 1fr)', gap: 16 }}>
         <div style={card}>
           <Head title="Live Bookings & Shifts" href="/dashboard/bookings" action="View all bookings" />
           {live.length === 0 ? <p className="dim" style={{ fontSize: 13.5 }}>No live bookings. Use “Book Staff” to raise a request.</p> : (
@@ -168,7 +168,7 @@ export default function ClientDashboard() {
               </div>
             ))}
           </div>
-          <div style={card}>
+          <div style={{ ...card, flex: 1 }}>
             <Head title="Compliance Status" href="/dashboard/compliance" />
             <div className="fx ac jb" style={{ marginBottom: 8 }}>
               <span style={{ fontSize: 13 }}>Your workers cleared</span>

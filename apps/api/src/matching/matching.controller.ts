@@ -28,3 +28,18 @@ export class MatchingController {
     return this.matching.recommend(id, { explain: explain === '1' || explain === 'true', actorId: u.id });
   }
 }
+
+/** Dashboard-wide top matches across all open jobs (separate path to avoid the /jobs/:id routes). */
+@ApiTags('matching')
+@ApiBearerAuth()
+@Controller('matching')
+@Roles(Role.ADMIN, Role.RECRUITER)
+export class TopMatchesController {
+  constructor(private readonly matching: MatchingService) {}
+
+  @Get('top')
+  top(@Query('limit') limit?: string) {
+    const n = Math.min(Math.max(Number(limit) || 6, 1), 12);
+    return this.matching.topMatches(n);
+  }
+}

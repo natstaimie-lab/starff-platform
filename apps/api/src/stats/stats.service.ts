@@ -208,4 +208,56 @@ export class StatsService {
       reliabilityConcerns: reliabilityConcerns.slice(0, 8),
     };
   }
+
+  /**
+   * Workforce reliability snapshot for the dashboard — all derived from real
+   * data: average worker rating, attendance & punctuality from completed
+   * shifts, and the share of workers in good standing (no MEDIUM+ concern).
+   * Metrics with no data yet return `null` so the UI can show "—" rather than
+   * a fabricated figure.
+   */
+  async reliability() {
+    const [rated, shifts, incidents, workerCount] = await Promise.all([
+      this.prisma.candidate.findMany({ where: { archivedAt: null, rating: { not: null } }, select: { rating: true } }),
+      this.prisma.shift.findMany({ where: { status: { in: ['COMPLETED', 'NO_SHOW'] } }, select: { status: true, startAt: true, checkInAt: true } }),
+      this.prisma.reliabilityIncident.findMany({ where: { status: { in: ['CONFIRMED', 'UNCONFIRMED'] } }, select: { candidateId: true, scoreImpact: true, weightFactor: true, status: true } }),
+      this.prisma.candidate.count({ where: { archivedAt: null, status: { in: [CandidateStatus.COMPLIANT, CandidateStatus.ACTIVE] } } }),
+    ]);
+
+    const avgRating = rated.length ? rated.reduce((a, c) => a + (c.rating ?? 0), 0) / rated.length : null;
+
+    const completed = shifts.filter((s) => s.status === 'COMPLETED').length;
+    const noShow = shifts.filter((s) => s.status === 'NO_SHOW').length;
+    const attended = completed + noShow;
+    const attendancePct = attended ? Math.round((completed / attended) * 100) : null;
+
+    // Punctuality — of completed shifts with a check-in, share on time (≤5 min grace).
+    const checkedIn = shifts.filter((s) => s.status === 'COMPLETED' && s.checkInAt);
+    const onTime = checkedIn.filter((s) => (s.checkInAt as Date).getTime() <= s.startAt.getTime() + 5 * 60 * 1000).length;
+    const punctualityPct = checkedIn.length ? Math.round((onTime / checkedIn.length) * 100) : null;
+
+    // Good standing — workers not currently at MEDIUM/HIGH concern.
+    const byCand = new Map<string, { status: any; scoreImpact: number; weightFactor: number }[]>();
+    for (const i of incidents) {
+      if (!byCand.has(i.candidateId)) byCand.set(i.candidateId, []);
+      byCand.get(i.candidateId)!.push(i);
+    }
+    let concern = 0;
+    for (const list of byCand.values()) {
+      const level = ReliabilityService.levelFor(ReliabilityService.pointsFor(list));
+      if (level === 'MEDIUM' || level === 'HIGH') concern += 1;
+    }
+    const goodStandingPct = workerCount ? Math.round(((workerCount - concern) / workerCount) * 100) : null;
+
+    return {
+      avgRating: avgRating != null ? Math.round(avgRating * 10) / 10 : null,
+      ratingCount: rated.length,
+      metrics: [
+        { label: 'Attendance', pct: attendancePct, detail: attended ? `${completed}/${attended} shifts` : 'No completed shifts yet' },
+        { label: 'Punctuality', pct: punctualityPct, detail: checkedIn.length ? `${onTime}/${checkedIn.length} on time` : 'No check-ins yet' },
+        { label: 'Good standing', pct: goodStandingPct, detail: workerCount ? `${workerCount - concern}/${workerCount} workers` : 'No workers yet' },
+      ],
+      concerns: concern,
+    };
+  }
 }

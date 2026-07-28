@@ -102,6 +102,64 @@ export class MatchingService {
   }
 
   /**
+   * Dashboard-wide "top recommendations" feed: runs the deterministic scorer
+   * across the currently open/recruiting jobs and returns the strongest
+   * candidate–job matches (best score per candidate). No side effects.
+   */
+  async topMatches(limit = 6): Promise<
+    {
+      candidateId: string;
+      name: string;
+      headline: string | null;
+      score: number;
+      available: boolean;
+      reason: string | null;
+      pipelineStatus: string | null;
+      jobId: string;
+      jobTitle: string;
+    }[]
+  > {
+    const openStatuses = ['RECRUITING', 'APPROVED', 'CANDIDATES_SUBMITTED', 'PARTIALLY_FILLED', 'OPEN', 'OFFERS_SENT'];
+    const jobs = await this.prisma.job.findMany({
+      where: { status: { in: openStatuses as never } },
+      orderBy: { createdAt: 'desc' },
+      take: 6,
+      select: { id: true },
+    });
+
+    // Best match per candidate across the sampled jobs.
+    const best = new Map<
+      string,
+      { candidateId: string; name: string; headline: string | null; score: number; available: boolean; reason: string | null; pipelineStatus: string | null; jobId: string; jobTitle: string }
+    >();
+    for (const j of jobs) {
+      let scored;
+      try {
+        scored = await this.score(j.id);
+      } catch {
+        continue;
+      }
+      for (const r of scored.recommendations.slice(0, 8)) {
+        const prev = best.get(r.candidateId);
+        if (!prev || r.score > prev.score) {
+          best.set(r.candidateId, {
+            candidateId: r.candidateId,
+            name: r.name,
+            headline: r.headline,
+            score: r.score,
+            available: r.available,
+            reason: r.reasons[0] ?? null,
+            pipelineStatus: r.pipelineStatus,
+            jobId: scored.job.id,
+            jobTitle: scored.job.title,
+          });
+        }
+      }
+    }
+    return [...best.values()].sort((a, b) => b.score - a.score).slice(0, limit);
+  }
+
+  /**
    * Pure deterministic scoring — no side effects (no audit / no AI). Callable by
    * the invite flow to persist the score on the Application it creates.
    */

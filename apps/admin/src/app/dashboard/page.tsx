@@ -3,17 +3,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
-import { Card, KPIStat, Badge, ComplianceBadge, Avatar, DataTable, type Column } from '@/components/ui';
-import { AreaChart, DonutChart } from '@/components/charts';
+import { Badge, Avatar } from '@/components/ui';
 import * as Ic from '@/components/icons';
 
-// Colours for the (live) Overview trend series, in the order the API returns them.
-const SERIES_COLORS = ['#8b5cf6', 'var(--blue-500)', 'var(--orange-500)', 'var(--success-500)'];
-type Stats ={ candidates: number; workers: number; clients: number; bookings: number; timesheets: number; revenue: number; pendingTimesheets: number; newEnquiries: number; complianceAttention: number };
+type Stats = { candidates: number; workers: number; clients: number; bookings: number; timesheets: number; revenue: number; pendingTimesheets: number; newEnquiries: number; complianceAttention: number };
 type Compliance = { compliant: number; active: number; screening: number; awaiting: number; inactive: number; rejected: number; total: number; clearedPct: number };
-type Trends = { labels: string[]; series: { name: string; data: number[] }[] };
-type Cand = { id: string; firstName: string; lastName: string; status: string; headline?: string };
-type Job = { id: string; title: string; status: string; client: { name: string } };
+type Job = { id: string; title: string; status: string; openings?: number; client: { name: string }; _count?: { shifts: number; applications: number } };
 type WF = {
   counts: { awaitingApproval: number; responsesToReview: number; readyToSubmit: number; awaitingClient: number; clientAccepted: number; alternativesRequested: number; placements: number; recruiting: number; toRefill: number; upcomingShifts: number; reliabilityConcerns: number };
   awaitingApprovalJobs: { id: string; title: string; openings: number; status: string; submittedAt?: string | null; client: { name: string } }[];
@@ -22,250 +17,292 @@ type WF = {
   reliabilityConcerns: { candidateId: string; name: string; points: number; level: string }[];
 };
 type Alert = { type: string; severity: 'high' | 'medium' | 'low'; message: string; candidateId: string | null; shiftId: string | null; jobId: string | null; occurredAt: string };
+type TopMatch = { candidateId: string; name: string; headline: string | null; score: number; available: boolean; reason: string | null; pipelineStatus: string | null; jobId: string; jobTitle: string };
+type Reliability = { avgRating: number | null; ratingCount: number; metrics: { label: string; pct: number | null; detail: string }[]; concerns: number };
 
 const money = (n: number) => '£' + n.toLocaleString();
 const num = (n?: number) => (n === undefined ? '—' : n.toLocaleString());
 
-const jobTone: Record<string, string> = { FILLED: 'success', OPEN: 'warning', DRAFT: 'neutral', CLOSED: 'neutral', CANCELLED: 'error' };
-const jobLabel: Record<string, string> = { FILLED: 'Confirmed', OPEN: 'Open', DRAFT: 'Draft', CLOSED: 'Closed', CANCELLED: 'Cancelled' };
+// Jobs still consuming recruiter effort (not terminal states).
+const ACTIVE_JOB = new Set(['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'RECRUITING', 'CANDIDATES_SUBMITTED', 'PARTIALLY_FILLED', 'OPEN', 'OFFERS_SENT']);
+const FILLED_JOB = new Set(['FILLED', 'COMPLETED']);
+const NEEDS_STAFF = new Set(['RECRUITING', 'PARTIALLY_FILLED', 'OPEN', 'CANDIDATES_SUBMITTED', 'OFFERS_SENT']);
+
+const shiftTone: Record<string, { bg: string; fg: string; label: string }> = {
+  CONFIRMED: { bg: 'var(--success-100)', fg: 'var(--success-600)', label: 'Confirmed' },
+  ASSIGNED: { bg: 'var(--blue-100)', fg: 'var(--blue-600)', label: 'Assigned' },
+  IN_PROGRESS: { bg: 'var(--success-100)', fg: 'var(--success-600)', label: 'In progress' },
+  COMPLETED: { bg: 'var(--grey-100)', fg: 'var(--grey-600)', label: 'Completed' },
+  OPEN: { bg: 'var(--orange-100)', fg: 'var(--orange-600)', label: 'Open' },
+};
+
+function Kpi({ label, value, hint, icon, bg }: { label: string; value: string; hint: string; icon: React.ReactNode; bg: string }) {
+  return (
+    <div style={{ ...cardStyle, padding: 18, display: 'flex', alignItems: 'center', gap: 15 }}>
+      <div style={{ width: 56, height: 56, borderRadius: 16, background: bg, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{icon}</div>
+      <div style={{ minWidth: 0 }}>
+        <div className="dim" style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase' }}>{label}</div>
+        <div style={{ fontSize: 27, fontWeight: 800, lineHeight: 1.05, margin: '3px 0' }}>{value}</div>
+        <div className="dim" style={{ fontSize: 12 }}>{hint}</div>
+      </div>
+    </div>
+  );
+}
+
+function SectionHead({ title, href, action }: { title: string; href?: string; action?: string }) {
+  return (
+    <div className="fx ac jb" style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>{title}</div>
+      {href && <Link href={href} className="link" style={{ fontSize: 12.5, fontWeight: 600 }}>{action ?? 'View all'} →</Link>}
+    </div>
+  );
+}
+
+const cardStyle: React.CSSProperties = { background: 'var(--surface-card)', border: '1px solid var(--border-subtle)', borderRadius: 16, padding: 22 };
+const fmtTime = (d: string) => new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+const fmtDay = (d: string) => new Date(d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 
 export default function DashboardHome() {
   const [stats, setStats] = useState<Stats | null>(null);
-  const [cands, setCands] = useState<Cand[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [wf, setWf] = useState<WF | null>(null);
   const [alerts, setAlerts] = useState<Alert[] | null>(null);
   const [comp, setComp] = useState<Compliance | null>(null);
-  const [trends, setTrends] = useState<Trends | null>(null);
+  const [matches, setMatches] = useState<TopMatch[] | null>(null);
+  const [rel, setRel] = useState<Reliability | null>(null);
+  const [now, setNow] = useState<string>('');
 
   useEffect(() => {
     apiFetch<Stats>('/stats/overview').then(setStats).catch(() => {});
-    apiFetch<Cand[]>('/candidates').then((c) => setCands(c.slice(0, 5))).catch(() => {});
     apiFetch<Job[]>('/jobs').then(setJobs).catch(() => {});
     apiFetch<WF>('/stats/workflow').then(setWf).catch(() => {});
     apiFetch<{ alerts: Alert[] }>('/stats/alerts').then((r) => setAlerts(r.alerts)).catch(() => {});
     apiFetch<Compliance>('/stats/compliance').then(setComp).catch(() => {});
-    apiFetch<Trends>('/stats/trends').then(setTrends).catch(() => {});
+    apiFetch<TopMatch[]>('/matching/top?limit=5').then(setMatches).catch(() => setMatches([]));
+    apiFetch<Reliability>('/stats/reliability').then(setRel).catch(() => {});
+    setNow(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
   }, []);
 
-  // Live compliance breakdown (candidate status) → donut segments.
-  const donut = comp ? [
-    { label: 'Compliant', value: comp.compliant, color: 'var(--success-500)' },
-    { label: 'Active', value: comp.active, color: 'var(--blue-500)' },
-    { label: 'In screening', value: comp.screening, color: 'var(--warning-500)' },
-    { label: 'Awaiting checks', value: comp.awaiting, color: 'var(--orange-500)' },
-    { label: 'Inactive / rejected', value: comp.inactive + comp.rejected, color: 'var(--grey-400)' },
-  ].filter((s) => s.value > 0) : [];
-  // Live weekly activity → area series (attach colours in API order).
-  const areaSeries = trends ? trends.series.map((s, i) => ({ ...s, color: SERIES_COLORS[i % SERIES_COLORS.length] })) : [];
+  const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  const recentJobs = jobs.slice(0, 5);
+  // ── Derived, real figures ──
+  const activeJobs = jobs.filter((j) => ACTIVE_JOB.has(j.status)).length;
+  const requireStaff = jobs.filter((j) => NEEDS_STAFF.has(j.status)).length;
+  const fillDenom = jobs.filter((j) => j.status !== 'DRAFT' && j.status !== 'CANCELLED').length;
+  const fillRate = fillDenom ? Math.round((jobs.filter((j) => FILLED_JOB.has(j.status)).length / fillDenom) * 100) : 0;
+  const recentJobs = jobs.slice(0, 4);
 
-  // ── Needs attention: everything waiting on the admin, newest-action first ──
-  const pl = (n: number) => (n === 1 ? '' : 's');
-  const attention: { icon: string; text: string; href: string; action: string; urgent?: boolean }[] = [];
-  if (wf) {
-    const c = wf.counts;
-    if (c.awaitingApproval) attention.push({ icon: '📋', text: `${c.awaitingApproval} job request${pl(c.awaitingApproval)} to review`, href: '/dashboard/bookings?status=SUBMITTED,UNDER_REVIEW', action: 'Review', urgent: true });
-    if (c.clientAccepted) attention.push({ icon: '✅', text: `${c.clientAccepted} client-accepted candidate${pl(c.clientAccepted)} to confirm`, href: '/dashboard/bookings?status=CANDIDATES_SUBMITTED', action: 'Confirm', urgent: true });
-    if (c.readyToSubmit) attention.push({ icon: '📤', text: `${c.readyToSubmit} interested candidate${pl(c.readyToSubmit)} ready to submit to client`, href: '/dashboard/bookings?status=RECRUITING,OFFERS_SENT', action: 'Submit' });
-    if (c.alternativesRequested) attention.push({ icon: '🔄', text: `${c.alternativesRequested} alternative${pl(c.alternativesRequested)} requested by clients`, href: '/dashboard/bookings', action: 'Review' });
-    if (c.toRefill) attention.push({ icon: '🔁', text: `${c.toRefill} replacement${pl(c.toRefill)} to fill`, href: '/dashboard/bookings', action: 'Fill' });
-    if (c.reliabilityConcerns) attention.push({ icon: '⚠️', text: `${c.reliabilityConcerns} worker${pl(c.reliabilityConcerns)} with reliability concerns`, href: '/dashboard/candidates', action: 'Review' });
-  }
-  if (stats) {
-    if (stats.pendingTimesheets) attention.push({ icon: '⏱️', text: `${stats.pendingTimesheets} timesheet${pl(stats.pendingTimesheets)} to approve`, href: '/dashboard/timesheets', action: 'Approve' });
-    if (stats.newEnquiries) attention.push({ icon: '📨', text: `${stats.newEnquiries} new website enquir${stats.newEnquiries === 1 ? 'y' : 'ies'}`, href: '/dashboard/enquiries', action: 'View' });
-  }
+  const compRows = comp ? [
+    { label: 'Cleared / Compliant', value: comp.compliant },
+    { label: 'Active', value: comp.active },
+    { label: 'In screening', value: comp.screening },
+    { label: 'Awaiting checks', value: comp.awaiting },
+    { label: 'Inactive / rejected', value: comp.inactive + comp.rejected },
+  ] : [];
+
   const ALERT_ICON: Record<string, React.ReactNode> = {
-    RUNNING_LATE: <Ic.Clock width={18} />, REPORTED_ABSENT: <Ic.AlertCircle width={18} />,
-    NOT_ACKNOWLEDGED: <Ic.User width={18} />, NO_CHECK_IN: <Ic.AlertCircle width={18} />,
-    TIMESHEET_OUTSTANDING: <Ic.Clock width={18} />, DOC_EXPIRING: <Ic.FileText width={18} />,
+    RUNNING_LATE: <Ic.Clock width={16} />, REPORTED_ABSENT: <Ic.AlertCircle width={16} />,
+    NOT_ACKNOWLEDGED: <Ic.User width={16} />, NO_CHECK_IN: <Ic.AlertCircle width={16} />,
+    TIMESHEET_OUTSTANDING: <Ic.Clock width={16} />, DOC_EXPIRING: <Ic.FileText width={16} />,
   };
 
-  const kpis = [
-    { label: 'Total Candidates', value: num(stats?.candidates), icon: <Ic.Users width={22} />, tone: 'info' as const },
-    { label: 'Active Workers', value: num(stats?.workers), icon: <Ic.HardHat width={22} />, tone: 'accent' as const },
-    { label: 'Clients', value: num(stats?.clients), icon: <Ic.Building width={22} />, tone: 'info' as const },
-    { label: 'Active Bookings', value: num(stats?.bookings), icon: <Ic.Calendar width={22} />, tone: 'success' as const },
-    { label: 'Timesheets', value: num(stats?.timesheets), icon: <Ic.Clock width={22} />, tone: 'info' as const },
-    { label: 'Revenue (MTD)', value: stats ? money(stats.revenue) : '—', icon: <Ic.PoundSterling width={22} />, tone: 'success' as const },
-  ];
-
-  const candCols: Column<Cand>[] = [
-    { key: 'name', header: 'Candidate', render: (r) => <div className="namecell"><Avatar name={`${r.firstName} ${r.lastName}`} size={26} /><span className="nm">{r.firstName} {r.lastName}</span></div> },
-    { key: 'role', header: 'Role', render: (r) => <span className="dim">{r.headline ?? '—'}</span> },
-    { key: 'status', header: 'Status', render: (r) => <ComplianceBadge status={r.status.toLowerCase()} /> },
-  ];
-  const jobCols: Column<Job>[] = [
-    { key: 'client', header: 'Client', render: (r) => <span className="nm">{r.client?.name}</span> },
-    { key: 'role', header: 'Role', render: (r) => <span className="dim">{r.title}</span> },
-    { key: 'status', header: 'Status', render: (r) => <Badge tone={(jobTone[r.status] ?? 'neutral') as any}>{jobLabel[r.status] ?? r.status}</Badge> },
-  ];
-
-  // Real insights derived from live stats — each links to where you act on it.
-  const insights: { bg: string; fg: string; icon: React.ReactNode; text: string; action: string; href: string }[] = [];
-  if (stats) {
-    const needsCompliance = Math.max(0, stats.candidates - stats.workers);
-    if (needsCompliance > 0) insights.push({ bg: 'var(--warning-100)', fg: 'var(--warning-600)', icon: <Ic.Shield width={16} />, text: `${needsCompliance} candidate${needsCompliance === 1 ? '' : 's'} need compliance checks before they can work.`, action: 'Review compliance', href: '/dashboard/compliance' });
-    if (stats.pendingTimesheets > 0) insights.push({ bg: 'var(--info-100)', fg: 'var(--blue-500)', icon: <Ic.Clock width={16} />, text: `${stats.pendingTimesheets} timesheet${stats.pendingTimesheets === 1 ? '' : 's'} awaiting your approval.`, action: 'Approve now', href: '/dashboard/timesheets' });
-    if (stats.newEnquiries > 0) insights.push({ bg: 'var(--success-100)', fg: 'var(--success-600)', icon: <Ic.FileText width={16} />, text: `${stats.newEnquiries} new website enquir${stats.newEnquiries === 1 ? 'y' : 'ies'} to follow up.`, action: 'View enquiries', href: '/dashboard/enquiries' });
-    if (stats.bookings > 0) insights.push({ bg: 'var(--orange-100)', fg: 'var(--orange-600)', icon: <Ic.Calendar width={16} />, text: `${stats.bookings} active booking${stats.bookings === 1 ? '' : 's'} on your books.`, action: 'View bookings', href: '/dashboard/bookings' });
-  }
-
   return (
-    <>
-      <div className="samplebar">
-        <Ic.AlertCircle width={16} />
-        Every figure on this dashboard — KPIs, the workflow queues, the activity trend, compliance ring &amp; alerts — is <b style={{ margin: '0 3px' }}>live from your database</b>.
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {/* Greeting */}
+      <div className="fx ac jb" style={{ gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>Welcome back, Admin <span style={{ fontWeight: 400 }}>👋</span></h1>
+          <p className="dim" style={{ fontSize: 13.5, margin: '4px 0 0' }}>Here&apos;s what&apos;s happening with your workforce today.</p>
+        </div>
+        <div className="fx ac" style={{ gap: 8, background: 'var(--surface-card)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '9px 14px', fontSize: 13, fontWeight: 600 }}>
+          <Ic.Calendar width={16} /> {today}
+        </div>
       </div>
 
-      <div className="g6">
-        {kpis.map((k) => (
-          <KPIStat key={k.label} label={k.label} value={k.value} icon={k.icon} tone={k.tone} />
-        ))}
+      {/* KPI row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 16 }}>
+        <Kpi label="Active Jobs" value={num(activeJobs || undefined)} hint={`${requireStaff} require staff`} icon={<Ic.Briefcase width={24} />} bg="var(--blue-500)" />
+        <Kpi label="Available Workers" value={num(stats?.workers)} hint="Ready for work" icon={<Ic.Users width={24} />} bg="var(--success-500)" />
+        <Kpi label="Booked Shifts" value={num(wf?.counts.upcomingShifts)} hint="Next 7 days" icon={<Ic.Calendar width={24} />} bg="var(--orange-500)" />
+        <Kpi label="Fill Rate" value={jobs.length ? `${fillRate}%` : '—'} hint="Across your jobs" icon={<Ic.TrendUp width={24} />} bg="var(--purple-500)" />
+        <Kpi label="Revenue (MTD)" value={stats ? money(stats.revenue) : '—'} hint="This month" icon={<Ic.PoundSterling width={24} />} bg="var(--navy-900)" />
       </div>
 
-      {/* Needs your attention — the compact action list (mirrors the worker/client dashboards). */}
-      <div style={{ marginTop: 20 }}>
-        <Card title="Needs your attention" action={<Link href="/dashboard/bookings" className="link">All bookings →</Link>}>
-          {!wf ? <p className="dim">Loading…</p>
-            : attention.length === 0 ? <p className="dim" style={{ fontSize: 13.5 }}>You&apos;re all caught up — nothing needs your attention right now. ✓</p>
+      {/* Row 2: candidates | live shifts | client requests */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(0, 1fr)', gap: 16 }}>
+        {/* AI Matching — top recommendations */}
+        <div style={cardStyle}>
+          <SectionHead title="AI Matching — Top Recommendations" href="/dashboard/bookings" action="View all matches" />
+          {!matches ? <p className="dim" style={{ fontSize: 13.5 }}>Loading…</p>
+            : matches.length === 0 ? <p className="dim" style={{ fontSize: 13.5 }}>No open jobs to match candidates against right now.</p>
             : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {attention.map((a, i) => (
-                  <div key={i} className="fx ac jb" style={{ gap: 10 }}>
-                    <span className="fx ac" style={{ gap: 9, fontSize: 13.5 }}><span style={{ fontSize: 16 }}>{a.icon}</span>{a.text}</span>
-                    <Link href={a.href} style={{ textDecoration: 'none', height: 30, display: 'inline-flex', alignItems: 'center', padding: '0 13px', borderRadius: 8, fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', background: a.urgent ? 'var(--blue-500)' : 'var(--surface-card)', color: a.urgent ? '#fff' : 'var(--text-secondary)', border: a.urgent ? 'none' : '1px solid var(--border-subtle)' }}>{a.action}</Link>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {matches.map((m) => (
+                  <div key={m.candidateId} className="fx ac" style={{ gap: 12, padding: '12px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                    <Avatar name={m.name} size={40} />
+                    <div style={{ minWidth: 0, flex: 1.3 }}>
+                      <div className="fx ac" style={{ gap: 5 }}>
+                        <span style={{ fontSize: 13.5, fontWeight: 700 }}>{m.name}</span>
+                        {(m.pipelineStatus === 'BOOKED' || m.pipelineStatus === 'CLIENT_ACCEPTED') && <span style={{ color: 'var(--blue-500)', fontSize: 12 }}>✓</span>}
+                      </div>
+                      <div className="dim" style={{ fontSize: 11.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.headline ?? m.jobTitle}</div>
+                    </div>
+                    <div style={{ width: 92, flexShrink: 0 }}>
+                      <div className="dim" style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em' }}>Match</div>
+                      <div className="fx ac" style={{ gap: 6 }}>
+                        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--success-600)' }}>{m.score}%</span>
+                        <span style={{ flex: 1, height: 5, borderRadius: 999, background: 'var(--surface-sunken)' }}><span style={{ display: 'block', height: 5, borderRadius: 999, width: `${m.score}%`, background: 'var(--success-500)' }} /></span>
+                      </div>
+                    </div>
+                    <div style={{ width: 66, flexShrink: 0, textAlign: 'center' }}>
+                      <div className="dim" style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em' }}>Avail.</div>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: m.available ? 'var(--success-600)' : 'var(--text-tertiary)' }}>{m.available ? 'Now' : '—'}</span>
+                    </div>
+                    <Link href={`/dashboard/bookings/${m.jobId}`} className="btn-outline" style={{ height: 30, fontSize: 12, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', padding: '0 12px', flexShrink: 0 }}>Shortlist</Link>
                   </div>
                 ))}
               </div>
             )}
-        </Card>
+        </div>
+
+        {/* Live shifts today */}
+        <div style={cardStyle}>
+          <SectionHead title="Live Shifts — Next 7 Days" href="/dashboard/shifts" action="View schedule" />
+          {!wf ? <p className="dim" style={{ fontSize: 13.5 }}>Loading…</p>
+            : wf.upcomingShifts.length === 0 ? <p className="dim" style={{ fontSize: 13.5 }}>No shifts booked in the next 7 days.</p>
+            : (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {wf.upcomingShifts.slice(0, 6).map((s) => { const t = shiftTone[s.status] ?? { bg: 'var(--grey-100)', fg: 'var(--grey-600)', label: s.status }; return (
+                  <div key={s.id} className="fx" style={{ gap: 12, padding: '9px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                    <div className="dim mono" style={{ fontSize: 12, fontWeight: 700, width: 38, flexShrink: 0, paddingTop: 1 }}>{fmtTime(s.startAt)}</div>
+                    <span style={{ width: 9, height: 9, borderRadius: 999, background: t.fg, flexShrink: 0, marginTop: 4 }} />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div className="fx ac jb" style={{ gap: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700 }}>{s.job.title}</span>
+                        <span style={{ background: t.bg, color: t.fg, borderRadius: 999, padding: '1px 8px', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>{t.label}</span>
+                      </div>
+                      <div className="dim" style={{ fontSize: 12 }}>{s.job.client.name} · {s.candidate.firstName} {s.candidate.lastName}</div>
+                    </div>
+                  </div>
+                ); })}
+              </div>
+            )}
+        </div>
+
+        {/* Client requests */}
+        <div style={cardStyle}>
+          <SectionHead title="Client Requests" href="/dashboard/bookings?status=SUBMITTED" action="View all" />
+          {!wf ? <p className="dim" style={{ fontSize: 13.5 }}>Loading…</p>
+            : wf.awaitingApprovalJobs.length === 0 ? <p className="dim" style={{ fontSize: 13.5 }}>No new requests to review. ✓</p>
+            : wf.awaitingApprovalJobs.slice(0, 5).map((j) => (
+              <Link key={j.id} href={`/dashboard/bookings/${j.id}`} className="fx ac jb" style={{ gap: 10, padding: '11px 0', borderBottom: '1px solid var(--border-subtle)', textDecoration: 'none', color: 'inherit' }}>
+                <div className="fx ac" style={{ gap: 11, minWidth: 0 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800, fontSize: 13, color: 'var(--text-secondary)' }}>{j.client.name.slice(0, 2).toUpperCase()}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>{j.client.name}</div>
+                    <div className="dim" style={{ fontSize: 12 }}>{j.openings} × {j.title}</div>
+                  </div>
+                </div>
+                <span style={{ background: 'var(--warning-100)', color: 'var(--warning-600)', borderRadius: 999, padding: '2px 9px', fontSize: 10.5, fontWeight: 800, flexShrink: 0 }}>Pending</span>
+              </Link>
+            ))}
+          {wf && wf.awaitingApprovalJobs.length > 0 && (
+            <Link href="/dashboard/bookings?status=SUBMITTED" className="link" style={{ display: 'block', textAlign: 'center', marginTop: 12, fontSize: 11.5, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase' }}>View all requests</Link>
+          )}
+        </div>
       </div>
 
-      {/* Action queues — the drill-down lists behind the summary above. */}
-      <h2 style={{ fontSize: 15, fontWeight: 800, margin: '26px 0 12px' }}>Action queues</h2>
-      <div className="gbot">
-        <Card title="Awaiting approval" subtitle="New client requests to review" action={<Link href="/dashboard/bookings?status=SUBMITTED" className="link">View all</Link>}>
-          {!wf ? <p className="dim">Loading…</p>
-            : wf.awaitingApprovalJobs.length === 0 ? <p className="dim">Nothing awaiting approval. ✓</p>
-            : wf.awaitingApprovalJobs.map((j) => (
-              <div key={j.id} className="fx ac jb" style={{ padding: '9px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                <div><div className="nm">{j.title}</div><div className="sub2">{j.client.name} · {j.openings} worker{j.openings === 1 ? '' : 's'}</div></div>
-                <Link href={`/dashboard/bookings/${j.id}`} className="link" style={{ fontWeight: 600, fontSize: 13 }}>Review →</Link>
+      {/* Row 3: compliance | cleared donut | recent bookings | alerts */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
+        {/* Compliance checklist */}
+        <div style={cardStyle}>
+          <SectionHead title="Compliance Overview" href="/dashboard/compliance" />
+          {!comp ? <p className="dim" style={{ fontSize: 13.5 }}>Loading…</p>
+            : comp.total === 0 ? <p className="dim" style={{ fontSize: 13.5 }}>No candidates yet.</p>
+            : compRows.map((r) => { const pct = comp.total ? Math.round((r.value / comp.total) * 100) : 0; return (
+              <div key={r.label} className="fx ac jb" style={{ gap: 10, padding: '9px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                <span className="fx ac" style={{ gap: 9, fontSize: 13 }}><Ic.Check width={15} style={{ color: 'var(--success-600)' }} />{r.label}</span>
+                <span className="fx ac" style={{ gap: 10 }}><span className="dim mono" style={{ fontSize: 12 }}>{r.value}/{comp.total}</span><span style={{ fontWeight: 800, fontSize: 12.5, color: 'var(--success-600)' }}>{pct}%</span></span>
               </div>
-            ))}
-        </Card>
+            ); })}
+        </div>
 
-        <Card title="Ready to confirm" subtitle="Client accepted — book them in" action={<Link href="/dashboard/bookings?status=CANDIDATES_SUBMITTED" className="link">View all</Link>}>
-          {!wf ? <p className="dim">Loading…</p>
-            : wf.readyToBook.length === 0 ? <p className="dim">No client-accepted candidates waiting.</p>
-            : wf.readyToBook.map((a) => (
-              <div key={a.id} className="fx ac jb" style={{ padding: '9px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                <div><div className="nm">{a.candidate.firstName} {a.candidate.lastName}</div><div className="sub2">{a.job.title} · {a.job.client.name}</div></div>
-                <Link href={`/dashboard/bookings/${a.job.id}`} className="link" style={{ fontWeight: 600, fontSize: 13 }}>Confirm →</Link>
-              </div>
-            ))}
-        </Card>
-
-        <Card title="Reliability concerns" subtitle="Workers to keep an eye on" action={<Link href="/dashboard/candidates" className="link">Candidates</Link>}>
-          {!wf ? <p className="dim">Loading…</p>
-            : wf.reliabilityConcerns.length === 0 ? <p className="dim">No candidates at medium or high concern. ✓</p>
-            : wf.reliabilityConcerns.map((c) => (
-              <div key={c.candidateId} className="fx ac jb" style={{ padding: '9px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                <Link href={`/dashboard/candidates/${c.candidateId}`} className="nm" style={{ color: 'var(--blue-500)' }}>{c.name}</Link>
-                <Badge tone={(c.level === 'HIGH' ? 'error' : 'warning') as any}>{c.level === 'HIGH' ? 'High concern' : 'Medium concern'}</Badge>
-              </div>
-            ))}
-        </Card>
-      </div>
-
-      <div className="gbot" style={{ marginTop: 16 }}>
-        <Card title="Upcoming shifts (7 days)" action={<Link href="/dashboard/bookings" className="link">View all</Link>}>
-          {!wf ? <p className="dim">Loading…</p>
-            : wf.upcomingShifts.length === 0 ? <p className="dim">No shifts booked in the next 7 days.</p>
-            : wf.upcomingShifts.map((s) => (
-              <div key={s.id} className="fx ac jb" style={{ padding: '9px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                <div><div className="nm">{s.candidate.firstName} {s.candidate.lastName}</div><div className="sub2">{s.job.title} · {s.job.client.name}</div></div>
-                <span className="dim" style={{ fontSize: 12.5 }}>{new Date(s.startAt).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}, {new Date(s.startAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
-              </div>
-            ))}
-        </Card>
-      </div>
-
-      <div className="gmid">
-        <Card title="Overview" subtitle="New records per week (last 7 weeks)">
-          {!trends ? <p className="dim">Loading…</p> : areaSeries.every((s) => s.data.every((n) => n === 0)) ? (
-            <p className="dim" style={{ fontSize: 13.5 }}>No activity recorded in the last 7 weeks yet.</p>
-          ) : (
+        {/* Worker reliability */}
+        <div style={cardStyle}>
+          <SectionHead title="Worker Reliability" href="/dashboard/candidates" action="View all" />
+          {!rel ? <p className="dim" style={{ fontSize: 13.5 }}>Loading…</p> : (
             <>
-              <div className="legrow">
-                {areaSeries.map((s) => (
-                  <div key={s.name} className="legcol">
-                    <span className="legl"><span className="legdot" style={{ background: s.color }} />{s.name}</span>
-                    <span className="legv">{s.data.reduce((a, b) => a + b, 0).toLocaleString()}</span>
+              <div className="fx" style={{ flexDirection: 'column', alignItems: 'center', marginBottom: 16 }}>
+                {(() => {
+                  const r = rel.avgRating; const pct = r != null ? (r / 5) * 360 : 0; const full = r != null ? Math.round(r) : 0;
+                  return (
+                    <div style={{ width: 110, height: 110, borderRadius: '50%', background: r != null ? `conic-gradient(var(--success-500) ${pct}deg, var(--surface-sunken) 0)` : 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ width: 86, height: 86, borderRadius: '50%', background: 'var(--surface-card)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                        <div style={{ fontSize: 24, fontWeight: 800, lineHeight: 1 }}>{r != null ? r.toFixed(1) : '—'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--orange-500)', letterSpacing: 1, lineHeight: 1 }}>{'★'.repeat(full)}{'☆'.repeat(5 - full)}</div>
+                        <div className="dim" style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.03em', lineHeight: 1.1 }}>Avg rating</div>
+                      </div>
+                    </div>
+                  );
+                })()}
+                <div className="dim" style={{ fontSize: 11, marginTop: 6 }}>{rel.ratingCount} rated worker{rel.ratingCount === 1 ? '' : 's'}</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+                {rel.metrics.map((m) => (
+                  <div key={m.label}>
+                    <div className="fx ac jb" style={{ marginBottom: 4 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600 }}>{m.label}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 800, color: m.pct == null ? 'var(--text-tertiary)' : m.pct >= 80 ? 'var(--success-600)' : m.pct >= 50 ? 'var(--orange-600)' : 'var(--error-600)' }}>{m.pct == null ? '—' : `${m.pct}%`}</span>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 999, background: 'var(--surface-sunken)' }}><div style={{ height: 6, borderRadius: 999, width: `${m.pct ?? 0}%`, background: m.pct != null && m.pct >= 80 ? 'var(--success-500)' : m.pct != null && m.pct >= 50 ? 'var(--orange-500)' : 'var(--error-500)' }} /></div>
+                    <div className="dim" style={{ fontSize: 10.5, marginTop: 2 }}>{m.detail}</div>
                   </div>
                 ))}
               </div>
-              <AreaChart labels={trends.labels} series={areaSeries} height={210} />
+              {rel.concerns > 0 && <div style={{ marginTop: 12, fontSize: 11.5, color: 'var(--warning-600)', fontWeight: 600 }}>⚠ {rel.concerns} worker{rel.concerns === 1 ? '' : 's'} at medium/high concern</div>}
             </>
           )}
-        </Card>
+        </div>
 
-        <Card title="Compliance Overview">
-          {!comp ? <p className="dim">Loading…</p> : comp.total === 0 ? (
-            <p className="dim" style={{ fontSize: 13.5 }}>No candidates yet.</p>
-          ) : (
-            <DonutChart segments={donut} centerValue={`${comp.clearedPct}%`} centerLabel="Cleared" />
-          )}
-          <Link href="/dashboard/compliance" className="link" style={{ display: 'block', textAlign: 'center', marginTop: 12, border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '8px' }}>
-            View Compliance Dashboard
-          </Link>
-        </Card>
+        {/* Recent bookings */}
+        <div style={cardStyle}>
+          <SectionHead title="Recent Bookings" href="/dashboard/bookings" />
+          {recentJobs.length === 0 ? <p className="dim" style={{ fontSize: 13.5 }}>No bookings yet.</p>
+            : recentJobs.map((j) => (
+              <Link key={j.id} href={`/dashboard/bookings/${j.id}`} className="fx ac jb" style={{ gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border-subtle)', textDecoration: 'none', color: 'inherit' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{j.title}</div>
+                  <div className="dim" style={{ fontSize: 12 }}>{j.client.name}{j._count ? ` · ${j._count.shifts} shift${j._count.shifts === 1 ? '' : 's'}` : ''}</div>
+                </div>
+                <Badge tone={(FILLED_JOB.has(j.status) ? 'success' : NEEDS_STAFF.has(j.status) ? 'warning' : 'neutral') as 'success' | 'warning' | 'neutral'}>{j.status.replace(/_/g, ' ').toLowerCase()}</Badge>
+              </Link>
+            ))}
+        </div>
 
-        <Card title="Operational alerts" subtitle="For your review — the system never acts automatically">
-          {!alerts ? <p className="dim">Loading…</p>
-            : alerts.length === 0 ? <p className="dim" style={{ fontSize: 13.5 }}>All clear — no operational alerts right now. ✓</p>
-            : alerts.slice(0, 10).map((a, i) => (
+        {/* Operational alerts */}
+        <div style={cardStyle}>
+          <SectionHead title="Operational Alerts" />
+          {!alerts ? <p className="dim" style={{ fontSize: 13.5 }}>Loading…</p>
+            : alerts.length === 0 ? <p className="dim" style={{ fontSize: 13.5 }}>All clear — no alerts right now. ✓</p>
+            : alerts.slice(0, 6).map((a, i) => (
               <div key={i} className="fx ac" style={{ gap: 10, padding: '9px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                <span style={{ color: a.severity === 'high' ? 'var(--error-600)' : a.severity === 'medium' ? 'var(--orange-600)' : 'var(--text-tertiary)', flexShrink: 0 }}>{ALERT_ICON[a.type] ?? <Ic.AlertCircle width={18} />}</span>
-                <span style={{ flex: 1, fontSize: 13 }}>
-                  {a.candidateId
-                    ? <Link href={`/dashboard/candidates/${a.candidateId}`} style={{ color: 'inherit', textDecoration: 'none' }}>{a.message}</Link>
-                    : a.message}
-                </span>
-                <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', color: a.severity === 'high' ? 'var(--error-600)' : a.severity === 'medium' ? 'var(--orange-600)' : 'var(--text-tertiary)' }}>{a.severity}</span>
+                <span style={{ color: a.severity === 'high' ? 'var(--error-600)' : a.severity === 'medium' ? 'var(--orange-600)' : 'var(--text-tertiary)', flexShrink: 0 }}>{ALERT_ICON[a.type] ?? <Ic.AlertCircle width={16} />}</span>
+                <span style={{ flex: 1, fontSize: 12.5 }}>{a.candidateId ? <Link href={`/dashboard/candidates/${a.candidateId}`} style={{ color: 'inherit', textDecoration: 'none' }}>{a.message}</Link> : a.message}</span>
               </div>
             ))}
-          {alerts && alerts.length > 10 && <p className="dim" style={{ fontSize: 12, marginTop: 8 }}>+ {alerts.length - 10} more</p>}
-        </Card>
+        </div>
       </div>
 
-      <div className="gbot">
-        <Card title="Recent Candidate Registrations" action={<Link href="/dashboard/candidates" className="link">View all</Link>}>
-          {cands.length ? <DataTable columns={candCols} rows={cands} /> : <p className="dim">No candidates yet.</p>}
-        </Card>
-
-        <Card title="Recent Job Bookings" action={<Link href="/dashboard/bookings" className="link">View all</Link>}>
-          {recentJobs.length ? <DataTable columns={jobCols} rows={recentJobs} /> : <p className="dim">No bookings yet.</p>}
-        </Card>
-
-        <Card title="AI Assistant" action={<Link href="/dashboard/ai" className="link">Open assistant</Link>}>
-          <div className="dim" style={{ fontSize: 13, marginBottom: 12 }}>Hello Admin, here are today&apos;s insights.</div>
-          {insights.length === 0 ? (
-            <div className="dim" style={{ fontSize: 13.5 }}>You&apos;re all caught up — nothing needs attention right now.</div>
-          ) : insights.map((it, i) => (
-            <div key={i} className="insight">
-              <span className="insight-ic" style={{ background: it.bg, color: it.fg }}>{it.icon}</span>
-              <div className="insight-body">
-                {it.text}
-                <Link href={it.href} className="insight-act">{it.action}</Link>
-              </div>
-            </div>
-          ))}
-        </Card>
+      {/* Status bar */}
+      <div className="card card-pad fx ac jb" style={{ gap: 16, flexWrap: 'wrap' }}>
+        <span className="fx ac" style={{ gap: 8, fontSize: 13, fontWeight: 600 }}><span style={{ width: 9, height: 9, borderRadius: 999, background: 'var(--success-500)' }} /> All systems operational</span>
+        <div className="fx ac" style={{ gap: 28, flexWrap: 'wrap' }}>
+          <span className="fx ac" style={{ gap: 8, fontSize: 13 }}><Ic.Users width={16} /> <span className="dim">Active workers</span> <b>{num(stats?.workers)}</b></span>
+          <span className="fx ac" style={{ gap: 8, fontSize: 13 }}><Ic.Briefcase width={16} /> <span className="dim">Active jobs</span> <b>{num(activeJobs || undefined)}</b></span>
+          <span className="fx ac" style={{ gap: 8, fontSize: 13 }}><Ic.Building width={16} /> <span className="dim">Clients</span> <b>{num(stats?.clients)}</b></span>
+          <span className="dim" style={{ fontSize: 12 }}>Updated {now}</span>
+        </div>
       </div>
-    </>
+    </div>
   );
 }
