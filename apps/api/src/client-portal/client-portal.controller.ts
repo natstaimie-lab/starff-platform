@@ -176,6 +176,11 @@ export class ClientPortalController {
     return this.svc.invoices(u.id);
   }
 
+  @Post('invoices/:id/contest')
+  contestInvoice(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() body: { reason: string }) {
+    return this.svc.contestInvoice(u.id, id, body?.reason);
+  }
+
   @Get('locations')
   locations(@CurrentUser() u: AuthUser) {
     return this.svc.locations(u.id);

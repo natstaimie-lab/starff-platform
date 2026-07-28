@@ -32,7 +32,9 @@ export type NotifyKind =
   | 'SHIFT_CHANGED'
   | 'REPLACEMENT_REQUIRED'
   | 'REPLACEMENT_CONFIRMED'
-  | 'RELIABILITY_REVIEW';
+  | 'RELIABILITY_REVIEW'
+  | 'INVOICE_SENT'
+  | 'INVOICE_DISPUTED';
 
 interface NotifyInput {
   to: string;

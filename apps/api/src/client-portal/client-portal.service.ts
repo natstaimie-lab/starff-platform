@@ -299,6 +299,32 @@ export class ClientPortalService {
     return { ok: true };
   }
 
+  /** Client contests a sent invoice — flags Starff to review it. Does NOT
+   *  change the invoice; Starff investigate and amend/void or explain. */
+  async contestInvoice(userId: string, id: string, reason: string) {
+    const { client, contact } = await this.clientFor(userId);
+    if (!reason?.trim()) throw new BadRequestException('Please tell us what looks wrong');
+    const invoice = await this.prisma.invoice.findFirst({ where: { id, clientId: client.id }, select: { id: true, number: true, total: true, status: true } });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.status === 'DRAFT' || invoice.status === 'VOID') throw new BadRequestException('This invoice cannot be contested');
+
+    await this.audit.log({ actorId: userId, action: 'invoice.contested', entity: 'Invoice', entityId: id, meta: { number: invoice.number, reason } });
+    const staff = await this.prisma.user.findMany({
+      where: { role: { in: [Role.ADMIN, Role.RECRUITER] }, isActive: true }, select: { id: true, email: true },
+    });
+    const who = `${contact.firstName} ${contact.lastName}`.trim() || client.name;
+    await Promise.all(
+      staff.map((s) => this.notifications.send({
+        to: s.email, kind: 'INVOICE_DISPUTED',
+        subject: `Invoice ${invoice.number} contested — ${client.name}`,
+        body: `${who} is contesting invoice ${invoice.number} (£${Number(invoice.total).toFixed(2)}): ${reason}`,
+        userId: s.id,
+        actionUrl: '/dashboard/timesheets',
+      })),
+    );
+    return { ok: true };
+  }
+
   async timesheets(userId: string) {
     const { client } = await this.clientFor(userId);
     return this.prisma.timesheet.findMany({
