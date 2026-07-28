@@ -106,6 +106,21 @@ export default function DashboardHome() {
     TIMESHEET_OUTSTANDING: <Ic.Clock width={16} />, DOC_EXPIRING: <Ic.FileText width={16} />,
   };
 
+  // ── AI Assistant: real, actionable insights derived from live data ──
+  const insights: { bg: string; fg: string; icon: React.ReactNode; text: string; action: string; href: string }[] = [];
+  if (wf) {
+    const c = wf.counts;
+    if (c.awaitingApproval) insights.push({ bg: 'var(--info-100)', fg: 'var(--blue-500)', icon: <Ic.FileText width={16} />, text: `${c.awaitingApproval} client request${c.awaitingApproval === 1 ? '' : 's'} waiting for your review.`, action: 'Review requests', href: '/dashboard/bookings?status=SUBMITTED' });
+    if (c.clientAccepted) insights.push({ bg: 'var(--success-100)', fg: 'var(--success-600)', icon: <Ic.Check width={16} />, text: `${c.clientAccepted} client-accepted candidate${c.clientAccepted === 1 ? '' : 's'} ready to confirm.`, action: 'Confirm bookings', href: '/dashboard/bookings?status=CANDIDATES_SUBMITTED' });
+  }
+  if (matches && matches.length) insights.push({ bg: '#efe7fd', fg: 'var(--purple-500)', icon: <Ic.Sparkle width={16} />, text: `I've matched ${matches.length} strong candidate${matches.length === 1 ? '' : 's'} to your open jobs — top score ${matches[0].score}%.`, action: 'Shortlist now', href: `/dashboard/bookings/${matches[0].jobId}` });
+  if (stats) {
+    if (stats.pendingTimesheets) insights.push({ bg: 'var(--orange-100)', fg: 'var(--orange-600)', icon: <Ic.Clock width={16} />, text: `${stats.pendingTimesheets} timesheet${stats.pendingTimesheets === 1 ? '' : 's'} awaiting your approval.`, action: 'Approve now', href: '/dashboard/timesheets' });
+    const needsCompliance = comp ? comp.screening + comp.awaiting : 0;
+    if (needsCompliance) insights.push({ bg: 'var(--warning-100)', fg: 'var(--warning-600)', icon: <Ic.Shield width={16} />, text: `${needsCompliance} candidate${needsCompliance === 1 ? '' : 's'} still need compliance checks before they can work.`, action: 'Review compliance', href: '/dashboard/compliance' });
+    if (stats.newEnquiries) insights.push({ bg: 'var(--info-100)', fg: 'var(--blue-500)', icon: <Ic.Message width={16} />, text: `${stats.newEnquiries} new website enquir${stats.newEnquiries === 1 ? 'y' : 'ies'} to follow up.`, action: 'View enquiries', href: '/dashboard/enquiries' });
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       {/* Greeting */}
@@ -210,6 +225,35 @@ export default function DashboardHome() {
             <Link href="/dashboard/bookings?status=SUBMITTED" className="link" style={{ display: 'block', textAlign: 'center', marginTop: 12, fontSize: 11.5, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase' }}>View all requests</Link>
           )}
         </div>
+      </div>
+
+      {/* AI Assistant — today's insights */}
+      <div style={cardStyle}>
+        <div className="fx ac jb" style={{ marginBottom: 14 }}>
+          <div className="fx ac" style={{ gap: 9 }}>
+            <span style={{ width: 30, height: 30, borderRadius: 9, background: '#efe7fd', color: 'var(--purple-500)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Ic.Sparkle width={17} /></span>
+            <div>
+              <div style={{ fontSize: 13.5, fontWeight: 800 }}>AI Assistant</div>
+              <div className="dim" style={{ fontSize: 11.5 }}>Hello Admin, here&apos;s what needs your attention today.</div>
+            </div>
+          </div>
+          <Link href="/dashboard/ai" className="link" style={{ fontSize: 12.5, fontWeight: 600 }}>Open assistant →</Link>
+        </div>
+        {!wf || !stats ? <p className="dim" style={{ fontSize: 13.5 }}>Loading…</p>
+          : insights.length === 0 ? <p className="dim" style={{ fontSize: 13.5 }}>You&apos;re all caught up — nothing needs attention right now. ✓</p>
+          : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+              {insights.map((it, i) => (
+                <div key={i} className="insight" style={{ marginTop: 0 }}>
+                  <span className="insight-ic" style={{ background: it.bg, color: it.fg }}>{it.icon}</span>
+                  <div className="insight-body">
+                    {it.text}
+                    <Link href={it.href} className="insight-act">{it.action} →</Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
       </div>
 
       {/* Row 3: compliance | cleared donut | recent bookings | alerts */}
