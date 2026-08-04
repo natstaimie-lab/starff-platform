@@ -30,6 +30,7 @@ export default function TimesheetsPage() {
   const [busy, setBusy] = useState(false);
   const [sel, setSel] = useState<Timesheet | null>(null);
   const [reason, setReason] = useState('');
+  const [filter, setFilter] = useState<string | null>(null);
 
   const load = () => apiFetch<Timesheet[]>('/timesheets').then(setRows).catch((e) => setError(e.message)).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
@@ -48,11 +49,15 @@ export default function TimesheetsPage() {
 
   const count = (s: string) => rows.filter((r) => r.status === s).length;
   const kpis = [
-    { label: 'Total', value: rows.length, icon: <Ic.Clock width={22} />, tone: 'info' as const },
-    { label: 'Pending', value: count('SUBMITTED'), icon: <Ic.AlertCircle width={22} />, tone: 'accent' as const },
-    { label: 'Approved', value: count('APPROVED'), icon: <Ic.ClipboardCheck width={22} />, tone: 'success' as const },
-    { label: 'Rejected', value: count('REJECTED'), icon: <Ic.FileText width={22} />, tone: 'accent' as const },
+    { label: 'Total', value: rows.length, icon: <Ic.Clock width={22} />, tone: 'info' as const, status: null as string | null, ring: 'var(--blue-500)' },
+    { label: 'Pending', value: count('SUBMITTED'), icon: <Ic.AlertCircle width={22} />, tone: 'accent' as const, status: 'SUBMITTED', ring: 'var(--orange-500)' },
+    { label: 'Approved', value: count('APPROVED'), icon: <Ic.ClipboardCheck width={22} />, tone: 'success' as const, status: 'APPROVED', ring: 'var(--success-500)' },
+    { label: 'Rejected', value: count('REJECTED'), icon: <Ic.FileText width={22} />, tone: 'accent' as const, status: 'REJECTED', ring: 'var(--error-500)' },
   ];
+
+  // Clicking a KPI card narrows the table to that status; click again (or Total) to clear.
+  const displayed = filter ? rows.filter((r) => r.status === filter) : rows;
+  const selLabel = kpis.find((k) => k.status && k.status === filter)?.label;
 
   const tsCols: Column<Timesheet>[] = [
     { key: 'name', header: 'Worker', render: (r) => <div className="namecell"><Avatar name={`${r.candidate.firstName} ${r.candidate.lastName}`} size={28} /><span className="nm">{r.candidate.firstName} {r.candidate.lastName}</span></div> },
@@ -75,15 +80,40 @@ export default function TimesheetsPage() {
 
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16, marginBottom: 16 }}>
-        {kpis.map((k) => <KPIStat key={k.label} label={k.label} value={String(k.value)} icon={k.icon} tone={k.tone} />)}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16, marginBottom: 6 }}>
+        {kpis.map((k) => {
+          const on = filter === k.status;
+          return (
+            <button
+              key={k.label}
+              type="button"
+              aria-pressed={on}
+              onClick={() => setFilter(on ? null : k.status)}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left', padding: 0, border: 'none', background: 'none', cursor: 'pointer',
+                borderRadius: 'var(--radius-lg)', transition: 'box-shadow .12s, transform .12s',
+                transform: on ? 'translateY(-1px)' : 'none',
+                boxShadow: on ? `0 0 0 2px ${k.ring}, 0 6px 16px rgba(11,31,58,.12)` : 'none',
+              }}
+            >
+              <KPIStat label={k.label} value={String(k.value)} icon={k.icon} tone={k.tone} />
+            </button>
+          );
+        })}
       </div>
+      <p className="dim" style={{ fontSize: 12, margin: '0 0 16px' }}>Click a card to filter the list — click it again (or Total) to clear.</p>
 
       {error ? <Card><p style={{ color: 'var(--error-600)', fontSize: 13 }}>{error}</p></Card>
         : loading ? <Card><p className="dim">Loading…</p></Card>
         : (
-          <Card title="Timesheets" subtitle="Approve or reject submitted hours">
-            {rows.length === 0 ? <p className="dim">No timesheets yet.</p> : <DataTable columns={tsCols} rows={rows} />}
+          <Card
+            title={selLabel ? `${selLabel} timesheets — ${displayed.length}` : 'Timesheets'}
+            subtitle="Approve or reject submitted hours"
+            action={filter ? <button onClick={() => setFilter(null)} className="link" style={{ background: 'none', border: 'none', cursor: 'pointer', font: 'inherit' }}>Clear filter ✕</button> : undefined}
+          >
+            {rows.length === 0 ? <p className="dim">No timesheets yet.</p>
+              : displayed.length === 0 ? <p className="dim">No {selLabel?.toLowerCase()} timesheets.</p>
+              : <DataTable columns={tsCols} rows={displayed} />}
           </Card>
         )}
 
