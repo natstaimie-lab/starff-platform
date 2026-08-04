@@ -84,8 +84,41 @@ export default function Dashboard() {
   const memberSince = me?.createdAt ? `${MON[new Date(me.createdAt).getMonth()]} ${new Date(me.createdAt).getFullYear()}` : '—';
   const initials = `${me?.firstName?.[0] ?? ''}${me?.lastName?.[0] ?? ''}`.toUpperCase();
 
+  // ── Needs your attention — everything waiting on the worker, most urgent first ──
+  const pl = (n: number) => (n === 1 ? '' : 's');
+  const submittedShiftIds = new Set((me?.timesheets ?? []).map((t) => t.shiftId).filter(Boolean));
+  const needTimesheet = (me?.shifts ?? []).filter((s) => s.status === 'COMPLETED' && !submittedShiftIds.has(s.id));
+  const rejectedTs = (me?.timesheets ?? []).filter((t) => t.status === 'REJECTED');
+  const expiringDocs = (me?.documents ?? []).filter((d) => {
+    if (!d.expiryDate) return false;
+    const t = new Date(d.expiryDate).getTime();
+    return t > now && t < now + 30 * 86400000;
+  });
+  const attention: { icon: string; text: string; href: string; action: string; urgent?: boolean }[] = [];
+  if (offers.length) attention.push({ icon: '📩', text: `${offers.length} shift offer${pl(offers.length)} waiting for your response`, href: '/dashboard/offers', action: 'Respond', urgent: true });
+  if (rejectedTs.length) attention.push({ icon: '⚠️', text: `${rejectedTs.length} timesheet${pl(rejectedTs.length)} rejected — please resubmit`, href: '/dashboard/bookings', action: 'Fix', urgent: true });
+  if (needTimesheet.length) attention.push({ icon: '⏱️', text: `${needTimesheet.length} completed shift${pl(needTimesheet.length)} need${needTimesheet.length === 1 ? 's' : ''} a timesheet`, href: '/dashboard/bookings', action: 'Submit' });
+  if (me && !cleared) attention.push({ icon: '📄', text: 'Compliance incomplete — upload your documents to get more offers', href: '/dashboard/documents', action: 'Upload', urgent: true });
+  else if (expiringDocs.length) attention.push({ icon: '📄', text: `${expiringDocs.length} document${pl(expiringDocs.length)} expiring soon`, href: '/dashboard/documents', action: 'Renew' });
+  if (me && availSet.size === 0) attention.push({ icon: '📅', text: 'Add your availability so Starff can offer you shifts', href: '/dashboard/availability', action: 'Set' });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Needs your attention */}
+      {attention.length > 0 && (
+        <div style={{ ...card, borderLeft: '3px solid var(--orange-500)', padding: 16 }}>
+          <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 10 }}>Needs your attention</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {attention.map((a, i) => (
+              <div key={i} className="fx ac jb" style={{ gap: 10 }}>
+                <span className="fx ac" style={{ gap: 9, fontSize: 13.5 }}><span style={{ fontSize: 16 }}>{a.icon}</span>{a.text}</span>
+                <Link href={a.href} className={a.urgent ? 'btn-primary' : 'btn-outline'} style={{ textDecoration: 'none', height: 30, display: 'inline-flex', alignItems: 'center', padding: '0 12px', fontSize: 12.5, whiteSpace: 'nowrap' }}>{a.action}</Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Row 1 — profile · matches · availability */}
       <div className="g3">
         {/* Profile */}
