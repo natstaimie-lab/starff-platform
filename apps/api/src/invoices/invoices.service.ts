@@ -77,9 +77,10 @@ export class InvoicesService {
 
   /**
    * Draft invoices from every APPROVED, not-yet-invoiced timesheet, grouped by
-   * client (one draft per client). Each line is a worker-shift at the client's
-   * charge rate; the source timesheets move to INVOICED so they aren't billed
-   * twice. Nothing is sent — the drafts are for admin review/edit first.
+   * client AND by week (Mon–Sun, based on the shift date) — one draft per client
+   * per week. Each line is a worker-shift at the client's charge rate; the source
+   * timesheets move to INVOICED so they aren't billed twice. Nothing is sent —
+   * the drafts are for admin review/edit first.
    */
   async generateDrafts(actorId?: string) {
     const timesheets = await this.prisma.timesheet.findMany({
@@ -95,24 +96,37 @@ export class InvoicesService {
       },
     });
 
-    // Group by client (skip any timesheet whose job isn't linked to a client).
-    const byClient = new Map<string, typeof timesheets>();
+    // Start of the ISO week (Monday 00:00) containing `d`.
+    const weekStartOf = (d: Date) => {
+      const x = new Date(d);
+      const dow = (x.getDay() + 6) % 7; // Mon=0 … Sun=6
+      x.setHours(0, 0, 0, 0);
+      x.setDate(x.getDate() - dow);
+      return x;
+    };
+
+    // Group by client + week (skip any timesheet whose job isn't linked to a client).
+    const groups = new Map<string, { clientId: string; weekStart: Date; list: typeof timesheets }>();
     for (const t of timesheets) {
       const cid = t.shift.job.clientId;
       if (!cid) continue;
-      if (!byClient.has(cid)) byClient.set(cid, []);
-      byClient.get(cid)!.push(t);
+      const weekStart = weekStartOf(new Date(t.shift.startAt));
+      const key = `${cid}|${weekStart.toISOString()}`;
+      if (!groups.has(key)) groups.set(key, { clientId: cid, weekStart, list: [] });
+      groups.get(key)!.list.push(t);
     }
-    if (byClient.size === 0) return { created: 0, invoices: [] as { id: string; number: string }[] };
+    if (groups.size === 0) return { created: 0, invoices: [] as { id: string; number: string }[] };
 
-    const now = new Date();
-    const ym = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+    // Oldest week first → stable, chronological invoice numbering.
+    const ordered = [...groups.values()].sort((a, b) => +a.weekStart - +b.weekStart);
     let seq = await this.prisma.invoice.count();
     const created: { id: string; number: string }[] = [];
 
-    for (const [clientId, list] of byClient) {
-      const periodStart = new Date(Math.min(...list.map((t) => +t.shift.startAt)));
-      const periodEnd = new Date(Math.max(...list.map((t) => +t.shift.endAt)));
+    for (const { clientId, weekStart, list } of ordered) {
+      const periodStart = weekStart;
+      const periodEnd = new Date(weekStart.getTime() + 6 * 86400000);
+      periodEnd.setHours(23, 59, 59, 999);
+      const ymd = `${weekStart.getFullYear()}${String(weekStart.getMonth() + 1).padStart(2, '0')}${String(weekStart.getDate()).padStart(2, '0')}`;
       const lines = list.map((t) => {
         const hours = Number(t.hoursWorked);
         const rate = Number(t.shift.chargeRate);
@@ -132,7 +146,7 @@ export class InvoicesService {
       const invoice = await this.prisma.invoice.create({
         data: {
           clientId,
-          number: `INV-${ym}-${String(seq).padStart(4, '0')}`,
+          number: `INV-${ymd}-${String(seq).padStart(3, '0')}`,
           status: InvoiceStatus.DRAFT,
           periodStart, periodEnd,
           subtotal, vat, total,

@@ -16,6 +16,7 @@ const TITLES: Record<string, [string, string]> = {
   '/dashboard/bookings': ['Job Bookings', 'Open and confirmed staffing requests'],
   '/dashboard/shifts': ['Shifts', 'Upcoming shifts and staffing progress'],
   '/dashboard/timesheets': ['Timesheets', 'Review and approve submitted hours'],
+  '/dashboard/payroll': ['Payroll & Invoices', 'Worker pay runs and client invoicing'],
   '/dashboard/compliance': ['Compliance Dashboard', 'Right to work, documents, licences & training'],
   '/dashboard/invoices': ['Payroll & Invoices', 'Billing, payments and payroll runs'],
   '/dashboard/ai': ['AI Assistant', 'Insights and answers across your operation'],

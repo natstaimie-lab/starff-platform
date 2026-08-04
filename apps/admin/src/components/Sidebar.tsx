@@ -36,7 +36,10 @@ const sections: Section[] = [
   },
   {
     label: 'Finance',
-    items: [{ key: 'timesheets', label: 'Payroll & Invoices', href: '/dashboard/timesheets', icon: <Ic.Receipt /> }],
+    items: [
+      { key: 'timesheets', label: 'Timesheets', href: '/dashboard/timesheets', icon: <Ic.Clock /> },
+      { key: 'payroll', label: 'Payroll & Invoices', href: '/dashboard/payroll', icon: <Ic.Receipt /> },
+    ],
   },
   {
     label: 'Insights',

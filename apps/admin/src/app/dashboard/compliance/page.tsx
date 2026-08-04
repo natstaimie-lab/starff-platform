@@ -20,6 +20,7 @@ export default function CompliancePage() {
   const [rows, setRows] = useState<Cand[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch<Cand[]>('/candidates').then(setRows).catch((e) => setError(e.message)).finally(() => setLoading(false));
@@ -29,6 +30,10 @@ export default function CompliancePage() {
   const count = (s: string) => rows.filter((r) => r.status === s).length;
   const compliantPct = Math.round(((count('COMPLIANT') + count('ACTIVE')) / total) * 100);
   const needAttention = rows.filter((r) => ATTENTION.includes(r.status));
+
+  // Clicking a category card narrows the table to that status; click again to clear.
+  const displayed = filter ? rows.filter((r) => r.status === filter) : needAttention;
+  const selected = CATS.find((c) => c.key === filter);
 
   const cols: Column<Cand>[] = [
     { key: 'name', header: 'Worker', render: (r) => <Link href={`/dashboard/candidates/${r.id}`} className="namecell" style={{ textDecoration: 'none', color: 'inherit' }}><Avatar name={`${r.firstName} ${r.lastName}`} size={28} /><span className="nm" style={{ color: 'var(--text-link)' }}>{r.firstName} {r.lastName}</span></Link> },
@@ -56,8 +61,21 @@ export default function CompliancePage() {
         {CATS.map((c) => {
           const n = count(c.key);
           const pct = Math.round((n / total) * 100);
+          const on = filter === c.key;
           return (
-            <div key={c.key} className="card card-pad">
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => setFilter(on ? null : c.key)}
+              aria-pressed={on}
+              className="card card-pad"
+              style={{
+                textAlign: 'left', cursor: 'pointer', font: 'inherit', color: 'inherit',
+                border: on ? `2px solid ${c.tone}` : '1px solid var(--border-subtle)',
+                boxShadow: on ? '0 4px 14px rgba(11,31,58,.10)' : 'none',
+                transition: 'border-color .12s, box-shadow .12s, transform .12s', transform: on ? 'translateY(-1px)' : 'none',
+              }}
+            >
               <div className="fx ac" style={{ gap: 10, marginBottom: 10 }}>
                 <span style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--orange-100)', color: 'var(--orange-500)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Ic.ClipboardCheck width={18} /></span>
                 <span style={{ fontSize: 14, fontWeight: 700 }}>{c.label}</span>
@@ -67,13 +85,21 @@ export default function CompliancePage() {
               <div style={{ height: 8, borderRadius: 999, background: 'var(--surface-sunken)' }}>
                 <div style={{ height: 8, width: `${pct}%`, borderRadius: 999, background: c.tone }} />
               </div>
-            </div>
+              <div className="fx ac" style={{ gap: 5, marginTop: 9, fontSize: 11.5, fontWeight: 700, color: on ? c.tone : 'var(--text-tertiary)' }}>
+                {on ? '✓ Filtering — click to clear' : 'Click to view these workers'}
+              </div>
+            </button>
           );
         })}
       </div>
 
-      <Card title={`Compliance rate: ${compliantPct}% — Workers needing attention`}>
-        {needAttention.length === 0 ? <p className="dim">Everyone is compliant. 🎉</p> : <DataTable columns={cols} rows={needAttention} />}
+      <Card
+        title={selected ? `${selected.label} — ${displayed.length} worker${displayed.length === 1 ? '' : 's'}` : `Compliance rate: ${compliantPct}% — Workers needing attention`}
+        action={filter ? <button onClick={() => setFilter(null)} className="link" style={{ background: 'none', border: 'none', cursor: 'pointer', font: 'inherit' }}>Clear filter ✕</button> : undefined}
+      >
+        {displayed.length === 0
+          ? <p className="dim">{selected ? `No workers in “${selected.label}”.` : 'Everyone is compliant. 🎉'}</p>
+          : <DataTable columns={cols} rows={displayed} />}
       </Card>
     </>
   );
