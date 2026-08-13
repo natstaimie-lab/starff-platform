@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { apiFetch } from '@/lib/api';
 import { Sidebar } from '@/components/Sidebar';
 import { Topbar } from '@/components/Topbar';
 
@@ -31,13 +32,23 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [email, setEmail] = useState('');
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) {
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!data.session) { router.replace('/login'); return; }
+      // Role gate — only staff may stay in the admin dashboard.
+      try {
+        const me = await apiFetch<{ role: string | null }>('/auth/whoami');
+        if (me.role !== 'ADMIN' && me.role !== 'RECRUITER') {
+          await supabase.auth.signOut();
+          router.replace('/login');
+          return;
+        }
+      } catch {
+        await supabase.auth.signOut();
         router.replace('/login');
-      } else {
-        setEmail(data.session.user.email ?? '');
-        setReady(true);
+        return;
       }
+      setEmail(data.session.user.email ?? '');
+      setReady(true);
     });
   }, [router]);
 

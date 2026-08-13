@@ -4,6 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
+import { apiFetch } from '@/lib/api';
+
+const ROLE_NAME: Record<string, string> = { ADMIN: 'staff', RECRUITER: 'staff', CLIENT: 'client' };
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,9 +20,24 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) setError(error.message);
-    else router.replace('/dashboard');
+    if (error) { setError(error.message); setLoading(false); return; }
+
+    // Role gate — this is the worker app, only candidates may enter.
+    try {
+      const me = await apiFetch<{ role: string | null }>('/auth/whoami');
+      if (me.role !== 'CANDIDATE') {
+        await supabase.auth.signOut();
+        const who = me.role ? ROLE_NAME[me.role] ?? 'that' : 'that';
+        setError(`This is a ${who} account — it can’t access the worker app. Staff use the admin dashboard and clients use the client portal.`);
+        setLoading(false);
+        return;
+      }
+      router.replace('/dashboard');
+    } catch {
+      await supabase.auth.signOut();
+      setError('We couldn’t verify your account. Please try again.');
+      setLoading(false);
+    }
   }
 
   return (

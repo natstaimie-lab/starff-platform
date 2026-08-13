@@ -21,6 +21,19 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         router.replace('/login');
         return;
       }
+      // Role gate — only client accounts may stay in the client portal.
+      try {
+        const who = await apiFetch<{ role: string | null }>('/auth/whoami');
+        if (who.role !== 'CLIENT') {
+          await supabase.auth.signOut();
+          router.replace('/login');
+          return;
+        }
+      } catch {
+        await supabase.auth.signOut();
+        router.replace('/login');
+        return;
+      }
       try {
         const me = await apiFetch<{ client: { name: string }; contact: { firstName: string; lastName: string } }>('/client/me');
         setCompany(me.client.name);

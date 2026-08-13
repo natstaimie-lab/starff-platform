@@ -42,6 +42,20 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         router.replace('/login');
         return;
       }
+      // Role gate — only workers may stay here (and before ensureProfile, so a
+      // non-candidate login can never auto-create a candidate profile).
+      try {
+        const who = await apiFetch<{ role: string | null }>('/auth/whoami');
+        if (who.role !== 'CANDIDATE') {
+          await supabase.auth.signOut();
+          router.replace('/login');
+          return;
+        }
+      } catch {
+        await supabase.auth.signOut();
+        router.replace('/login');
+        return;
+      }
       try {
         setName(await ensureProfile());
       } catch {
