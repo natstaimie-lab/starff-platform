@@ -1,0 +1,30 @@
+# Keeps the Supabase project awake so it never hits the free-tier 7-day
+# idle auto-pause (which takes Auth + DB offline and blocks all logins).
+#
+# Runs on GitHub's servers every 3 days — independent of any laptop being on.
+# Uses the PUBLIC anon key (the same one shipped in the web/mobile apps), so
+# there are NO secrets to configure. It only makes read pings; it changes nothing.
+name: Supabase keep-alive
+
+on:
+  schedule:
+    - cron: '17 9 */3 * *'   # every 3 days at 09:17 UTC (well under the 7-day limit)
+  workflow_dispatch: {}       # lets you run it manually from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase (Auth + REST)
+        run: |
+          URL="https://vtmafvssthoypwgcjtkm.supabase.co"
+          KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0bWFmdnNzdGhveXB3Z2NqdGttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1ODY3NDMsImV4cCI6MjA5OTE2Mjc0M30.7V8sYnRVR7NDsvkZdEZjBSB4y3zrq9nt65CmIuF3xO8"
+          auth=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$URL/auth/v1/health" -H "apikey: $KEY")
+          rest=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$URL/rest/v1/" -H "apikey: $KEY")
+          echo "Auth health: $auth   REST: $rest"
+          # Success as long as the project responds at all (any HTTP code = it's awake).
+          if [ "$auth" = "000" ] && [ "$rest" = "000" ]; then
+            echo "::error::Supabase project did not respond — it may be paused."
+            exit 1
+          fi
+          echo "Supabase is awake ✓"
