@@ -28,10 +28,11 @@ async function bootstrap() {
   const doc = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, doc);
 
-  const port = process.env.API_PORT ?? 3001;
-  await app.listen(port);
+  // Railway/Render inject PORT; fall back to API_PORT locally, then 3001.
+  const port = process.env.PORT ?? process.env.API_PORT ?? 3001;
+  await app.listen(port, '0.0.0.0');
   // eslint-disable-next-line no-console
-  console.log(`Starff API running on http://localhost:${port}/api/v1`);
-  console.log(`API docs at            http://localhost:${port}/api/docs`);
+  console.log(`Starff API running on port ${port} (prefix /api/v1)`);
+  console.log(`API docs at /api/docs`);
 }
 bootstrap();
