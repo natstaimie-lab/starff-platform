@@ -96,7 +96,7 @@ export default function EnquiriesPage() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
               {view.email && (
-                <a href={`mailto:${view.email}`} style={{ ...btn('var(--orange-500)'), textDecoration: 'none', display: 'inline-block' }}>Reply by email</a>
+                <a href={`mailto:${view.email}?subject=${encodeURIComponent('Re: Your enquiry to Starff')}`} style={{ ...btn('var(--orange-500)'), textDecoration: 'none', display: 'inline-block' }}>Reply by email</a>
               )}
               <button onClick={() => setView(null)} style={{ border: '1px solid var(--grey-200)', background: '#fff', color: 'var(--navy-900)', fontWeight: 700, fontSize: 12, padding: '6px 14px', borderRadius: 8, cursor: 'pointer' }}>Close</button>
             </div>
