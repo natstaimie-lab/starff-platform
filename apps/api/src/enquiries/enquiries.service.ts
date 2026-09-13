@@ -27,6 +27,32 @@ export class EnquiriesService {
       },
     });
 
+    // Notify staff in-app so a new enquiry shows on the admin bell (best-effort).
+    try {
+      const staff = await this.prisma.user.findMany({
+        where: { role: { in: [Role.ADMIN, Role.RECRUITER] }, isActive: true },
+        select: { id: true },
+      });
+      if (staff.length) {
+        const label: Record<string, string> = {
+          CONTACT: 'contact',
+          POST_A_JOB: 'post-a-job',
+          CANDIDATE_REGISTER: 'registration',
+        };
+        await this.prisma.notification.createMany({
+          data: staff.map((s) => ({
+            userId: s.id,
+            type: 'enquiry',
+            title: 'New website enquiry',
+            body: `${enquiry.name ?? 'Someone'} sent a ${label[enquiry.type] ?? 'new'} enquiry.`,
+            link: '/dashboard/enquiries',
+          })),
+        });
+      }
+    } catch {
+      // best-effort — never block the form on a notification failure
+    }
+
     // Auto-acknowledge a worker registration (best-effort — never blocks the form).
     if (enquiry.type === EnquiryType.CANDIDATE_REGISTER && enquiry.email) {
       const firstName = (enquiry.name ?? 'there').split(' ')[0];

@@ -64,8 +64,8 @@ export function Sidebar() {
   const [badges, setBadges] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    apiFetch<{ pendingTimesheets: number; complianceAttention: number }>('/stats/overview')
-      .then((s) => setBadges({ timesheets: s.pendingTimesheets, compliance: s.complianceAttention }))
+    apiFetch<{ pendingTimesheets: number; complianceAttention: number; newEnquiries: number }>('/stats/overview')
+      .then((s) => setBadges({ timesheets: s.pendingTimesheets, compliance: s.complianceAttention, enquiries: s.newEnquiries }))
       .catch(() => {});
   }, [pathname]);
 
