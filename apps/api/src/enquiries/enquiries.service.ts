@@ -5,6 +5,23 @@ import { CreateEnquiryDto } from './dto/create-enquiry.dto';
 import { RegistrationService } from '../registration/registration.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
+// Conservative spam signals — tuned to avoid false positives on genuine enquiries.
+const SPAM_KEYWORDS = [
+  /viagra|cialis/i,
+  /\bporn\b|\bxxx\b|\bnude\b/i,
+  /casino|betting|gambling|\bslots?\b/i,
+  /crypto|bitcoin|forex|binary option/i,
+  /\bseo\b|back ?links?|rank(ing)? your (site|website)/i,
+  /payday loan|loan offer/i,
+  /\bviagra\b|escort service/i,
+];
+const DISPOSABLE_DOMAINS = [
+  'mailinator.com', 'tempmail', '10minutemail', 'guerrillamail', 'yopmail',
+  'trashmail', 'sharklasers.com', 'getnada', 'dispostable', 'maildrop',
+];
+// Hidden honeypot field names bots love to fill (added to the site forms).
+const HONEYPOT_FIELDS = ['your-website', 'website', 'url', 'hp-field', 'contact-url'];
+
 @Injectable()
 export class EnquiriesService {
   constructor(
@@ -13,7 +30,35 @@ export class EnquiriesService {
     private readonly notifications: NotificationsService,
   ) {}
 
+  /** Cheap heuristics — returns why it looks like spam, or {spam:false}. */
+  private detectSpam(dto: CreateEnquiryDto): { spam: boolean; reason?: string } {
+    // 1. Honeypot: a hidden field a human never sees. Bots fill it.
+    const payload = (dto.payload ?? {}) as Record<string, unknown>;
+    for (const hp of HONEYPOT_FIELDS) {
+      const v = payload[hp];
+      if (typeof v === 'string' && v.trim() !== '') return { spam: true, reason: 'honeypot filled' };
+    }
+
+    const message = dto.message ?? '';
+    const text = `${dto.name ?? ''} ${message} ${dto.company ?? ''}`;
+    const links = message.match(/https?:\/\/|www\./gi) ?? [];
+
+    // 2. Link-stuffed message.
+    if (links.length >= 3) return { spam: true, reason: 'too many links' };
+    // 3. Known spam phrases.
+    for (const rx of SPAM_KEYWORDS) if (rx.test(text)) return { spam: true, reason: 'spam keyword' };
+    // 4. Disposable / throwaway email domain.
+    const email = (dto.email ?? '').toLowerCase();
+    if (DISPOSABLE_DOMAINS.some((d) => email.includes(d))) return { spam: true, reason: 'disposable email' };
+    // 5. Links + no real name (classic bot pattern).
+    if (links.length >= 2 && (!dto.name || dto.name.trim().length < 2)) return { spam: true, reason: 'link spam' };
+
+    return { spam: false };
+  }
+
   async create(dto: CreateEnquiryDto) {
+    const { spam, reason } = this.detectSpam(dto);
+
     const enquiry = await this.prisma.enquiry.create({
       data: {
         type: dto.type,
@@ -24,8 +69,13 @@ export class EnquiriesService {
         message: dto.message,
         payload: (dto.payload ?? undefined) as Prisma.InputJsonValue,
         source: 'wordpress',
+        spam,
+        spamReason: reason ?? null,
       },
     });
+
+    // Spam is filed quietly to the spam bucket — no bell, no badge, no email.
+    if (spam) return enquiry;
 
     // Notify staff in-app so a new enquiry shows on the admin bell (best-effort).
     try {
@@ -67,14 +117,26 @@ export class EnquiriesService {
     return enquiry;
   }
 
-  findAll(params: { type?: string; status?: string }) {
+  findAll(params: { type?: string; status?: string; spam?: string }) {
     const where: Prisma.EnquiryWhereInput = {};
     if (params.type) where.type = params.type as any;
     if (params.status) where.status = params.status as any;
+    // Hide spam by default; the admin "Spam" tab passes spam=true to review it.
+    where.spam = params.spam === 'true';
     return this.prisma.enquiry.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: 100,
+    });
+  }
+
+  /** Flag or unflag an enquiry as spam ("Not spam" restores it to the main list). */
+  async setSpam(id: string, spam: boolean) {
+    const enquiry = await this.prisma.enquiry.findUnique({ where: { id } });
+    if (!enquiry) throw new NotFoundException('Enquiry not found');
+    return this.prisma.enquiry.update({
+      where: { id },
+      data: { spam: !!spam, spamReason: spam ? (enquiry.spamReason ?? 'marked by staff') : null },
     });
   }
 

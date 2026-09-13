@@ -33,7 +33,7 @@ export class StatsService {
       this.prisma.job.count({ where: { status: { in: [JobStatus.OPEN, JobStatus.FILLED] } } }),
       this.prisma.timesheet.count(),
       this.prisma.timesheet.count({ where: { status: TimesheetStatus.SUBMITTED } }),
-      this.prisma.enquiry.count({ where: { status: EnquiryStatus.NEW } }),
+      this.prisma.enquiry.count({ where: { status: EnquiryStatus.NEW, spam: false } }),
       // Candidates needing a compliance decision (drives the sidebar badge).
       this.prisma.candidate.count({
         where: { status: { in: [CandidateStatus.NEW, CandidateStatus.SCREENING, CandidateStatus.INACTIVE, CandidateStatus.REJECTED] } },

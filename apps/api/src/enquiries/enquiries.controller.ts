@@ -4,6 +4,7 @@ import {
   Get,
   Headers,
   Param,
+  Patch,
   Post,
   Query,
   UnauthorizedException,
@@ -37,10 +38,22 @@ export class EnquiriesController {
   }
 
   // Staff only — read the submissions in the admin dashboard.
+  // Spam is hidden by default; pass ?spam=true to review the spam bucket.
   @Get()
   @Roles(Role.ADMIN, Role.RECRUITER)
-  findAll(@Query('type') type?: string, @Query('status') status?: string) {
-    return this.enquiries.findAll({ type, status });
+  findAll(
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+    @Query('spam') spam?: string,
+  ) {
+    return this.enquiries.findAll({ type, status, spam });
+  }
+
+  // Staff only — flag/unflag an enquiry as spam (e.g. "Not spam" to restore it).
+  @Patch(':id/spam')
+  @Roles(Role.ADMIN, Role.RECRUITER)
+  setSpam(@Param('id') id: string, @Body('spam') spam: boolean) {
+    return this.enquiries.setSpam(id, spam);
   }
 
   // Staff only — promote an enquiry into a Candidate or Client.

@@ -666,10 +666,14 @@ model Enquiry {
   message     String?
   payload     Json?         // full raw form payload, for anything extra
 
+  spam        Boolean       @default(false) // flagged by the spam filter / honeypot
+  spamReason  String?       // why it was flagged (for review)
+
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
   @@index([type, status])
+  @@index([spam])
 }
 
 // ══════════════════════════════════════════════
