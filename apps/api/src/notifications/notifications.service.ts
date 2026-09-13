@@ -34,7 +34,8 @@ export type NotifyKind =
   | 'REPLACEMENT_CONFIRMED'
   | 'RELIABILITY_REVIEW'
   | 'INVOICE_SENT'
-  | 'INVOICE_DISPUTED';
+  | 'INVOICE_DISPUTED'
+  | 'REGISTRATION_RECEIVED';
 
 interface NotifyInput {
   to: string;

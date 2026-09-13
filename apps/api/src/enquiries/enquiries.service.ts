@@ -1,15 +1,20 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { EnquiryStatus, EnquiryType, Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEnquiryDto } from './dto/create-enquiry.dto';
+import { RegistrationService } from '../registration/registration.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class EnquiriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly registration: RegistrationService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
-  create(dto: CreateEnquiryDto) {
-    return this.prisma.enquiry.create({
+  async create(dto: CreateEnquiryDto) {
+    const enquiry = await this.prisma.enquiry.create({
       data: {
         type: dto.type,
         name: dto.name,
@@ -21,6 +26,19 @@ export class EnquiriesService {
         source: 'wordpress',
       },
     });
+
+    // Auto-acknowledge a worker registration (best-effort — never blocks the form).
+    if (enquiry.type === EnquiryType.CANDIDATE_REGISTER && enquiry.email) {
+      const firstName = (enquiry.name ?? 'there').split(' ')[0];
+      await this.notifications.send({
+        to: enquiry.email,
+        kind: 'REGISTRATION_RECEIVED',
+        subject: "We've received your Starff registration",
+        body: `Hi ${firstName}, thanks for registering your interest with Starff. Our team will review your details and email you shortly with a link to set up your worker portal.`,
+      });
+    }
+
+    return enquiry;
   }
 
   findAll(params: { type?: string; status?: string }) {
@@ -35,65 +53,57 @@ export class EnquiriesService {
   }
 
   /**
-   * Turn an enquiry into a real record:
-   *  - "Post a job" → a Client (with the enquirer as a contact)
-   *  - anything else → a Candidate
+   * Turn an enquiry into a real record with a real login, reusing the tested
+   * registration flow (which creates the Supabase account + emails a secure
+   * activation / set-password link to the enquirer):
+   *  - "Post a job" → a Client (contact invited to the client portal)
+   *  - anything else → a Candidate (invited to the candidate portal)
    * Then mark the enquiry CONVERTED.
    */
   async convert(id: string) {
     const enquiry = await this.prisma.enquiry.findUnique({ where: { id } });
     if (!enquiry) throw new NotFoundException('Enquiry not found');
+    if (!enquiry.email) {
+      throw new BadRequestException(
+        "This enquiry has no email address, so it can't be converted into an account.",
+      );
+    }
 
     const [firstName, ...rest] = (enquiry.name ?? 'New Contact').split(' ');
     const lastName = rest.join(' ') || '—';
+
+    // Guard: don't collide with an account that already exists under a different role.
+    const existingUser = await this.prisma.user.findUnique({ where: { email: enquiry.email } });
+
     let result: { kind: 'client' | 'candidate'; id: string };
 
     if (enquiry.type === EnquiryType.POST_A_JOB) {
-      const client = await this.prisma.client.create({
-        data: {
-          name: enquiry.company ?? enquiry.name ?? 'New Client',
-          status: 'LEAD',
-          billingEmail: enquiry.email ?? undefined,
-          contacts: enquiry.name
-            ? { create: { firstName, lastName, email: enquiry.email ?? '', phone: enquiry.phone ?? undefined, isPrimary: true } }
-            : undefined,
-        },
-      });
-      result = { kind: 'client', id: client.id };
-    } else {
-      // Reuse an existing account for this email instead of crashing on the
-      // unique-email constraint (e.g. the enquirer is already a user).
-      const existingUser = enquiry.email
-        ? await this.prisma.user.findUnique({ where: { email: enquiry.email } })
-        : null;
-
-      if (existingUser) {
-        const existingCandidate = await this.prisma.candidate.findUnique({
-          where: { userId: existingUser.id },
-        });
-        if (existingCandidate) {
-          // Already a candidate — just link the enquiry to it.
-          result = { kind: 'candidate', id: existingCandidate.id };
-        } else if (existingUser.role === Role.CANDIDATE) {
-          const candidate = await this.prisma.candidate.create({
-            data: { userId: existingUser.id, firstName, lastName, phone: enquiry.phone ?? undefined, status: 'NEW' },
-          });
-          result = { kind: 'candidate', id: candidate.id };
-        } else {
-          throw new ConflictException(
-            `This email (${enquiry.email}) already belongs to a ${existingUser.role.toLowerCase()} account, so it can't be converted into a new candidate.`,
-          );
-        }
-      } else {
-        const userId = randomUUID();
-        await this.prisma.user.create({
-          data: { id: userId, email: enquiry.email ?? `${userId.slice(0, 8)}@candidate.local`, role: Role.CANDIDATE, firstName, lastName },
-        });
-        const candidate = await this.prisma.candidate.create({
-          data: { userId, firstName, lastName, phone: enquiry.phone ?? undefined, status: 'NEW' },
-        });
-        result = { kind: 'candidate', id: candidate.id };
+      if (existingUser && existingUser.role !== Role.CLIENT) {
+        throw new ConflictException(
+          `This email (${enquiry.email}) already belongs to a ${existingUser.role.toLowerCase()} account, so it can't be set up as a new client.`,
+        );
       }
+      const res = await this.registration.registerClient({
+        companyName: enquiry.company ?? enquiry.name ?? 'New Client',
+        contactFirstName: firstName,
+        contactLastName: lastName,
+        contactEmail: enquiry.email,
+        contactPhone: enquiry.phone ?? undefined,
+      } as any);
+      result = { kind: 'client', id: res.clientId };
+    } else {
+      if (existingUser && existingUser.role !== Role.CANDIDATE) {
+        throw new ConflictException(
+          `This email (${enquiry.email}) already belongs to a ${existingUser.role.toLowerCase()} account, so it can't be converted into a new candidate.`,
+        );
+      }
+      const res = await this.registration.registerCandidate({
+        firstName,
+        lastName,
+        email: enquiry.email,
+        phone: enquiry.phone ?? undefined,
+      } as any);
+      result = { kind: 'candidate', id: res.candidateId };
     }
 
     await this.prisma.enquiry.update({ where: { id }, data: { status: EnquiryStatus.CONVERTED } });
