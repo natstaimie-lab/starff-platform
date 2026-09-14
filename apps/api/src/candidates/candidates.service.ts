@@ -10,10 +10,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../auth/current-user.decorator';
 import { CreateCandidateDto } from './dto/create-candidate.dto';
 import { UpdateCandidateDto } from './dto/update-candidate.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class CandidatesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   /**
    * Create a candidate profile. Also creates the User row (as CANDIDATE) if it
@@ -47,7 +51,7 @@ export class CandidatesService {
     const existing = await this.prisma.candidate.findUnique({ where: { userId } });
     if (existing) return existing;
 
-    return this.prisma.candidate.create({
+    const candidate = await this.prisma.candidate.create({
       data: {
         userId,
         firstName: dto.firstName,
@@ -58,6 +62,24 @@ export class CandidatesService {
         headline: dto.headline,
       },
     });
+
+    // Self-serve app signups pass a real email — send the same branded welcome the
+    // website flow sends (best-effort). Admin @candidate.local placeholders skipped.
+    if (!email.endsWith('@candidate.local')) {
+      await this.notifications
+        .send({
+          to: email,
+          userId,
+          kind: 'ACTIVATION',
+          subject: 'Welcome to Starff',
+          body: `Hi ${dto.firstName}, welcome to Starff! Your worker account is ready. Complete your profile, upload your documents and set your availability so we can start matching you to shifts.`,
+          actionUrl: process.env.CANDIDATE_PORTAL_URL || undefined,
+          actionLabel: 'Open your worker portal',
+        })
+        .catch(() => {});
+    }
+
+    return candidate;
   }
 
   // Admin/recruiter list with simple filtering + pagination.
