@@ -53,8 +53,11 @@ export default function ClientsPage() {
   const load = () => apiFetch<Client[]>('/clients').then(setRows).catch((e) => setError(e.message)).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
 
+  const emailBad = (v: string) => !!v.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
+  const formInvalid = !form.name.trim() || emailBad(form.billingEmail) || emailBad(form.contactEmail) || (!!form.contactEmail.trim() && !form.contactFirstName.trim());
+
   async function save() {
-    if (!form.name.trim()) return;
+    if (formInvalid) return;
     setSaving(true);
     try {
       await apiFetch('/clients', { method: 'POST', body: JSON.stringify(form) });
@@ -107,13 +110,14 @@ export default function ClientsPage() {
           onClose={() => setOpen(false)}
           footer={<>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={save} disabled={saving || !form.name.trim()}>{saving ? 'Saving…' : 'Create client'}</Button>
+            <Button onClick={save} disabled={saving || formInvalid}>{saving ? 'Saving…' : 'Create client'}</Button>
           </>}
         >
           <Field label="Company name"><TextInput value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Acme Logistics" /></Field>
           <Field label="Industry"><TextInput value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} placeholder="Logistics" /></Field>
           <Field label="City"><TextInput value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="Birmingham" /></Field>
           <Field label="Billing email"><TextInput type="email" value={form.billingEmail} onChange={(e) => setForm({ ...form, billingEmail: e.target.value })} placeholder="accounts@acme.co.uk" /></Field>
+          {emailBad(form.billingEmail) ? <p style={{ color: 'var(--error-600)', fontSize: 12, marginTop: -6 }}>Enter a valid billing email.</p> : null}
           <Field label="Status">
             <SelectInput value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
               {['LEAD', 'PROSPECT', 'ACTIVE', 'ON_HOLD', 'CLOSED'].map((s) => <option key={s} value={s}>{s}</option>)}
@@ -129,6 +133,8 @@ export default function ClientsPage() {
             <Field label="Last name"><TextInput value={form.contactLastName} onChange={(e) => setForm({ ...form, contactLastName: e.target.value })} placeholder="Turner" /></Field>
           </div>
           <Field label="Contact email"><TextInput type="email" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} placeholder="rachel@acme.co.uk" /></Field>
+          {emailBad(form.contactEmail) ? <p style={{ color: 'var(--error-600)', fontSize: 12, marginTop: -6 }}>Enter a valid contact email.</p> : null}
+          {!!form.contactEmail.trim() && !form.contactFirstName.trim() ? <p style={{ color: 'var(--error-600)', fontSize: 12, marginTop: -6 }}>Add the contact&apos;s first name to send an invite.</p> : null}
         </Modal>
       )}
     </Card>

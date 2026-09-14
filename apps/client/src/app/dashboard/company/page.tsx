@@ -15,6 +15,8 @@ type Loc = { id: string; name: string; city?: string | null; postcode?: string |
 type Contact = { id: string; firstName: string; lastName: string; email: string; jobTitle?: string | null; isPrimary: boolean };
 
 const inputStyle: React.CSSProperties = { width: '100%', height: 40, padding: '0 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', fontSize: 14, outline: 'none' };
+const errStyle: React.CSSProperties = { color: 'var(--error-600)', fontSize: 12, marginTop: 4 };
+const emailBad = (v: string) => !!v.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
 const AGREEMENT = [
   'The information provided about our company is accurate and we are authorised to enter this agreement.',
   'We will provide a safe working environment and site induction for workers Starff places with us.',
@@ -54,6 +56,7 @@ export default function CompanySetupPage() {
   useEffect(() => { load(); }, []);
 
   async function saveProfile() {
+    if (emailBad(profile.billingEmail)) { setError('Enter a valid billing email.'); return; }
     setSavingP(true); setSavedP(false); setError('');
     try {
       const body: any = { ...profile };
@@ -69,7 +72,7 @@ export default function CompanySetupPage() {
   }
   async function delLoc(id: string) { setLocs((l) => l.filter((x) => x.id !== id)); try { await apiFetch(`/client/locations/${id}`, { method: 'DELETE' }); } catch { load(); } }
   async function addCon() {
-    if (!conForm.firstName.trim() || !conForm.email.trim()) return;
+    if (!conForm.firstName.trim() || emailBad(conForm.email) || !conForm.email.trim()) return;
     try { await apiFetch('/client/contacts', { method: 'POST', body: JSON.stringify(conForm) }); setConForm({ firstName: '', lastName: '', email: '', jobTitle: '' }); load(); }
     catch (e: any) { setError(e.message); }
   }
@@ -94,10 +97,10 @@ export default function CompanySetupPage() {
           <Field label="Company name"><input {...P('name')} /></Field>
           <Field label="Industry / sector"><input {...P('industry')} placeholder="e.g. Logistics" /></Field>
           <Field label="Company registration no."><input {...P('companyRegNo')} placeholder="Companies House number" /></Field>
-          <Field label="Billing email"><input {...P('billingEmail')} /></Field>
+          <Field label="Billing email"><input {...P('billingEmail')} placeholder="accounts@company.co.uk" />{emailBad(profile.billingEmail) ? <p style={errStyle}>Enter a valid email.</p> : null}</Field>
           <Field label="Address line 1" full><input {...P('addressLine1')} /></Field>
           <Field label="City"><input {...P('city')} /></Field>
-          <Field label="Postcode"><input {...P('postcode')} /></Field>
+          <Field label="Postcode"><input value={profile.postcode} onChange={(e) => { setProfile({ ...profile, postcode: e.target.value.toUpperCase() }); setSavedP(false); }} style={inputStyle} /></Field>
           <Field label="Payment terms (days)"><input type="number" {...P('paymentTerms')} placeholder="30" /></Field>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
@@ -121,7 +124,7 @@ export default function CompanySetupPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 10, alignItems: 'end' }}>
           <Field label="Site name"><input value={locForm.name} onChange={(e) => setLocForm({ ...locForm, name: e.target.value })} style={inputStyle} placeholder="Birmingham Depot" /></Field>
           <Field label="City"><input value={locForm.city} onChange={(e) => setLocForm({ ...locForm, city: e.target.value })} style={inputStyle} /></Field>
-          <Field label="Postcode"><input value={locForm.postcode} onChange={(e) => setLocForm({ ...locForm, postcode: e.target.value })} style={inputStyle} /></Field>
+          <Field label="Postcode"><input value={locForm.postcode} onChange={(e) => setLocForm({ ...locForm, postcode: e.target.value.toUpperCase() })} style={inputStyle} /></Field>
           <button className="btn-primary" onClick={addLoc} disabled={!locForm.name.trim()} style={{ height: 40 }}>Add</button>
         </div>
       </Card>
@@ -141,10 +144,10 @@ export default function CompanySetupPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 10 }}>
           <Field label="First name"><input value={conForm.firstName} onChange={(e) => setConForm({ ...conForm, firstName: e.target.value })} style={inputStyle} /></Field>
           <Field label="Last name"><input value={conForm.lastName} onChange={(e) => setConForm({ ...conForm, lastName: e.target.value })} style={inputStyle} /></Field>
-          <Field label="Email"><input value={conForm.email} onChange={(e) => setConForm({ ...conForm, email: e.target.value })} style={inputStyle} /></Field>
+          <Field label="Email"><input value={conForm.email} onChange={(e) => setConForm({ ...conForm, email: e.target.value })} style={inputStyle} />{emailBad(conForm.email) ? <p style={errStyle}>Enter a valid email.</p> : null}</Field>
           <Field label="Job title"><input value={conForm.jobTitle} onChange={(e) => setConForm({ ...conForm, jobTitle: e.target.value })} style={inputStyle} /></Field>
         </div>
-        <button className="btn-primary" onClick={addCon} disabled={!conForm.firstName.trim() || !conForm.email.trim()}>Add authorised user</button>
+        <button className="btn-primary" onClick={addCon} disabled={!conForm.firstName.trim() || !conForm.email.trim() || emailBad(conForm.email)}>Add authorised user</button>
       </Card>
 
       <Card title="Terms & agreement" subtitle="Please read, then sign to confirm.">
