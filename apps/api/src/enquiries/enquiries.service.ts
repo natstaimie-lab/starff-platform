@@ -103,14 +103,18 @@ export class EnquiriesService {
       // best-effort — never block the form on a notification failure
     }
 
-    // Auto-acknowledge a worker registration (best-effort — never blocks the form).
-    if (enquiry.type === EnquiryType.CANDIDATE_REGISTER && enquiry.email) {
+    // Auto-acknowledge worker registrations AND company staffing requests
+    // (best-effort — never blocks the form). Contact enquiries are not auto-replied.
+    if (enquiry.email && (enquiry.type === EnquiryType.CANDIDATE_REGISTER || enquiry.type === EnquiryType.POST_A_JOB)) {
       const firstName = (enquiry.name ?? 'there').split(' ')[0];
+      const isClient = enquiry.type === EnquiryType.POST_A_JOB;
       await this.notifications.send({
         to: enquiry.email,
         kind: 'REGISTRATION_RECEIVED',
-        subject: "We've received your Starff registration",
-        body: `Hi ${firstName}, thanks for registering your interest with Starff. Our team will review your details and email you shortly with a link to set up your worker portal.`,
+        subject: isClient ? "We've received your staffing request" : "We've received your Starff registration",
+        body: isClient
+          ? `Hi ${firstName}, thanks for your staffing request to Starff. Our team will review it and email you shortly with the next steps and access to your client portal.`
+          : `Hi ${firstName}, thanks for registering your interest with Starff. Our team will review your details and email you shortly with a link to set up your worker portal.`,
       });
     }
 
