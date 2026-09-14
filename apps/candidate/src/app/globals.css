@@ -876,7 +876,7 @@ a.link:hover {
   }
   /* Make room for the fixed hamburger and tighten padding for small screens. */
   .phead {
-    padding: 16px 16px 16px 64px;
+    padding-left: 64px !important;
   }
   .content {
     padding: 16px 16px 32px;

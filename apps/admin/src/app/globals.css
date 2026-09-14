@@ -679,7 +679,7 @@ a.link:hover {
     transform: translateX(0);
   }
   .phead {
-    padding: 16px 16px 16px 64px;
+    padding-left: 64px !important;
   }
   .content {
     padding: 16px 16px 32px;
