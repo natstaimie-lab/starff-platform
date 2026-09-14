@@ -2,7 +2,7 @@
  * Shared dark-gradient shell for the auth screens (login / register), matching
  * the prototype's navy radial background and white brand wordmark.
  */
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/theme/tokens';
 import { logos, LOGO_ASPECT } from '@/theme/logos';
 import { Icon } from '@/components/Icon';
+import { ScrollLockContext } from '@/components/scrollLock';
 
 export function AuthShell({
   children,
@@ -19,6 +20,9 @@ export function AuthShell({
   onBack?: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+  const lock = useCallback(() => setScrollEnabled(false), []);
+  const unlock = useCallback(() => setScrollEnabled(true), []);
   return (
     <LinearGradient
       colors={[colors.authTop, colors.authMid, colors.authBottom]}
@@ -27,6 +31,7 @@ export function AuthShell({
     >
       <StatusBar style="light" />
       <ScrollView
+        scrollEnabled={scrollEnabled}
         contentContainerStyle={{
           paddingTop: insets.top + 12,
           paddingBottom: insets.bottom + 24,
@@ -47,7 +52,9 @@ export function AuthShell({
         <View style={styles.brand}>
           <Image source={logos.white} style={styles.logo} resizeMode="contain" />
         </View>
-        {children}
+        <ScrollLockContext.Provider value={{ lock, unlock }}>
+          {children}
+        </ScrollLockContext.Provider>
       </ScrollView>
     </LinearGradient>
   );

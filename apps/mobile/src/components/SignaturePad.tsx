@@ -13,6 +13,7 @@ import { PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { Icon } from '@/components/Icon';
 import { colors, radius } from '@/theme/tokens';
+import { useScrollLock } from '@/components/scrollLock';
 
 export interface SignaturePadRef {
   clear: () => void;
@@ -25,16 +26,22 @@ export const SignaturePad = forwardRef<SignaturePadRef, { onChange?: (hasInk: bo
     const [, tick] = useState(0);
     const render = () => tick((t) => t + 1);
 
+    // Freeze the enclosing ScrollView while a stroke is in progress so the drag
+    // draws instead of scrolls. Kept in a ref so the (once-created) PanResponder
+    // always calls the current lock/unlock.
+    const { lock, unlock } = useScrollLock();
+    const lockRef = useRef({ lock, unlock });
+    lockRef.current = { lock, unlock };
+
     const pan = useRef(
       PanResponder.create({
-        // Capture the touch so the parent ScrollView can't steal it for scrolling
-        // while the user is drawing their signature.
         onStartShouldSetPanResponder: () => true,
         onStartShouldSetPanResponderCapture: () => true,
         onMoveShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponderCapture: () => true,
         onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: (e) => {
+          lockRef.current.lock();
           const { locationX, locationY } = e.nativeEvent;
           currentRef.current = `M ${locationX.toFixed(1)} ${locationY.toFixed(1)}`;
           render();
@@ -44,7 +51,11 @@ export const SignaturePad = forwardRef<SignaturePadRef, { onChange?: (hasInk: bo
           currentRef.current += ` L ${locationX.toFixed(1)} ${locationY.toFixed(1)}`;
           render();
         },
+        onPanResponderTerminate: () => {
+          lockRef.current.unlock();
+        },
         onPanResponderRelease: () => {
+          lockRef.current.unlock();
           const stroke = currentRef.current;
           currentRef.current = '';
           if (stroke) {
