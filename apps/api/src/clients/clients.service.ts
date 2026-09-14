@@ -2,13 +2,38 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { createClient } from '@supabase/supabase-js';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClientDto } from './dto/create-client.dto';
+import { RegistrationService } from '../registration/registration.service';
 
 @Injectable()
 export class ClientsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly registration: RegistrationService,
+  ) {}
 
-  create(dto: CreateClientDto) {
-    return this.prisma.client.create({ data: dto });
+  async create(dto: CreateClientDto) {
+    // Split the optional primary-contact fields from the client's own fields.
+    const { contactFirstName, contactLastName, contactEmail, contactPhone, ...clientData } = dto;
+    const client = await this.prisma.client.create({
+      data: { ...clientData, registrationSource: 'ADMIN' },
+    });
+
+    // If a contact email was given, invite them to the client portal (best-effort).
+    if (contactEmail && contactFirstName) {
+      try {
+        await this.registration.inviteClientContact({
+          clientId: client.id,
+          firstName: contactFirstName,
+          lastName: contactLastName || '—',
+          email: contactEmail,
+          phone: contactPhone,
+        });
+      } catch {
+        // never fail client creation because an invite email bounced
+      }
+    }
+
+    return client;
   }
 
   findAll(params: { includeArchived?: boolean } = {}) {

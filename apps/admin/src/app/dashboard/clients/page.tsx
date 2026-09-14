@@ -28,7 +28,7 @@ type Client = {
 
 const statusTone: Record<string, string> = { ACTIVE: 'success', LEAD: 'info', PROSPECT: 'warning', ON_HOLD: 'warning', CLOSED: 'neutral' };
 const SOURCE_LABEL: Record<string, string> = { WEBSITE: 'Website', MOBILE: 'Mobile app', PORTAL: 'Portal', ADMIN: 'Admin' };
-const empty = { name: '', industry: '', city: '', billingEmail: '', status: 'ACTIVE' };
+const empty = { name: '', industry: '', city: '', billingEmail: '', status: 'ACTIVE', contactFirstName: '', contactLastName: '', contactEmail: '' };
 
 // Same 5-section rule as the API's client onboarding progress.
 function clientProgressPct(c: Client): number {
@@ -119,6 +119,16 @@ export default function ClientsPage() {
               {['LEAD', 'PROSPECT', 'ACTIVE', 'ON_HOLD', 'CLOSED'].map((s) => <option key={s} value={s}>{s}</option>)}
             </SelectInput>
           </Field>
+
+          <div style={{ borderTop: '1px solid var(--border-subtle)', margin: '6px 0 2px', paddingTop: 12 }}>
+            <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 2 }}>Primary contact <span className="dim" style={{ fontWeight: 500 }}>(optional)</span></div>
+            <p className="dim" style={{ fontSize: 12.5, margin: '0 0 10px' }}>Add a contact email and we'll email them a secure invite to the client portal (set-password link included).</p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="First name"><TextInput value={form.contactFirstName} onChange={(e) => setForm({ ...form, contactFirstName: e.target.value })} placeholder="Rachel" /></Field>
+            <Field label="Last name"><TextInput value={form.contactLastName} onChange={(e) => setForm({ ...form, contactLastName: e.target.value })} placeholder="Turner" /></Field>
+          </div>
+          <Field label="Contact email"><TextInput type="email" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} placeholder="rachel@acme.co.uk" /></Field>
         </Modal>
       )}
     </Card>

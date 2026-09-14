@@ -330,6 +330,71 @@ export class RegistrationService {
     };
   }
 
+  /**
+   * Invite a contact to an EXISTING client (used when admin adds a client in the
+   * dashboard): create their Supabase login + link the contact + email a secure
+   * activation/portal link. Idempotent on the contact's email.
+   */
+  async inviteClientContact(input: {
+    clientId: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+  }) {
+    const email = input.email.trim().toLowerCase();
+    let user = await this.prisma.user.findUnique({ where: { email } });
+    let isNew = false;
+    let activationUrl: string | undefined;
+
+    if (!user) {
+      const auth = await this.ensureAuthUser(
+        email,
+        { firstName: input.firstName, lastName: input.lastName, role: 'client' },
+        this.clientPortalUrl(),
+      );
+      isNew = auth.isNew;
+      activationUrl = auth.actionLink;
+      user = await this.prisma.user.upsert({
+        where: { id: auth.id },
+        update: {},
+        create: { id: auth.id, email, role: Role.CLIENT, firstName: input.firstName, lastName: input.lastName, phone: input.phone },
+      });
+    }
+
+    // Link the contact to this client (idempotent by the contact's userId).
+    let contact = await this.prisma.clientContact.findUnique({ where: { userId: user.id } });
+    if (!contact) {
+      const primaryCount = await this.prisma.clientContact.count({ where: { clientId: input.clientId, isPrimary: true } });
+      contact = await this.prisma.clientContact.create({
+        data: {
+          clientId: input.clientId,
+          userId: user.id,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          email,
+          phone: input.phone,
+          isPrimary: primaryCount === 0,
+        },
+      });
+    }
+
+    const portalUrl = this.clientPortalUrl();
+    await this.notifications.send({
+      to: email,
+      userId: user.id,
+      kind: isNew ? 'ACTIVATION' : 'CONTINUE_REGISTRATION',
+      subject: isNew ? "You've been invited to the Starff client portal" : 'Your Starff client portal',
+      body: isNew
+        ? `Hi ${input.firstName}, you've been set up on the Starff client portal. Activate your account to log in and manage your staffing.`
+        : `Hi ${input.firstName}, log in to the Starff client portal to manage your staffing.`,
+      actionUrl: activationUrl ?? portalUrl,
+      actionLabel: isNew ? 'Activate & log in' : 'Go to portal',
+    });
+
+    return { contactId: contact.id, userId: user.id, invited: isNew };
+  }
+
   // ────────────────────────────────────────────────────────────
   // PROGRESS  (derived — no duplicated "percent" column)
   // ────────────────────────────────────────────────────────────
