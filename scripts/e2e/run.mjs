@@ -5,7 +5,7 @@
 // SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY, WORDPRESS_WEBHOOK_SECRET.
 //
 //   npm run test:e2e            (or: node --env-file=.env scripts/e2e/run.mjs)
-import { p, req, webhook, makeUser, track, cleanup, log, check, allPassed } from './helpers.mjs';
+import { p, req, webhook, makeUser, track, cleanup, log, check, allPassed, API } from './helpers.mjs';
 
 const H = 3600e3;
 const results = [];
@@ -212,7 +212,7 @@ async function enquiry(created) {
   const regBody = await reg.json();
   if (regBody.id) created.enquiryIds.push(regBody.id);
   check('webhook accepts correct secret → NEW enquiry', reg.status === 201 && (await p.enquiry.findUnique({ where: { id: regBody.id }, select: { status: true } })).status === 'NEW');
-  check('list endpoint needs login (401)', (await fetch(`${process.env.API_PORT ? '' : ''}${'http://localhost:' + (process.env.API_PORT || 3001) + '/api/v1'}/enquiries`)).status === 401);
+  check('list endpoint needs login (401)', (await fetch(`${API}/enquiries`)).status === 401);
   const conv = await req(`/enquiries/${regBody.id}/convert`, admin.bearer, 'POST');
   const convBody = await conv.json();
   if (convBody.kind === 'candidate') {

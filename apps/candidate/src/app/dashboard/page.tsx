@@ -297,7 +297,7 @@ export default function Dashboard() {
 
         {/* Latest feedback */}
         <div style={card}>
-          <Head title="Latest Feedback" href="/dashboard/ratings" />
+          <Head title="Latest Feedback" />
           {me?.rating != null ? (
             <div>
               <div className="fx ac" style={{ gap: 4, fontSize: 16 }}>{'★'.repeat(Math.round(me.rating))}<span className="dim" style={{ fontSize: 13, marginLeft: 4 }}>{me.rating.toFixed(1)} / 5</span></div>

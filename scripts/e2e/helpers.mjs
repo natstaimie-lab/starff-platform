@@ -11,7 +11,9 @@ export const SUPABASE_URL = process.env.SUPABASE_URL;
 export const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 export const ANON = process.env.SUPABASE_ANON_KEY;
 export const SECRET = process.env.WORDPRESS_WEBHOOK_SECRET;
-export const API = `http://localhost:${process.env.API_PORT || 3001}/api/v1`;
+// Target the local API by default; set E2E_API_BASE (e.g. the live Railway URL,
+// including the /api/v1 prefix) to smoke-test a deployed environment instead.
+export const API = process.env.E2E_API_BASE || `http://localhost:${process.env.API_PORT || 3001}/api/v1`;
 
 export const log = (...a) => console.log(...a);
 let PASS = true;
