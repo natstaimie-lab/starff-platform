@@ -207,7 +207,8 @@ export function RegisterScreen({ navigation, route }: Props) {
         {role === 'employer' ? (
           <>
             <Field label="Company name"><Input onDark value={company} onChangeText={setCompany} placeholder="Tesco Distribution" /></Field>
-            <Field label="Work email"><Input onDark value={email} onChangeText={setEmail} placeholder="you@company.com" autoCapitalize="none" keyboardType="email-address" /></Field>
+            <Field label="Work email"><Input onDark value={email} onChangeText={setEmail} placeholder="you@company.com" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" /></Field>
+            {email.length > 0 && !emailOk ? <Text style={styles.err}>Enter a valid work email address.</Text> : null}
             <Field label="Create password"><Input onDark value={password} onChangeText={setPassword} placeholder="At least 4 characters" secureTextEntry /></Field>
           </>
         ) : null}
