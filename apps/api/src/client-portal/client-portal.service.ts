@@ -43,7 +43,7 @@ export class ClientPortalService {
   async registerCompany(
     userId: string,
     email: string | undefined,
-    dto: { companyName: string; firstName?: string; lastName?: string; phone?: string },
+    dto: { companyName: string; firstName?: string; lastName?: string; phone?: string; postcode?: string },
   ) {
     const existing = await this.prisma.clientContact.findUnique({
       where: { userId },
@@ -70,6 +70,7 @@ export class ClientPortalService {
         status: 'LEAD',
         registrationSource: 'MOBILE',
         billingEmail: email,
+        postcode: dto.postcode?.trim().toUpperCase() || undefined,
       },
     });
     const contact = await this.prisma.clientContact.create({

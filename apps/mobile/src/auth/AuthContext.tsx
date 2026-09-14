@@ -82,6 +82,8 @@ interface EmployerSignUp {
   email: string;
   password: string;
   companyName: string;
+  phone?: string;
+  postcode?: string;
 }
 
 const BIOMETRIC_FLAG = 'starff_biometric_enabled';
@@ -229,6 +231,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         companyName: (meta.companyName as string) ?? 'My company',
         firstName: (meta.firstName as string) ?? undefined,
         lastName: (meta.lastName as string) ?? undefined,
+        phone: (meta.phone as string) ?? undefined,
+        postcode: (meta.postcode as string) ?? undefined,
       });
     } catch {
       // Non-fatal: idempotent; admin-created clients already have a company.
@@ -290,7 +294,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: input.email.trim(),
           password: input.password,
           options: {
-            data: { role: 'employer', companyName: input.companyName },
+            data: { role: 'employer', companyName: input.companyName, phone: input.phone, postcode: input.postcode },
           },
         });
         if (error) throw new Error(error.message);

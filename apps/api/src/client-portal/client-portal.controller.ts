@@ -24,7 +24,7 @@ export class ClientPortalController {
   @Roles()
   registerCompany(
     @CurrentUser() u: AuthUser,
-    @Body() dto: { companyName: string; firstName?: string; lastName?: string; phone?: string },
+    @Body() dto: { companyName: string; firstName?: string; lastName?: string; phone?: string; postcode?: string },
   ) {
     return this.svc.registerCompany(u.id, u.email, dto);
   }

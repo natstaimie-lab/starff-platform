@@ -199,7 +199,7 @@ export const clientApi = {
     apiFetch('/client/agreement', { method: 'PUT', body: input }),
 
   /** POST /client/register-company — self-provision a company on employer signup (idempotent). */
-  registerCompany: (input: { companyName: string; firstName?: string; lastName?: string }) =>
+  registerCompany: (input: { companyName: string; firstName?: string; lastName?: string; phone?: string; postcode?: string }) =>
     apiFetch('/client/register-company', { method: 'POST', body: input }),
 };
 

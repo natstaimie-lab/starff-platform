@@ -120,7 +120,7 @@ export function RegisterScreen({ navigation, route }: Props) {
 
   // per-step validity
   let ready = false;
-  if (role === 'employer') ready = !!(company.trim() && emailOk && password.length >= 4);
+  if (role === 'employer') ready = !!(company.trim() && emailOk && phoneOk && postcodeOk && password.length >= 4);
   else if (step === 0) ready = !!(name.trim() && emailOk && phoneOk && postcodeOk && dobOk);
   else if (step === 1) ready = sectors.length > 0;
   else if (step === 2) ready = password.length >= 4;
@@ -157,7 +157,7 @@ export function RegisterScreen({ navigation, route }: Props) {
           signatureName: name.trim(),
         });
       } else {
-        res = await signUpEmployer({ email, password, companyName: company });
+        res = await signUpEmployer({ email, password, companyName: company, phone, postcode: postcode.trim().toUpperCase() });
       }
       if (res.needsEmailConfirm) {
         Alert.alert(
@@ -209,6 +209,16 @@ export function RegisterScreen({ navigation, route }: Props) {
             <Field label="Company name"><Input onDark value={company} onChangeText={setCompany} placeholder="Tesco Distribution" /></Field>
             <Field label="Work email"><Input onDark value={email} onChangeText={setEmail} placeholder="you@company.com" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" /></Field>
             {email.length > 0 && !emailOk ? <Text style={styles.err}>Enter a valid work email address.</Text> : null}
+            <View style={styles.row2}>
+              <View style={{ flex: 1 }}>
+                <Field label="Contact number"><Input onDark value={phone} onChangeText={setPhone} placeholder="07700 900000" keyboardType="phone-pad" maxLength={16} /></Field>
+                {phone.length > 0 && !phoneOk ? <Text style={styles.err}>Enter a valid UK number.</Text> : null}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Field label="Company postcode"><Input onDark value={postcode} onChangeText={(v) => setPostcode(v.toUpperCase())} placeholder="RM18 7AB" autoCapitalize="characters" autoCorrect={false} maxLength={8} /></Field>
+                {postcode.length > 0 && !postcodeOk ? <Text style={styles.err}>Invalid postcode.</Text> : null}
+              </View>
+            </View>
             <Field label="Create password"><Input onDark value={password} onChangeText={setPassword} placeholder="At least 4 characters" secureTextEntry /></Field>
           </>
         ) : null}
