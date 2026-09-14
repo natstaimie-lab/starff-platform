@@ -38,6 +38,7 @@ interface AuthContextValue {
   /** True once a session exists but before role resolution finishes. */
   resolvingRole: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   signUpCandidate: (input: CandidateSignUp) => Promise<{ needsEmailConfirm: boolean }>;
   signUpEmployer: (input: EmployerSignUp) => Promise<{ needsEmailConfirm: boolean }>;
   signOut: () => Promise<void>;
@@ -246,6 +247,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password,
+        });
+        if (error) throw new Error(error.message);
+      },
+      async resetPassword(email) {
+        // Sends a Supabase recovery email (branded via Resend SMTP). The link
+        // opens the live web reset page where the user sets a new password, then
+        // returns to the app to sign in.
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: 'https://starff-platform-candidate.vercel.app/reset-password',
         });
         if (error) throw new Error(error.message);
       },

@@ -11,7 +11,7 @@ import type { AuthStackParams } from '@/navigation/RootNavigator';
 type Props = NativeStackScreenProps<AuthStackParams, 'Login'>;
 
 export function LoginScreen({ navigation }: Props) {
-  const { signIn, biometricAvailable, biometricEnabled, authenticateBiometric } =
+  const { signIn, resetPassword, biometricAvailable, biometricEnabled, authenticateBiometric } =
     useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -70,12 +70,21 @@ export function LoginScreen({ navigation }: Props) {
       </Field>
 
       <Pressable
-        onPress={() =>
+        onPress={async () => {
+          if (!email.includes('@')) {
+            Alert.alert('Reset password', 'Enter your email address above first, then tap “Forgot password?”.');
+            return;
+          }
+          try {
+            await resetPassword(email);
+          } catch {
+            // Never reveal whether an account exists — show the same message.
+          }
           Alert.alert(
-            'Reset password',
-            'A password reset link will be sent to your email. (Wired to Supabase password recovery.)',
-          )
-        }
+            'Check your email',
+            `If an account exists for ${email.trim()}, we’ve sent a link to reset your password. Open it, set a new password, then come back and sign in.`,
+          );
+        }}
       >
         <Text style={styles.forgot}>Forgot password?</Text>
       </Pressable>
