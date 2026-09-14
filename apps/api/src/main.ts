@@ -1,7 +1,15 @@
+import WebSocket from 'ws';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+
+// @supabase/realtime-js requires a global WebSocket at client construction time.
+// We never use realtime, but the server-side Supabase admin client (invites,
+// signed URLs) needs this to exist on Node runtimes without a native WebSocket.
+if (!(globalThis as { WebSocket?: unknown }).WebSocket) {
+  (globalThis as { WebSocket?: unknown }).WebSocket = WebSocket as unknown;
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
