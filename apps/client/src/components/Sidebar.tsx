@@ -55,6 +55,10 @@ export function Sidebar() {
   const router = useRouter();
   // Live "needs attention" counts for the menu badges.
   const [badges, setBadges] = useState<Record<string, number>>({});
+  // Mobile: the sidebar becomes an off-canvas drawer toggled by a hamburger.
+  const [open, setOpen] = useState(false);
+  // Close the drawer whenever the route changes (i.e. after tapping a link).
+  useEffect(() => { setOpen(false); }, [pathname]);
 
   useEffect(() => {
     Promise.all([
@@ -76,7 +80,14 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="sidebar">
+    <>
+      {/* Mobile-only hamburger (hidden on desktop via CSS). */}
+      <button className="sb-toggle" aria-label="Open menu" onClick={() => setOpen(true)}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      {/* Backdrop shown only while the drawer is open on mobile. */}
+      {open && <div className="sb-backdrop" onClick={() => setOpen(false)} />}
+      <aside className={`sidebar ${open ? 'open' : ''}`}>
       <div className="sb-head">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logos/starff-white.png" alt="Starff" style={{ height: 34, width: 'auto', display: 'block' }} />
@@ -102,6 +113,7 @@ export function Sidebar() {
           Logout
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
