@@ -52,7 +52,8 @@ export default function LoginPage() {
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@company.co.uk" style={{ ...input, marginBottom: 14 }} />
 
         <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>Password</label>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" style={{ ...input, marginBottom: 20 }} />
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" style={{ ...input, marginBottom: 8 }} />
+        <div style={{ textAlign: 'right', marginBottom: 18 }}><a href="/forgot-password" className="link" style={{ fontSize: 13 }}>Forgot password?</a></div>
 
         {error && <p style={{ color: 'var(--error-600)', fontSize: 13, background: 'var(--error-100)', borderRadius: 8, padding: '8px 12px', marginBottom: 16 }}>{error}</p>}
 

@@ -53,7 +53,8 @@ export default function LoginPage() {
 
         <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>Password</label>
         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••"
-          style={{ width: '100%', height: 42, padding: '0 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', marginBottom: 20, fontSize: 14, outline: 'none' }} />
+          style={{ width: '100%', height: 42, padding: '0 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', marginBottom: 8, fontSize: 14, outline: 'none' }} />
+        <div style={{ textAlign: 'right', marginBottom: 18 }}><Link href="/forgot-password" className="link" style={{ fontSize: 13 }}>Forgot password?</Link></div>
 
         {error && <p style={{ color: 'var(--error-600)', fontSize: 13, background: 'var(--error-100)', borderRadius: 8, padding: '8px 12px', marginBottom: 16 }}>{error}</p>}
 
