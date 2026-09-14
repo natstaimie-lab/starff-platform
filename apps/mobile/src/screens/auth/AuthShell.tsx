@@ -34,6 +34,9 @@ export function AuthShell({
           flexGrow: 1,
         }}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets={true}
+        contentInsetAdjustmentBehavior="always"
         showsVerticalScrollIndicator={false}
       >
         {onBack ? (

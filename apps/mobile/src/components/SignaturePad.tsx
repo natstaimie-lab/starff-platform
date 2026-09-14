@@ -27,8 +27,13 @@ export const SignaturePad = forwardRef<SignaturePadRef, { onChange?: (hasInk: bo
 
     const pan = useRef(
       PanResponder.create({
+        // Capture the touch so the parent ScrollView can't steal it for scrolling
+        // while the user is drawing their signature.
         onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponderCapture: () => true,
         onMoveShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponderCapture: () => true,
+        onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: (e) => {
           const { locationX, locationY } = e.nativeEvent;
           currentRef.current = `M ${locationX.toFixed(1)} ${locationY.toFixed(1)}`;
@@ -99,7 +104,7 @@ SignaturePad.displayName = 'SignaturePad';
 
 const styles = StyleSheet.create({
   wrap: {
-    height: 150,
+    height: 190,
     borderRadius: radius.tile,
     borderWidth: 1.5,
     borderColor: colors.orangeBorder,
@@ -108,7 +113,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   placeholder: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
