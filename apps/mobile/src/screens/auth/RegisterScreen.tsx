@@ -25,6 +25,34 @@ const SECTORS = ['Logistics', 'Events', 'Construction', 'Delivery', 'Hospitality
 const STEP_TITLES = ['About you', 'Work preferences', 'Eligibility & account', 'Agreements & signature'];
 const LAST = STEP_TITLES.length - 1;
 
+// ── field format helpers ──────────────────────────────────────────────
+const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
+const digitsOnly = (v: string) => v.replace(/\D/g, '');
+const isUKPhone = (v: string) => {
+  const d = digitsOnly(v);
+  return /^0\d{9,10}$/.test(d) || /^44\d{9,10}$/.test(d); // 07… / 01… / 02… or +44…
+};
+const isUKPostcode = (v: string) =>
+  /^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/.test(v.trim().toUpperCase());
+// Type digits, get DD/MM/YYYY with separators inserted automatically.
+const formatDob = (v: string) => {
+  const d = digitsOnly(v).slice(0, 8);
+  return [d.slice(0, 2), d.slice(2, 4), d.slice(4, 8)].filter(Boolean).join('/');
+};
+const isDob = (v: string) => {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);
+  if (!m) return false;
+  const day = +m[1], mon = +m[2], yr = +m[3];
+  const dt = new Date(yr, mon - 1, day);
+  if (dt.getFullYear() !== yr || dt.getMonth() !== mon - 1 || dt.getDate() !== day) return false;
+  const age = (Date.now() - dt.getTime()) / (365.25 * 864e5);
+  return age >= 16 && age <= 100;
+};
+const dobToISO = (v: string) => {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : undefined;
+};
+
 const LEGAL: Record<string, { title: string; updated: string; body: [string, string][] }> = {
   terms: {
     title: 'Terms & Conditions',
@@ -84,13 +112,16 @@ export function RegisterScreen({ navigation, route }: Props) {
   const [alerts, setAlerts] = useState(true);
   const [signed, setSigned] = useState(false);
 
-  const emailOk = email.includes('@');
+  const emailOk = isEmail(email);
+  const phoneOk = isUKPhone(phone);
+  const postcodeOk = isUKPostcode(postcode);
+  const dobOk = isDob(dob);
   const isReg = role === 'candidate';
 
   // per-step validity
   let ready = false;
   if (role === 'employer') ready = !!(company.trim() && emailOk && password.length >= 4);
-  else if (step === 0) ready = !!(name.trim() && emailOk && phone.trim() && postcode.trim() && dob.trim());
+  else if (step === 0) ready = !!(name.trim() && emailOk && phoneOk && postcodeOk && dobOk);
   else if (step === 1) ready = sectors.length > 0;
   else if (step === 2) ready = password.length >= 4;
   else ready = terms && privacy && gdpr && signed;
@@ -115,8 +146,8 @@ export function RegisterScreen({ navigation, route }: Props) {
           firstName,
           lastName: rest.join(' '),
           phone,
-          postcode,
-          dateOfBirth: dob || undefined,
+          postcode: postcode.trim().toUpperCase(),
+          dateOfBirth: dobToISO(dob),
           rightToWorkType: rtw,
           nationalInsurance: ni || undefined,
           headline: prefRole || sectors.join(', ') || undefined,
@@ -185,12 +216,20 @@ export function RegisterScreen({ navigation, route }: Props) {
         {isReg && step === 0 ? (
           <>
             <Field label="Full name"><Input onDark value={name} onChangeText={setName} placeholder="Jamie Smith" /></Field>
-            <Field label="Email"><Input onDark value={email} onChangeText={setEmail} placeholder="you@email.com" autoCapitalize="none" keyboardType="email-address" /></Field>
+            <Field label="Email"><Input onDark value={email} onChangeText={setEmail} placeholder="you@email.com" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" /></Field>
+            {email.length > 0 && !emailOk ? <Text style={styles.err}>Enter a valid email address.</Text> : null}
             <View style={styles.row2}>
-              <View style={{ flex: 1 }}><Field label="Mobile"><Input onDark value={phone} onChangeText={setPhone} placeholder="07700 900000" keyboardType="phone-pad" /></Field></View>
-              <View style={{ flex: 1 }}><Field label="Postcode"><Input onDark value={postcode} onChangeText={setPostcode} placeholder="RM18 7AB" /></Field></View>
+              <View style={{ flex: 1 }}>
+                <Field label="Mobile"><Input onDark value={phone} onChangeText={setPhone} placeholder="07700 900000" keyboardType="phone-pad" maxLength={16} /></Field>
+                {phone.length > 0 && !phoneOk ? <Text style={styles.err}>Enter a valid UK number.</Text> : null}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Field label="Postcode"><Input onDark value={postcode} onChangeText={(v) => setPostcode(v.toUpperCase())} placeholder="RM18 7AB" autoCapitalize="characters" autoCorrect={false} maxLength={8} /></Field>
+                {postcode.length > 0 && !postcodeOk ? <Text style={styles.err}>Invalid postcode.</Text> : null}
+              </View>
             </View>
-            <Field label="Date of birth" hint="(YYYY-MM-DD)"><Input onDark value={dob} onChangeText={setDob} placeholder="1996-04-21" /></Field>
+            <Field label="Date of birth" hint="(DD/MM/YYYY)"><Input onDark value={dob} onChangeText={(v) => setDob(formatDob(v))} placeholder="21/04/1996" keyboardType="number-pad" maxLength={10} /></Field>
+            {dob.length > 0 && !dobOk ? <Text style={styles.err}>Enter a valid date (DD/MM/YYYY), age 16+.</Text> : null}
           </>
         ) : null}
 
@@ -356,6 +395,7 @@ const styles = StyleSheet.create({
   roleTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
   roleSub: { color: '#A9B6C9', fontSize: 12, marginTop: 2 },
   row2: { flexDirection: 'row', gap: 11 },
+  err: { color: '#FCA5A5', fontSize: 12, marginTop: 4, marginBottom: 4, marginLeft: 2 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 8, paddingHorizontal: 13, borderRadius: radius.chip, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', backgroundColor: 'rgba(255,255,255,0.06)' },
   chipOn: { backgroundColor: colors.orange, borderColor: colors.orange },
