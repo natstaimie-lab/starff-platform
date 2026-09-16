@@ -1,4 +1,5 @@
 import { Body, Controller, Post } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { AiService } from './ai.service';
@@ -11,6 +12,9 @@ type ChatMessage = { role: 'user' | 'assistant'; content: string };
 @ApiBearerAuth()
 @Controller('ai')
 @Roles(Role.ADMIN, Role.RECRUITER)
+// The AI routes call Claude (real cost) — cap them tighter than the global
+// limit so a stuck client or abuse can't run up the bill.
+@Throttle({ default: { limit: 30, ttl: 60000 } })
 export class AiController {
   constructor(private readonly ai: AiService) {}
 

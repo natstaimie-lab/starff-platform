@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { CandidatesModule } from './candidates/candidates.module';
@@ -28,6 +30,11 @@ import { ReliabilityModule } from './reliability/reliability.module';
       isGlobal: true,
       envFilePath: ['../../.env', '.env'],
     }),
+    // Rate limiting (per client IP). A generous default so a site full of
+    // workers behind one WiFi never trips it, while gross abuse / scraping /
+    // brute force is stopped. Costlier routes (e.g. the AI assistant) set
+    // tighter per-route limits with @Throttle.
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 300 }]),
     PrismaModule,
     AuditModule,
     AuthModule,
@@ -49,6 +56,10 @@ import { ReliabilityModule } from './reliability/reliability.module';
     MatchingModule,
     ApplicationsModule,
     ReliabilityModule,
+  ],
+  providers: [
+    // Apply the rate limiter globally to every route.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}
