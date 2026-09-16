@@ -2,6 +2,7 @@
   "expo": {
     "name": "Starff",
     "slug": "starff-mobile",
+    "owner": "starffltd",
     "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "starff",
@@ -32,9 +33,12 @@
         "backgroundColor": "#0B1F3A"
       },
       "permissions": [
-        "CAMERA",
-        "USE_BIOMETRIC",
-        "USE_FINGERPRINT"
+        "android.permission.CAMERA",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -54,7 +58,13 @@
           "color": "#F47A20"
         }
       ],
-      "expo-font"
-    ]
+      "expo-font",
+      "expo-status-bar"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f87a0fcd-d48c-472d-9b2a-e1530edf1b32"
+      }
+    }
   }
 }
