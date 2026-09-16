@@ -120,7 +120,11 @@ export function MfaGate({ email, onVerified }: { email?: string; onVerified: () 
               app (Google Authenticator, Authy, 1Password…), then enter the 6-digit code it shows.
             </p>
             <div className="flex justify-center mb-3">
-              <div className="p-3 bg-white border border-line rounded-xl" style={{ width: 200, height: 200 }} dangerouslySetInnerHTML={{ __html: qr }} />
+              <div className="p-3 bg-white border border-line rounded-xl">
+                {/* Supabase returns the QR as a data-URI SVG — render it as an image. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {qr && <img src={qr} alt="Authenticator QR code" style={{ width: 176, height: 176, display: 'block' }} />}
+              </div>
             </div>
             <p className="text-xs text-muted mb-1">Can’t scan? Enter this key manually:</p>
             <code className="block text-xs bg-surface-2 rounded-md px-2 py-1.5 mb-4 break-all" style={{ background: '#F5F7FA' }}>{secret}</code>
