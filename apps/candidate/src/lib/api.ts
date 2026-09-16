@@ -25,13 +25,15 @@ export async function apiFetch<T = any>(
     });
 
   const { data: { session } } = await supabase.auth.getSession();
-  let res = await call(session?.access_token);
+  let token = session?.access_token;
+  let res = await call(token);
 
   if (res.status === 401) {
     // Token likely expired — force a refresh and retry once.
     const { data } = await supabase.auth.refreshSession();
     if (data.session?.access_token) {
-      res = await call(data.session.access_token);
+      token = data.session.access_token;
+      res = await call(token);
     }
     if (res.status === 401) {
       // Session is genuinely gone — clear it and return to login.
@@ -39,6 +41,14 @@ export async function apiFetch<T = any>(
       if (typeof window !== 'undefined') window.location.href = '/login';
       throw new Error('Your session has expired. Please sign in again.');
     }
+  }
+
+  // Transient server errors — e.g. brief database-pool contention when a page
+  // fires several queries at once — retry a couple of times with backoff so a
+  // momentary blip never leaves a panel stuck. (401 is handled above.)
+  for (let attempt = 0; attempt < 2 && res.status >= 500 && res.status < 600; attempt++) {
+    await new Promise((r) => setTimeout(r, 400 * (attempt + 1) + Math.floor(Math.random() * 300)));
+    res = await call(token);
   }
 
   if (!res.ok) {
