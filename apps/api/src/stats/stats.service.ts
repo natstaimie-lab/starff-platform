@@ -217,9 +217,12 @@ export class StatsService {
    * a fabricated figure.
    */
   async reliability() {
+    // Attendance/punctuality reflect the last 6 months so this scan stays fast
+    // (and bounded) as shift history grows, rather than loading every shift ever.
+    const since = new Date(Date.now() - 180 * 24 * 3600 * 1000);
     const [rated, shifts, incidents, workerCount] = await Promise.all([
       this.prisma.candidate.findMany({ where: { archivedAt: null, rating: { not: null } }, select: { rating: true } }),
-      this.prisma.shift.findMany({ where: { status: { in: ['COMPLETED', 'NO_SHOW'] } }, select: { status: true, startAt: true, checkInAt: true } }),
+      this.prisma.shift.findMany({ where: { status: { in: ['COMPLETED', 'NO_SHOW'] }, startAt: { gte: since } }, select: { status: true, startAt: true, checkInAt: true } }),
       this.prisma.reliabilityIncident.findMany({ where: { status: { in: ['CONFIRMED', 'UNCONFIRMED'] } }, select: { candidateId: true, scoreImpact: true, weightFactor: true, status: true } }),
       this.prisma.candidate.count({ where: { archivedAt: null, status: { in: [CandidateStatus.COMPLIANT, CandidateStatus.ACTIVE] } } }),
     ]);
