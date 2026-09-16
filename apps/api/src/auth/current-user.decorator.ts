@@ -5,6 +5,8 @@ export interface AuthUser {
   id: string;
   email?: string;
   role?: Role;
+  /** Supabase Authenticator Assurance Level: 'aal1' (password) or 'aal2' (MFA). */
+  aal?: string;
 }
 
 // Usage: myRoute(@CurrentUser() user: AuthUser) { ... }

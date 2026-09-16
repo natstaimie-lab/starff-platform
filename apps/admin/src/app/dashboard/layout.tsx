@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { apiFetch } from '@/lib/api';
 import { Sidebar } from '@/components/Sidebar';
 import { Topbar } from '@/components/Topbar';
+import { MfaGate } from '@/components/MfaGate';
 
 const TITLES: Record<string, [string, string]> = {
   '/dashboard': ['Dashboard', 'Overview of your recruitment operations'],
@@ -29,12 +30,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
+  const [mfaOk, setMfaOk] = useState(false);
   const [email, setEmail] = useState('');
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) { router.replace('/login'); return; }
-      // Role gate — only staff may stay in the admin dashboard.
+      // Role gate — only staff may stay in the admin dashboard. (whoami is
+      // @MfaExempt so it works before MFA is completed.)
       try {
         const me = await apiFetch<{ role: string | null }>('/auth/whoami');
         if (me.role !== 'ADMIN' && me.role !== 'RECRUITER') {
@@ -48,11 +51,19 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         return;
       }
       setEmail(data.session.user.email ?? '');
+      // MFA gate — staff must be stepped up to aal2 before the dashboard loads.
+      try {
+        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        setMfaOk(aal?.currentLevel === 'aal2');
+      } catch {
+        setMfaOk(false);
+      }
       setReady(true);
     });
   }, [router]);
 
   if (!ready) return <div style={{ padding: 32, color: 'var(--text-secondary)' }}>Loading…</div>;
+  if (!mfaOk) return <MfaGate email={email} onVerified={() => setMfaOk(true)} />;
 
   const [title, subtitle] = TITLES[pathname] ?? ['Starff', ''];
 

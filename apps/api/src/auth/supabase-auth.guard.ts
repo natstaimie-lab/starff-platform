@@ -14,8 +14,10 @@ import {
   decodeProtectedHeader,
   type JWTPayload,
 } from 'jose';
+import { Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { IS_PUBLIC_KEY } from './public.decorator';
+import { MFA_EXEMPT_KEY } from './mfa-exempt.decorator';
 
 /**
  * Verifies the Supabase access token on every request (unless @Public()),
@@ -100,11 +102,31 @@ export class SupabaseAuthGuard implements CanActivate {
       throw new ForbiddenException('This account has been deactivated.');
     }
 
+    const aal = typeof payload.aal === 'string' ? payload.aal : undefined;
     req.user = {
       id: userId,
       email: user?.email ?? (payload.email as string | undefined),
       role: user?.role,
+      aal,
     };
+
+    // Staff MFA enforcement. Behind REQUIRE_STAFF_MFA so it can be rolled out
+    // safely (turn it on only once staff have enrolled). Staff (ADMIN /
+    // RECRUITER) must have stepped up to aal2 (completed MFA); everyone else and
+    // any @MfaExempt() route (e.g. whoami, used to drive enrollment) is allowed.
+    if (
+      process.env.REQUIRE_STAFF_MFA === 'true' &&
+      (user?.role === Role.ADMIN || user?.role === Role.RECRUITER) &&
+      aal !== 'aal2'
+    ) {
+      const mfaExempt = this.reflector.getAllAndOverride<boolean>(MFA_EXEMPT_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]);
+      if (!mfaExempt) {
+        throw new ForbiddenException('MFA_REQUIRED');
+      }
+    }
     return true;
   }
 }
