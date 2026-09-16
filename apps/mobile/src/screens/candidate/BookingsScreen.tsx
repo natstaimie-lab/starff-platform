@@ -6,6 +6,7 @@ import { Card, Pill, Muted, Button, LoadingState, ErrorState, EmptyState } from 
 import { colors } from '@/theme/tokens';
 import { useApi } from '@/lib/useApi';
 import { candidateApi } from '@/lib/endpoints';
+import { offerWakeReminder } from '@/lib/shiftReminder';
 import { ApiError } from '@/lib/api';
 import type { CandidateProfile, Shift } from '@/lib/types';
 
@@ -31,6 +32,12 @@ export function CandidateBookingsScreen() {
       else if (action === 'out') await candidateApi.checkOutShift(id);
       else { await candidateApi.reportLate(id); Alert.alert('Thanks', "We've let the team know you're running late."); }
       reload();
+      // Right after the worker confirms they'll attend, offer a one-tap wake-up
+      // reminder for that shift (they can still set/tweak it in Plan my journey).
+      if (action === 'ack') {
+        const shift = (me?.shifts ?? []).find((x) => x.id === id);
+        if (shift) offerWakeReminder(shift);
+      }
     } catch (e) { Alert.alert('Could not update', e instanceof ApiError ? e.message : 'Please try again.'); }
     finally { setBusy(null); }
   };
