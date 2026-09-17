@@ -255,8 +255,25 @@ model Candidate {
   employmentHistory  EmploymentHistory[]
   references         CandidateReference[]
   reliabilityIncidents ReliabilityIncident[]
+  ratings              CandidateRating[]
 
   @@index([status])
+}
+
+/// One rating of a worker — from a client after a shift, or a staff assessment.
+/// The worker's displayed `Candidate.rating` is kept as the average of these.
+model CandidateRating {
+  id          String    @id @default(cuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  byUserId    String    @db.Uuid // the staff member or client contact who rated
+  byRole      Role // ADMIN / RECRUITER / CLIENT
+  stars       Int // 1..5
+  comment     String?
+  shiftId     String?
+  createdAt   DateTime  @default(now())
+
+  @@index([candidateId])
 }
 
 // Past jobs the candidate lists during onboarding.

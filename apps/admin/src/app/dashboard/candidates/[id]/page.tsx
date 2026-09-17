@@ -80,6 +80,13 @@ export default function CandidateProfile() {
     await apiFetch(`/candidates/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
     load();
   }
+  async function rate(stars: number) {
+    setBusy('rate'); setError('');
+    try {
+      await apiFetch(`/candidates/${id}/rate`, { method: 'POST', body: JSON.stringify({ stars }) });
+      await load();
+    } catch (e: any) { setError(e.message); } finally { setBusy(null); }
+  }
   async function review(action: 'APPROVE' | 'REJECT' | 'REQUEST_INFO') {
     let note: string | undefined;
     if (action !== 'APPROVE') {
@@ -190,6 +197,35 @@ export default function CandidateProfile() {
               )}
             </div>
             <div className="dim" style={{ fontSize: 12.5, marginTop: 10 }}>Source: {c.registrationSource ?? '—'} · Skills: {c.skills.map((s) => s.skill.name).join(', ') || '—'}</div>
+          </Card>
+
+          <Card title="Worker rating" subtitle="Staff assessment — feeds the reliability panel">
+            {(() => {
+              const cur = (c as { rating?: number | null }).rating ?? null;
+              return (
+                <>
+                  <div style={{ fontSize: 13, marginBottom: 8 }}>
+                    {cur != null
+                      ? <><b style={{ fontSize: 18 }}>{cur.toFixed(1)}</b> <span className="dim">/ 5 average</span></>
+                      : <span className="dim">Not rated yet</span>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => rate(n)}
+                        disabled={busy === 'rate'}
+                        title={`${n} star${n > 1 ? 's' : ''}`}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 26, lineHeight: 1, padding: 0, color: cur != null && n <= Math.round(cur) ? '#F47A20' : 'var(--border-strong)' }}
+                      >
+                        ★
+                      </button>
+                    ))}
+                  </div>
+                  <p className="dim" style={{ fontSize: 12, marginTop: 8 }}>Click a star to add your rating. Clients can also rate workers after a shift.</p>
+                </>
+              );
+            })()}
           </Card>
 
           <Card title="Manage account">

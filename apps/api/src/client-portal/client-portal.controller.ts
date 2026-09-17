@@ -156,6 +156,12 @@ export class ClientPortalController {
     return this.svc.workerDetail(u.id, id);
   }
 
+  // Rate a worker who has worked one of this company's shifts (1–5 stars).
+  @Post('workers/:id/rate')
+  rateWorker(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: { stars: number; comment?: string }) {
+    return this.svc.rateWorker(u.id, id, dto.stars, dto.comment);
+  }
+
   @Get('timesheets')
   timesheets(@CurrentUser() u: AuthUser) {
     return this.svc.timesheets(u.id);

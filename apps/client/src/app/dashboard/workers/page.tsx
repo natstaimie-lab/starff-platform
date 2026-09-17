@@ -56,6 +56,10 @@ export default function WorkersPage() {
       .finally(() => setDLoading(false));
   }
   function close() { setOpenId(null); setDetail(null); setDError(''); }
+  function refreshDetail() {
+    if (!openId) return;
+    apiFetch<WorkerDetail>(`/client/workers/${openId}`).then(setDetail).catch(() => {});
+  }
 
   const cols: Column<Worker>[] = [
     { key: 'name', header: 'Worker', render: (r) => <div className="namecell"><Avatar name={r.name} size={30} /><div><div className="nm">{r.name}</div><div className="sub2">{r.role}</div></div></div> },
@@ -75,16 +79,26 @@ export default function WorkersPage() {
         <Modal title={openName} subtitle="Worker profile" onClose={close} width={520}>
           {dLoading ? <p className="dim">Loading…</p>
             : dError ? <p style={{ color: 'var(--error-600)', fontSize: 13 }}>{dError}</p>
-            : detail ? <WorkerCard d={detail} /> : null}
+            : detail ? <WorkerCard d={detail} id={openId} onRated={refreshDetail} /> : null}
         </Modal>
       )}
     </>
   );
 }
 
-function WorkerCard({ d }: { d: WorkerDetail }) {
+function WorkerCard({ d, id, onRated }: { d: WorkerDetail; id: string; onRated: () => void }) {
   const wy = d.withYou;
   const a = d.attendance;
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  async function rate(stars: number) {
+    setBusy(true); setMsg('');
+    try {
+      await apiFetch(`/client/workers/${id}/rate`, { method: 'POST', body: JSON.stringify({ stars }) });
+      setMsg('Thanks — your rating was saved.');
+      onRated();
+    } catch (e: any) { setMsg(e?.message ?? 'Could not save your rating.'); } finally { setBusy(false); }
+  }
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -140,6 +154,26 @@ function WorkerCard({ d }: { d: WorkerDetail }) {
         <Row k="Late arrivals" v={String(a.lateArrivals)} />
         <Row k="No-shows" v={String(a.noShows)} />
         {a.timesheetsPending > 0 && <p className="dim" style={{ fontSize: 12, marginTop: 6 }}>You have {a.timesheetsPending} timesheet{a.timesheetsPending === 1 ? '' : 's'} from this worker awaiting your approval.</p>}
+      </div>
+
+      <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 14, marginTop: 2 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Rate this worker</div>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              onClick={() => rate(n)}
+              disabled={busy}
+              title={`${n} star${n > 1 ? 's' : ''}`}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 26, lineHeight: 1, padding: 0, color: d.rating != null && n <= Math.round(d.rating) ? '#F47A20' : 'var(--border-strong, #cbd5e1)' }}
+            >
+              ★
+            </button>
+          ))}
+          {d.rating != null && <span className="dim" style={{ fontSize: 12.5, marginLeft: 6 }}>{d.rating.toFixed(1)} / 5 average</span>}
+        </div>
+        {msg && <p className="dim" style={{ fontSize: 12, marginTop: 6 }}>{msg}</p>}
+        <p className="dim" style={{ fontSize: 11.5, marginTop: 6 }}>Your rating helps Starff match reliable, well-regarded workers to your shifts.</p>
       </div>
 
       <p className="dim" style={{ fontSize: 11.5, marginTop: 4 }}>Starff shares only what you need to manage the booking. Personal contact and identity details stay with Starff.</p>

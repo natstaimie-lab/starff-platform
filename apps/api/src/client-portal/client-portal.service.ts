@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AuditService } from '../audit/audit.service';
 import { ReliabilityService } from '../reliability/reliability.service';
+import { RatingsService } from '../ratings/ratings.service';
 
 @Injectable()
 export class ClientPortalService {
@@ -17,7 +18,22 @@ export class ClientPortalService {
     private readonly notifications: NotificationsService,
     private readonly audit: AuditService,
     private readonly reliability: ReliabilityService,
+    private readonly ratings: RatingsService,
   ) {}
+
+  /** A client rates a worker who has worked one of their shifts (1–5 stars). */
+  async rateWorker(userId: string, candidateId: string, stars: number, comment?: string) {
+    const { client } = await this.clientFor(userId);
+    // Authorisation: the worker must have been on one of this company's shifts.
+    const shift = await this.prisma.shift.findFirst({
+      where: { candidateId, job: { clientId: client.id } },
+      select: { id: true },
+    });
+    if (!shift) {
+      throw new ForbiddenException('You can only rate workers who have worked one of your shifts.');
+    }
+    return this.ratings.rate(candidateId, userId, Role.CLIENT, stars, comment, shift.id);
+  }
 
   /** Resolve the Client company for the logged-in client-contact user. */
   private async clientFor(userId: string) {

@@ -11,6 +11,7 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { DocumentStatus, Role } from '@prisma/client';
 import { CandidatesService } from './candidates.service';
+import { RatingsService } from '../ratings/ratings.service';
 import { CreateCandidateDto } from './dto/create-candidate.dto';
 import { UpdateCandidateDto } from './dto/update-candidate.dto';
 import { Roles } from '../auth/roles.decorator';
@@ -20,7 +21,22 @@ import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
 @ApiBearerAuth()
 @Controller('candidates')
 export class CandidatesController {
-  constructor(private readonly candidates: CandidatesService) {}
+  constructor(
+    private readonly candidates: CandidatesService,
+    private readonly ratings: RatingsService,
+  ) {}
+
+  // Staff assessment rating for a worker (1–5 stars). Feeds the same average as
+  // client ratings, so the dashboard reliability panel reflects it.
+  @Post(':id/rate')
+  @Roles(Role.ADMIN, Role.RECRUITER)
+  rate(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: { stars: number; comment?: string },
+  ) {
+    return this.ratings.rate(id, user.id, user.role!, dto.stars, dto.comment);
+  }
 
   // Any logged-in user (a new sign-up) can create their own candidate profile.
   @Post()
