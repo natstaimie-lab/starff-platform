@@ -1,7 +1,7 @@
 import React from 'react';
 import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { AppBar, ScreenScroll } from '@/components/Screen';
+import { AppBar, ActionButton, ScreenScroll } from '@/components/Screen';
 import { Card, Pill, Button, Muted, LoadingState, ErrorState } from '@/components/ui';
 import { Icon } from '@/components/Icon';
 import { colors } from '@/theme/tokens';
@@ -32,6 +32,12 @@ export function EmployerAccountScreen() {
     { icon: 'message', label: 'Messages', value: 'Starff team', to: 'Messages' },
   ] as const;
 
+  const confirmSignOut = () =>
+    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign out', style: 'destructive', onPress: signOut },
+    ]);
+
   const onToggleBiometric = async (on: boolean) => {
     if (on && !biometricAvailable) {
       Alert.alert('Biometrics unavailable', 'Set up Face ID / fingerprint on your device first.');
@@ -42,7 +48,7 @@ export function EmployerAccountScreen() {
 
   return (
     <View style={styles.root}>
-      <AppBar title="Account" onBack={() => nav.goBack()} />
+      <AppBar title="Account" onBack={() => nav.goBack()} right={<ActionButton icon="logout" onPress={confirmSignOut} />} />
       <ScreenScroll>
         {loading ? (
           <LoadingState />
@@ -98,7 +104,7 @@ export function EmployerAccountScreen() {
               </View>
             </Card>
 
-            <Button title="Sign out" kind="ghost" icon="logout" onPress={signOut} />
+            <Button title="Sign out" kind="ghost" icon="logout" onPress={confirmSignOut} />
           </>
         )}
       </ScreenScroll>

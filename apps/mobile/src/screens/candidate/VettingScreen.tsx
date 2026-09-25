@@ -155,7 +155,8 @@ export function VettingScreen() {
       <AppBar
         title="My vetting"
         subtitle={`Step ${i + 1} of ${STEPS.length} · ${step.label}`}
-        onBack={() => nav.goBack()}
+        // Step back through the wizard; only leave the screen from the first step.
+        onBack={() => { if (i > 0) setI(i - 1); else nav.goBack(); }}
         right={<View style={styles.count}><Text style={styles.countText}>{completed}/{STEPS.length}</Text></View>}
       />
       <ScreenScroll>

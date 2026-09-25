@@ -1,7 +1,7 @@
 import React from 'react';
 import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { AppBar, ScreenScroll } from '@/components/Screen';
+import { AppBar, ActionButton, ScreenScroll } from '@/components/Screen';
 import {
   Card,
   Pill,
@@ -38,6 +38,12 @@ export function CandidateProfileScreen() {
     { icon: 'credit-card', label: 'Payment details', value: (me as any)?.bankAccountNumber ? `••••${String((me as any).bankAccountNumber).slice(-4)}` : 'Add bank details', to: 'Payment' },
   ] as const;
 
+  const confirmSignOut = () =>
+    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign out', style: 'destructive', onPress: signOut },
+    ]);
+
   const onToggleBiometric = async (on: boolean) => {
     if (on && !biometricAvailable) {
       Alert.alert(
@@ -51,7 +57,7 @@ export function CandidateProfileScreen() {
 
   return (
     <View style={styles.root}>
-      <AppBar title="Profile" />
+      <AppBar title="Profile" right={<ActionButton icon="logout" onPress={confirmSignOut} />} />
       <ScreenScroll refreshing={refreshing} onRefresh={refresh}>
         {loading ? (
           <LoadingState />
@@ -112,7 +118,7 @@ export function CandidateProfileScreen() {
               </View>
             </Card>
 
-            <Button title="Sign out" kind="ghost" icon="logout" onPress={signOut} />
+            <Button title="Sign out" kind="ghost" icon="logout" onPress={confirmSignOut} />
           </>
         )}
       </ScreenScroll>
