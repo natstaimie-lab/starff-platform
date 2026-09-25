@@ -52,6 +52,16 @@ export class RegistrationService {
   }
 
   /**
+   * Where an invite / magic link should land. New accounts have no password, so
+   * we send them to the portal's set-password page — that page captures the
+   * Supabase session from the link and lets them choose their own password. The
+   * portal root just forwards a session straight to /dashboard, skipping this.
+   */
+  private activationRedirect(portalBase: string) {
+    return `${portalBase.replace(/\/$/, '')}/reset-password`;
+  }
+
+  /**
    * Create the Supabase auth account for `email` (or return the existing one),
    * plus a secure activation link. No password is ever generated or emailed —
    * activation goes through Supabase's own invite/magic-link flow.
@@ -112,7 +122,7 @@ export class RegistrationService {
       const auth = await this.ensureAuthUser(
         email,
         { firstName, lastName, role: 'candidate' },
-        this.candidatePortalUrl(),
+        this.activationRedirect(this.candidatePortalUrl()),
       );
       isNewAccount = auth.isNew;
       activationUrl = auth.actionLink;
@@ -232,7 +242,7 @@ export class RegistrationService {
       const auth = await this.ensureAuthUser(
         email,
         { firstName, lastName, role: 'client' },
-        this.clientPortalUrl(),
+        this.activationRedirect(this.clientPortalUrl()),
       );
       isNewAccount = auth.isNew;
       activationUrl = auth.actionLink;
@@ -351,7 +361,7 @@ export class RegistrationService {
       const auth = await this.ensureAuthUser(
         email,
         { firstName: input.firstName, lastName: input.lastName, role: 'client' },
-        this.clientPortalUrl(),
+        this.activationRedirect(this.clientPortalUrl()),
       );
       isNew = auth.isNew;
       activationUrl = auth.actionLink;

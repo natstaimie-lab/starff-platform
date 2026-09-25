@@ -56,7 +56,7 @@ export class StaffService {
     const invite = await supabase.auth.admin.generateLink({
       type: 'invite',
       email,
-      options: { data: { role: dto.role }, redirectTo: process.env.ADMIN_PORTAL_URL ?? 'http://localhost:3000' },
+      options: { data: { role: dto.role }, redirectTo: `${(process.env.ADMIN_PORTAL_URL ?? 'http://localhost:3000').replace(/\/$/, '')}/reset-password` },
     });
     if (invite.error || !invite.data.user) {
       throw new ConflictException(`Could not create login: ${invite.error?.message ?? 'unknown error'}`);
