@@ -17,7 +17,7 @@ type Candidate = {
   registrationSource?: string | null; submittedAt?: string | null;
   documents?: Doc[]; _count?: { availability: number; employmentHistory: number; references: number };
 };
-const empty = { firstName: '', lastName: '', headline: '', city: '', phone: '', email: '' };
+const empty = { firstName: '', lastName: '', headline: '', city: '', postcode: '', phone: '', email: '', sendInvite: false };
 
 const SOURCE_LABEL: Record<string, string> = { WEBSITE: 'Website', MOBILE: 'Mobile app', PORTAL: 'Portal', ADMIN: 'Admin' };
 
@@ -59,8 +59,8 @@ export default function CandidatesPage() {
     if (!form.firstName.trim() || !form.lastName.trim()) return;
     setSaving(true);
     try {
-      const body: any = { firstName: form.firstName, lastName: form.lastName, headline: form.headline, city: form.city, phone: form.phone };
-      if (form.email.trim()) body.email = form.email;
+      const body: any = { firstName: form.firstName, lastName: form.lastName, headline: form.headline, city: form.city, postcode: form.postcode, phone: form.phone };
+      if (form.email.trim()) { body.email = form.email.trim(); body.sendInvite = form.sendInvite; }
       await apiFetch('/candidates', { method: 'POST', body: JSON.stringify(body) });
       setOpen(false); setForm(empty); await load();
     } catch (e: any) { setError(e.message); } finally { setSaving(false); }
@@ -119,9 +119,16 @@ export default function CandidatesPage() {
           <Field label="Headline / role"><TextInput value={form.headline} onChange={(e) => setForm({ ...form, headline: e.target.value })} placeholder="Warehouse Operative" /></Field>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Field label="City"><TextInput value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="Birmingham" /></Field>
-            <Field label="Phone"><TextInput value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="07700 900000" /></Field>
+            <Field label="Postcode"><TextInput value={form.postcode} onChange={(e) => setForm({ ...form, postcode: e.target.value })} placeholder="B1 1AA" /></Field>
           </div>
+          <Field label="Phone"><TextInput value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="07700 900000" /></Field>
           <Field label="Email (optional)"><TextInput type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="jordan@email.com" /></Field>
+          {form.email.trim() && (
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13, cursor: 'pointer', background: 'var(--surface-sunken)', padding: '10px 12px', borderRadius: 10 }}>
+              <input type="checkbox" checked={form.sendInvite} onChange={(e) => setForm({ ...form, sendInvite: e.target.checked })} style={{ marginTop: 2 }} />
+              <span>Email them a portal invite now<br /><span className="dim" style={{ fontSize: 12 }}>They'll get a link to set a password and access their worker portal. Leave unticked to just record them — you can invite from their profile later.</span></span>
+            </label>
+          )}
         </Modal>
       )}
     </Card>

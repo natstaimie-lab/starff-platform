@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { ClientsService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
+import { UpdateClientDto, ClientContactDto } from './dto/update-client.dto';
 import { Roles } from '../auth/roles.decorator';
 
 @ApiTags('clients')
@@ -25,6 +26,33 @@ export class ClientsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.clients.findOne(id);
+  }
+
+  // Edit the company record.
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateClientDto) {
+    return this.clients.update(id, dto);
+  }
+
+  // ── Authorised contacts (portal users) ──
+  @Post(':id/contacts')
+  addContact(@Param('id') id: string, @Body() dto: ClientContactDto) {
+    return this.clients.addContact(id, dto);
+  }
+
+  @Patch(':id/contacts/:contactId')
+  updateContact(@Param('id') id: string, @Param('contactId') contactId: string, @Body() dto: Partial<ClientContactDto>) {
+    return this.clients.updateContact(id, contactId, dto);
+  }
+
+  @Post(':id/contacts/:contactId/invite')
+  inviteContact(@Param('id') id: string, @Param('contactId') contactId: string) {
+    return this.clients.resendContactInvite(id, contactId);
+  }
+
+  @Delete(':id/contacts/:contactId')
+  removeContact(@Param('id') id: string, @Param('contactId') contactId: string) {
+    return this.clients.removeContact(id, contactId);
   }
 
   // Archive / restore (soft-delete). Day-to-day staff action — reversible.

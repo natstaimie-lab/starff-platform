@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 import { useRole } from '@/lib/useRole';
 import { Card, Avatar, Badge, ComplianceBadge } from '@/components/ui';
+import { Modal, Field, TextInput, Button } from '@/components/Modal';
 import { ReliabilityCard } from '@/components/ReliabilityCard';
 import * as Ic from '@/components/icons';
 
@@ -21,9 +22,18 @@ type Candidate = {
   healthDeclaration?: boolean; healthNotes?: string | null; consentGdpr?: boolean; consentGdprAt?: string | null;
   agreementAccepted?: boolean; signatureName?: string | null; signedAt?: string | null;
   submittedAt?: string | null; registrationSource?: string | null;
+  loginEmail?: string | null; hasLogin?: boolean;
   documents: Doc[]; skills: { skill: { name: string } }[]; availability: { dayOfWeek: number }[];
   employmentHistory: Job[]; references: Ref[];
 };
+
+// The fields the admin can edit on behalf of a walk-in / phone registration.
+const EDITABLE = [
+  'firstName', 'lastName', 'phone', 'headline', 'addressLine1', 'addressLine2', 'city', 'postcode',
+  'dateOfBirth', 'nationalInsurance', 'emergencyName', 'emergencyPhone', 'emergencyRelationship',
+  'bankAccountName', 'bankSortCode', 'bankAccountNumber',
+] as const;
+type EditKey = typeof EDITABLE[number];
 
 const REQUIRED = [
   { type: 'RIGHT_TO_WORK', label: 'Right to Work' },
@@ -51,9 +61,51 @@ export default function CandidateProfile() {
   const [busy, setBusy] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [error, setError] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [edit, setEdit] = useState<Record<string, string>>({});
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteMsg, setInviteMsg] = useState('');
+  const [inviting, setInviting] = useState(false);
 
   const load = () => apiFetch<Candidate>(`/candidates/${id}`).then(setC).catch((e) => setError(e.message));
   useEffect(() => { load(); }, [id]);
+
+  function openEdit() {
+    if (!c) return;
+    const seed: Record<string, string> = {};
+    for (const k of EDITABLE) {
+      const v = (c as any)[k as EditKey];
+      seed[k] = k === 'dateOfBirth' && v ? String(v).slice(0, 10) : (v ?? '');
+    }
+    setEdit(seed); setEditing(true);
+  }
+  async function saveEdit() {
+    setSavingEdit(true); setError('');
+    try {
+      const body: Record<string, any> = {};
+      for (const k of EDITABLE) {
+        const v = (edit[k] ?? '').trim();
+        body[k] = v === '' ? null : v;
+      }
+      if (!body.dateOfBirth) delete body.dateOfBirth; // avoid sending null date-string
+      await apiFetch(`/candidates/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+      setEditing(false); await load();
+    } catch (e: any) { setError(e.message); } finally { setSavingEdit(false); }
+  }
+  function openInvite() {
+    setInviteEmail(c?.loginEmail ?? ''); setInviteMsg(''); setInviteOpen(true);
+  }
+  async function sendInvite() {
+    setInviting(true); setInviteMsg('');
+    try {
+      await apiFetch(`/candidates/${id}/invite`, { method: 'POST', body: JSON.stringify({ email: inviteEmail.trim(), sendInvite: true }) });
+      setInviteMsg('Invite sent — they can now set a password and log in.');
+      await load();
+      setTimeout(() => setInviteOpen(false), 1400);
+    } catch (e: any) { setInviteMsg(e?.message ?? 'Could not send the invite.'); } finally { setInviting(false); }
+  }
 
   async function archive() {
     if (!confirm('Archive this candidate? They\'ll be hidden from lists and unable to log in, but their data is kept and you can restore them later.')) return;
@@ -150,14 +202,34 @@ export default function CandidateProfile() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Card>
-            <div className="fx ac" style={{ gap: 14 }}>
-              <Avatar name={`${c.firstName} ${c.lastName}`} size={56} />
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 800 }}>{c.firstName} {c.lastName}</div>
-                <div className="dim" style={{ fontSize: 13 }}>{c.headline ?? '—'}</div>
-                <div style={{ marginTop: 6 }}><ComplianceBadge status={c.status.toLowerCase()} /></div>
+            <div className="fx ac jb" style={{ gap: 14 }}>
+              <div className="fx ac" style={{ gap: 14 }}>
+                <Avatar name={`${c.firstName} ${c.lastName}`} size={56} />
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 800 }}>{c.firstName} {c.lastName}</div>
+                  <div className="dim" style={{ fontSize: 13 }}>{c.headline ?? '—'}</div>
+                  <div style={{ marginTop: 6 }}><ComplianceBadge status={c.status.toLowerCase()} /></div>
+                </div>
               </div>
+              <button onClick={openEdit} style={{ border: '1px solid var(--border-strong)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 13, padding: '7px 12px', borderRadius: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}>Edit details</button>
             </div>
+          </Card>
+
+          <Card title="Portal access">
+            {c.hasLogin ? (
+              <>
+                <div className="fx ac" style={{ gap: 8, marginBottom: 8 }}>
+                  <Badge tone="success">Has login</Badge>
+                  <span className="dim" style={{ fontSize: 12.5, wordBreak: 'break-all' }}>{c.loginEmail}</span>
+                </div>
+                <button onClick={openInvite} style={{ width: '100%', border: '1px solid var(--border-strong)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 13, padding: '9px 12px', borderRadius: 10, cursor: 'pointer' }}>Resend invite / login link</button>
+              </>
+            ) : (
+              <>
+                <p className="dim" style={{ fontSize: 13, marginBottom: 10 }}>No portal login yet — this worker was added at the front desk. Send them an invite when you have their email so they can log in and complete their profile.</p>
+                <button onClick={openInvite} className="aibtn" style={{ width: '100%', justifyContent: 'center', background: 'var(--blue-500)', color: '#fff', border: 'none' }}>Invite to portal</button>
+              </>
+            )}
           </Card>
 
           {/* Registration review */}
@@ -289,6 +361,64 @@ export default function CandidateProfile() {
         <Row k="Candidate agreement" v={c.agreementAccepted ? <Badge tone="success">Accepted</Badge> : <span className="dim">Not accepted</span>} />
         <Row k="Signature" v={c.signatureName ? `${c.signatureName} · ${fmt(c.signedAt)}` : '—'} />
       </Card>
+
+      {editing && (
+        <Modal
+          title="Edit candidate details"
+          subtitle="Update this worker's record on their behalf"
+          width={560}
+          onClose={() => setEditing(false)}
+          footer={<>
+            <Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+            <Button onClick={saveEdit} disabled={savingEdit}>{savingEdit ? 'Saving…' : 'Save changes'}</Button>
+          </>}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="First name"><TextInput value={edit.firstName} onChange={(e) => setEdit({ ...edit, firstName: e.target.value })} /></Field>
+            <Field label="Last name"><TextInput value={edit.lastName} onChange={(e) => setEdit({ ...edit, lastName: e.target.value })} /></Field>
+          </div>
+          <Field label="Headline / role"><TextInput value={edit.headline} onChange={(e) => setEdit({ ...edit, headline: e.target.value })} placeholder="Warehouse Operative" /></Field>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="Phone"><TextInput value={edit.phone} onChange={(e) => setEdit({ ...edit, phone: e.target.value })} /></Field>
+            <Field label="Date of birth"><TextInput type="date" value={edit.dateOfBirth} onChange={(e) => setEdit({ ...edit, dateOfBirth: e.target.value })} /></Field>
+          </div>
+          <Field label="Address line 1"><TextInput value={edit.addressLine1} onChange={(e) => setEdit({ ...edit, addressLine1: e.target.value })} /></Field>
+          <Field label="Address line 2"><TextInput value={edit.addressLine2} onChange={(e) => setEdit({ ...edit, addressLine2: e.target.value })} /></Field>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="City"><TextInput value={edit.city} onChange={(e) => setEdit({ ...edit, city: e.target.value })} /></Field>
+            <Field label="Postcode"><TextInput value={edit.postcode} onChange={(e) => setEdit({ ...edit, postcode: e.target.value })} /></Field>
+          </div>
+          <Field label="National Insurance no."><TextInput value={edit.nationalInsurance} onChange={(e) => setEdit({ ...edit, nationalInsurance: e.target.value })} placeholder="QQ123456C" /></Field>
+          <div style={{ fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-secondary)', marginTop: 4 }}>Emergency contact</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="Name"><TextInput value={edit.emergencyName} onChange={(e) => setEdit({ ...edit, emergencyName: e.target.value })} /></Field>
+            <Field label="Phone"><TextInput value={edit.emergencyPhone} onChange={(e) => setEdit({ ...edit, emergencyPhone: e.target.value })} /></Field>
+          </div>
+          <Field label="Relationship"><TextInput value={edit.emergencyRelationship} onChange={(e) => setEdit({ ...edit, emergencyRelationship: e.target.value })} placeholder="Partner, parent…" /></Field>
+          <div style={{ fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-secondary)', marginTop: 4 }}>Bank details (payroll)</div>
+          <Field label="Account name"><TextInput value={edit.bankAccountName} onChange={(e) => setEdit({ ...edit, bankAccountName: e.target.value })} /></Field>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="Sort code"><TextInput value={edit.bankSortCode} onChange={(e) => setEdit({ ...edit, bankSortCode: e.target.value })} placeholder="00-00-00" /></Field>
+            <Field label="Account number"><TextInput value={edit.bankAccountNumber} onChange={(e) => setEdit({ ...edit, bankAccountNumber: e.target.value })} placeholder="12345678" /></Field>
+          </div>
+        </Modal>
+      )}
+
+      {inviteOpen && (
+        <Modal
+          title={c.hasLogin ? 'Resend portal invite' : 'Invite to portal'}
+          subtitle="Give this worker access to their Starff portal"
+          onClose={() => setInviteOpen(false)}
+          footer={<>
+            <Button variant="outline" onClick={() => setInviteOpen(false)}>Cancel</Button>
+            <Button onClick={sendInvite} disabled={inviting || !inviteEmail.trim()}>{inviting ? 'Sending…' : c.hasLogin ? 'Resend link' : 'Send invite'}</Button>
+          </>}
+        >
+          <p className="dim" style={{ fontSize: 13 }}>We'll email a secure link where they set their own password and open their worker portal. Nothing is shared until they activate.</p>
+          <Field label="Email address"><TextInput type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="worker@email.com" /></Field>
+          {inviteMsg && <p style={{ fontSize: 13, color: inviteMsg.startsWith('Invite') ? 'var(--success-600)' : 'var(--error-600)' }}>{inviteMsg}</p>}
+        </Modal>
+      )}
     </div>
   );
 }

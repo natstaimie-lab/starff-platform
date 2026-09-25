@@ -84,6 +84,14 @@ export class CandidatesController {
     return this.candidates.update(id, dto, user);
   }
 
+  // Staff — give a candidate a portal login and (optionally) email the invite.
+  // Used for walk-ins added without an email, or to resend an activation link.
+  @Post(':id/invite')
+  @Roles(Role.ADMIN, Role.RECRUITER)
+  invite(@Param('id') id: string, @Body() dto: { email?: string; sendInvite?: boolean }) {
+    return this.candidates.attachLogin(id, dto);
+  }
+
   // Staff — verify / reject a candidate's compliance document.
   @Patch(':id/documents/:docId')
   @Roles(Role.ADMIN, Role.RECRUITER)

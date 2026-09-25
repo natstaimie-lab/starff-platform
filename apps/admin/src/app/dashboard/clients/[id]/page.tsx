@@ -6,9 +6,10 @@ import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 import { useRole } from '@/lib/useRole';
 import { Card, Avatar, Badge } from '@/components/ui';
+import { Modal, Field, TextInput, SelectInput, Button } from '@/components/Modal';
 import * as Ic from '@/components/icons';
 
-type Contact = { id: string; firstName: string; lastName: string; email: string; phone?: string | null; jobTitle?: string | null; isPrimary: boolean };
+type Contact = { id: string; firstName: string; lastName: string; email: string; phone?: string | null; jobTitle?: string | null; isPrimary: boolean; userId?: string | null };
 type Site = { id: string; name: string; addressLine1?: string | null; city?: string | null; postcode?: string | null };
 type Client = {
   id: string; name: string; industry?: string | null; companyRegNo?: string | null; status: string;
@@ -40,9 +41,56 @@ export default function ClientProfile() {
   const [c, setC] = useState<Client | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [error, setError] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [edit, setEdit] = useState<Record<string, string>>({});
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contact, setContact] = useState({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', sendInvite: false });
+  const [savingContact, setSavingContact] = useState(false);
+  const [busyContact, setBusyContact] = useState<string | null>(null);
 
   const load = () => apiFetch<Client>(`/clients/${id}`).then(setC).catch((e) => setError(e.message));
   useEffect(() => { load(); }, [id]);
+
+  const CO_FIELDS = ['name', 'industry', 'companyRegNo', 'addressLine1', 'city', 'postcode', 'billingEmail', 'paymentTerms'] as const;
+  function openEdit() {
+    if (!c) return;
+    const seed: Record<string, string> = { status: c.status };
+    for (const k of CO_FIELDS) { const v = (c as any)[k]; seed[k] = v == null ? '' : String(v); }
+    setEdit(seed); setEditing(true);
+  }
+  async function saveEdit() {
+    setSavingEdit(true); setError('');
+    try {
+      const body: Record<string, any> = { status: edit.status };
+      for (const k of CO_FIELDS) {
+        const v = (edit[k] ?? '').trim();
+        if (k === 'paymentTerms') { body.paymentTerms = v === '' ? null : Number(v); }
+        else body[k] = v === '' ? null : v;
+      }
+      await apiFetch(`/clients/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+      setEditing(false); await load();
+    } catch (e: any) { setError(e.message); } finally { setSavingEdit(false); }
+  }
+  async function addContact() {
+    if (!contact.firstName.trim() || !contact.lastName.trim() || !contact.email.trim()) return;
+    setSavingContact(true); setError('');
+    try {
+      await apiFetch(`/clients/${id}/contacts`, { method: 'POST', body: JSON.stringify(contact) });
+      setContactOpen(false); setContact({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', sendInvite: false }); await load();
+    } catch (e: any) { setError(e.message); } finally { setSavingContact(false); }
+  }
+  async function inviteContact(ctId: string) {
+    setBusyContact(ctId);
+    try { await apiFetch(`/clients/${id}/contacts/${ctId}/invite`, { method: 'POST' }); await load(); alert('Invite sent.'); }
+    catch (e: any) { alert(e.message); } finally { setBusyContact(null); }
+  }
+  async function removeContact(ctId: string) {
+    if (!confirm('Remove this contact and their portal login? This cannot be undone for that person.')) return;
+    setBusyContact(ctId);
+    try { await apiFetch(`/clients/${id}/contacts/${ctId}`, { method: 'DELETE' }); await load(); }
+    catch (e: any) { alert(e.message); } finally { setBusyContact(null); }
+  }
 
   async function archive() {
     if (!confirm('Archive this client? They\'ll be hidden from lists and their team unable to log in, but the data is kept and you can restore them later.')) return;
@@ -82,13 +130,16 @@ export default function ClientProfile() {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)', gap: 16 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Card>
-            <div className="fx ac" style={{ gap: 14 }}>
-              <Avatar name={c.name} size={56} />
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 800 }}>{c.name}</div>
-                <div className="dim" style={{ fontSize: 13 }}>{c.industry ?? '—'}</div>
-                <div style={{ marginTop: 6 }}><Badge tone={(statusTone[c.status] ?? 'neutral') as any}>{c.status}</Badge></div>
+            <div className="fx ac jb" style={{ gap: 14 }}>
+              <div className="fx ac" style={{ gap: 14 }}>
+                <Avatar name={c.name} size={56} />
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 800 }}>{c.name}</div>
+                  <div className="dim" style={{ fontSize: 13 }}>{c.industry ?? '—'}</div>
+                  <div style={{ marginTop: 6 }}><Badge tone={(statusTone[c.status] ?? 'neutral') as any}>{c.status}</Badge></div>
+                </div>
               </div>
+              <button onClick={openEdit} style={{ border: '1px solid var(--border-strong)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 13, padding: '7px 12px', borderRadius: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}>Edit company</button>
             </div>
           </Card>
 
@@ -110,10 +161,21 @@ export default function ClientProfile() {
             ))}
           </Card>
 
-          <Card title={`Authorised users (${c.contacts.length})`}>
+          <Card
+            title={`Authorised users (${c.contacts.length})`}
+            action={<button onClick={() => setContactOpen(true)} style={{ border: '1px solid var(--border-strong)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12.5, padding: '6px 10px', borderRadius: 9, cursor: 'pointer' }}>+ Add contact</button>}
+          >
+            {c.contacts.length === 0 && <p className="dim" style={{ fontSize: 13.5 }}>No contacts yet.</p>}
             {c.contacts.map((ct) => (
-              <div key={ct.id} className="fx ac jb" style={{ padding: '9px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                <div><div className="nm">{ct.firstName} {ct.lastName}{ct.isPrimary && <span className="dim" style={{ fontWeight: 500 }}> · Primary</span>}</div><div className="sub2">{[ct.jobTitle, ct.email, ct.phone].filter(Boolean).join(' · ')}</div></div>
+              <div key={ct.id} className="fx ac jb" style={{ padding: '10px 0', borderBottom: '1px solid var(--border-subtle)', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div className="nm">{ct.firstName} {ct.lastName}{ct.isPrimary && <span className="dim" style={{ fontWeight: 500 }}> · Primary</span>} {ct.userId ? <Badge tone="success">Has login</Badge> : <Badge tone="neutral">No login</Badge>}</div>
+                  <div className="sub2">{[ct.jobTitle, ct.email, ct.phone].filter(Boolean).join(' · ')}</div>
+                </div>
+                <div className="fx ac" style={{ gap: 6 }}>
+                  <button disabled={busyContact === ct.id} onClick={() => inviteContact(ct.id)} style={{ border: 'none', background: 'var(--blue-100, #e4eeff)', color: 'var(--blue-600, #2563eb)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>{ct.userId ? 'Resend' : 'Invite'}</button>
+                  <button disabled={busyContact === ct.id} onClick={() => removeContact(ct.id)} style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--error-600)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>Remove</button>
+                </div>
               </div>
             ))}
           </Card>
@@ -161,6 +223,65 @@ export default function ClientProfile() {
           </Card>
         </div>
       </div>
+
+      {editing && (
+        <Modal
+          title="Edit company"
+          subtitle="Update this client's record"
+          width={540}
+          onClose={() => setEditing(false)}
+          footer={<>
+            <Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+            <Button onClick={saveEdit} disabled={savingEdit || !edit.name?.trim()}>{savingEdit ? 'Saving…' : 'Save changes'}</Button>
+          </>}
+        >
+          <Field label="Company name"><TextInput value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></Field>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="Industry / sector"><TextInput value={edit.industry} onChange={(e) => setEdit({ ...edit, industry: e.target.value })} /></Field>
+            <Field label="Company reg. no."><TextInput value={edit.companyRegNo} onChange={(e) => setEdit({ ...edit, companyRegNo: e.target.value })} placeholder="12345678" /></Field>
+          </div>
+          <Field label="Address line 1"><TextInput value={edit.addressLine1} onChange={(e) => setEdit({ ...edit, addressLine1: e.target.value })} /></Field>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="City"><TextInput value={edit.city} onChange={(e) => setEdit({ ...edit, city: e.target.value })} /></Field>
+            <Field label="Postcode"><TextInput value={edit.postcode} onChange={(e) => setEdit({ ...edit, postcode: e.target.value })} /></Field>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="Billing email"><TextInput type="email" value={edit.billingEmail} onChange={(e) => setEdit({ ...edit, billingEmail: e.target.value })} /></Field>
+            <Field label="Payment terms (days)"><TextInput type="number" value={edit.paymentTerms} onChange={(e) => setEdit({ ...edit, paymentTerms: e.target.value })} placeholder="30" /></Field>
+          </div>
+          <Field label="Status">
+            <SelectInput value={edit.status} onChange={(e) => setEdit({ ...edit, status: e.target.value })}>
+              {['LEAD', 'PROSPECT', 'ACTIVE', 'ON_HOLD', 'CLOSED'].map((s) => <option key={s} value={s}>{s}</option>)}
+            </SelectInput>
+          </Field>
+        </Modal>
+      )}
+
+      {contactOpen && (
+        <Modal
+          title="Add contact"
+          subtitle="Add an authorised person for this client"
+          onClose={() => setContactOpen(false)}
+          footer={<>
+            <Button variant="outline" onClick={() => setContactOpen(false)}>Cancel</Button>
+            <Button onClick={addContact} disabled={savingContact || !contact.firstName.trim() || !contact.lastName.trim() || !contact.email.trim()}>{savingContact ? 'Saving…' : 'Add contact'}</Button>
+          </>}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="First name"><TextInput value={contact.firstName} onChange={(e) => setContact({ ...contact, firstName: e.target.value })} /></Field>
+            <Field label="Last name"><TextInput value={contact.lastName} onChange={(e) => setContact({ ...contact, lastName: e.target.value })} /></Field>
+          </div>
+          <Field label="Job title"><TextInput value={contact.jobTitle} onChange={(e) => setContact({ ...contact, jobTitle: e.target.value })} placeholder="Operations Manager" /></Field>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="Email"><TextInput type="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} /></Field>
+            <Field label="Phone"><TextInput value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} /></Field>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13, cursor: 'pointer', background: 'var(--surface-sunken)', padding: '10px 12px', borderRadius: 10 }}>
+            <input type="checkbox" checked={contact.sendInvite} onChange={(e) => setContact({ ...contact, sendInvite: e.target.checked })} style={{ marginTop: 2 }} />
+            <span>Email them a portal invite now<br /><span className="dim" style={{ fontSize: 12 }}>Secure set-password link to the client portal. Leave unticked to record them only — you can invite later.</span></span>
+          </label>
+        </Modal>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsEmail,
   IsOptional,
   IsString,
@@ -41,4 +42,10 @@ export class CreateCandidateDto {
   @IsOptional()
   @IsString()
   headline?: string;
+
+  // Admin front desk: when a real email is given, email the portal set-password
+  // invite now. Without this the login is still created but no email is sent.
+  @IsOptional()
+  @IsBoolean()
+  sendInvite?: boolean;
 }

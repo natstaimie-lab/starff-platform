@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import {
   CandidateStatus,
@@ -351,8 +357,12 @@ export class RegistrationService {
     lastName: string;
     email: string;
     phone?: string;
+    jobTitle?: string;
+    /** Whether to actually email the invite now. Defaults to true. */
+    sendInvite?: boolean;
   }) {
     const email = input.email.trim().toLowerCase();
+    const sendInvite = input.sendInvite !== false;
     let user = await this.prisma.user.findUnique({ where: { email } });
     let isNew = false;
     let activationUrl: string | undefined;
@@ -384,25 +394,168 @@ export class RegistrationService {
           lastName: input.lastName,
           email,
           phone: input.phone,
+          jobTitle: input.jobTitle,
           isPrimary: primaryCount === 0,
         },
       });
     }
 
     const portalUrl = this.clientPortalUrl();
+    if (sendInvite) {
+      await this.notifications.send({
+        to: email,
+        userId: user.id,
+        kind: isNew ? 'ACTIVATION' : 'CONTINUE_REGISTRATION',
+        subject: isNew ? "You've been invited to the Starff client portal" : 'Your Starff client portal',
+        body: isNew
+          ? `Hi ${input.firstName}, you've been set up on the Starff client portal. Activate your account to log in and manage your staffing.`
+          : `Hi ${input.firstName}, log in to the Starff client portal to manage your staffing.`,
+        actionUrl: activationUrl ?? portalUrl,
+        actionLabel: isNew ? 'Activate & log in' : 'Go to portal',
+      });
+    }
+
+    return { contactId: contact.id, userId: user.id, invited: isNew, emailed: sendInvite };
+  }
+
+  /**
+   * Add a further contact to an existing client from the admin front desk.
+   * Optionally provisions a portal login + emails the invite.
+   */
+  async addClientContact(
+    clientId: string,
+    dto: { firstName: string; lastName: string; email: string; phone?: string; jobTitle?: string; sendInvite?: boolean },
+  ) {
+    const client = await this.prisma.client.findUnique({ where: { id: clientId } });
+    if (!client) throw new NotFoundException('Client not found');
+    return this.inviteClientContact({
+      clientId,
+      firstName: dto.firstName.trim(),
+      lastName: dto.lastName.trim(),
+      email: dto.email,
+      phone: dto.phone,
+      jobTitle: dto.jobTitle,
+      sendInvite: dto.sendInvite,
+    });
+  }
+
+  /**
+   * (Re)send a portal invite / login link to an existing client contact — e.g. a
+   * contact added earlier without one, or one who never activated. Always mints a
+   * fresh link (invite for a brand-new login, magic-link for an existing one).
+   */
+  async resendClientContactInvite(contactId: string) {
+    const contact = await this.prisma.clientContact.findUnique({ where: { id: contactId } });
+    if (!contact) throw new NotFoundException('Contact not found');
+    const email = contact.email.trim().toLowerCase();
+    const auth = await this.ensureAuthUser(
+      email,
+      { firstName: contact.firstName, lastName: contact.lastName, role: 'client' },
+      this.activationRedirect(this.clientPortalUrl()),
+    );
+    // Make sure a login row exists and the contact points at it.
+    await this.prisma.user.upsert({
+      where: { id: auth.id },
+      update: {},
+      create: { id: auth.id, email, role: Role.CLIENT, firstName: contact.firstName, lastName: contact.lastName, phone: contact.phone },
+    });
+    if (contact.userId !== auth.id) {
+      await this.prisma.clientContact.update({ where: { id: contactId }, data: { userId: auth.id } });
+    }
     await this.notifications.send({
       to: email,
-      userId: user.id,
-      kind: isNew ? 'ACTIVATION' : 'CONTINUE_REGISTRATION',
-      subject: isNew ? "You've been invited to the Starff client portal" : 'Your Starff client portal',
-      body: isNew
-        ? `Hi ${input.firstName}, you've been set up on the Starff client portal. Activate your account to log in and manage your staffing.`
-        : `Hi ${input.firstName}, log in to the Starff client portal to manage your staffing.`,
-      actionUrl: activationUrl ?? portalUrl,
-      actionLabel: isNew ? 'Activate & log in' : 'Go to portal',
+      userId: auth.id,
+      kind: auth.isNew ? 'ACTIVATION' : 'CONTINUE_REGISTRATION',
+      subject: auth.isNew ? "You've been invited to the Starff client portal" : 'Your Starff client portal',
+      body: auth.isNew
+        ? `Hi ${contact.firstName}, you've been set up on the Starff client portal. Activate your account to log in and manage your staffing.`
+        : `Hi ${contact.firstName}, here's your link to the Starff client portal.`,
+      actionUrl: auth.actionLink ?? this.clientPortalUrl(),
+      actionLabel: auth.isNew ? 'Activate & log in' : 'Go to portal',
     });
+    return { contactId, userId: auth.id, invited: auth.isNew, emailed: true };
+  }
 
-    return { contactId: contact.id, userId: user.id, invited: isNew };
+  /**
+   * Give an existing candidate a real portal login (or repair / resend one) and
+   * optionally email them a set-password invite. Powers the admin "Invite to
+   * portal / Resend invite" button and the Add-worker-with-email flow.
+   *
+   * A walk-in added without an email has a placeholder `@candidate.local` User
+   * (random id, no Supabase auth). To grant a login we create the Supabase auth
+   * user (which gets its own id) and re-point the candidate + that user's rows
+   * onto it. Idempotent.
+   */
+  async attachCandidateLogin(candidateId: string, opts: { email?: string; sendInvite?: boolean }) {
+    const candidate = await this.prisma.candidate.findUnique({
+      where: { id: candidateId },
+      include: { user: true },
+    });
+    if (!candidate) throw new NotFoundException('Candidate not found');
+
+    const currentEmail = (candidate.user?.email ?? '').toLowerCase();
+    const currentIsPlaceholder = !currentEmail || currentEmail.endsWith('@candidate.local');
+    const email = (opts.email?.trim().toLowerCase() || (currentIsPlaceholder ? '' : currentEmail));
+    if (!email || email.endsWith('@candidate.local')) {
+      throw new BadRequestException('A real email address is required to send a portal invite.');
+    }
+    // The email must not already belong to a different account.
+    const clash = await this.prisma.user.findUnique({ where: { email } });
+    if (clash && clash.id !== candidate.userId) {
+      throw new ConflictException('Another account already uses that email address.');
+    }
+
+    const sendInvite = opts.sendInvite !== false;
+    const firstName = candidate.firstName;
+    const lastName = candidate.lastName;
+    const redirect = this.activationRedirect(this.candidatePortalUrl());
+
+    const auth = await this.ensureAuthUser(email, { firstName, lastName, role: 'candidate' }, redirect);
+    const newId = auth.id;
+    const oldId = candidate.userId;
+
+    if (newId !== oldId) {
+      // Move the candidate (and any of the placeholder user's rows) onto the real
+      // Supabase login, then drop the placeholder. Ordered to respect the User.email
+      // unique index and the FKs pointing at the old id.
+      await this.prisma.$transaction(async (tx) => {
+        // 1. free the email on the old placeholder row
+        await tx.user.update({ where: { id: oldId }, data: { email: `migrated_${oldId}@candidate.local` } });
+        // 2. create the real login row
+        await tx.user.upsert({
+          where: { id: newId },
+          update: { email, role: Role.CANDIDATE, firstName, lastName, phone: candidate.phone ?? undefined },
+          create: { id: newId, email, role: Role.CANDIDATE, firstName, lastName, phone: candidate.phone ?? undefined },
+        });
+        // 3. re-point everything that referenced the placeholder
+        await tx.candidate.update({ where: { id: candidateId }, data: { userId: newId } });
+        await tx.notification.updateMany({ where: { userId: oldId }, data: { userId: newId } });
+        await tx.pushToken.updateMany({ where: { userId: oldId }, data: { userId: newId } });
+        await tx.conversation.updateMany({ where: { memberUserId: oldId }, data: { memberUserId: newId } });
+        await tx.auditLog.updateMany({ where: { actorId: oldId }, data: { actorId: newId } });
+        // 4. remove the now-orphan placeholder
+        await tx.user.delete({ where: { id: oldId } }).catch(() => {});
+      });
+    } else if (currentEmail !== email) {
+      // Same login id, just a corrected email/name.
+      await this.prisma.user.update({ where: { id: newId }, data: { email, firstName, lastName } });
+    }
+
+    if (sendInvite) {
+      await this.notifications.send({
+        to: email,
+        userId: newId,
+        kind: auth.isNew ? 'ACTIVATION' : 'CONTINUE_REGISTRATION',
+        subject: auth.isNew ? 'Activate your Starff worker account' : 'Your Starff worker portal',
+        body: auth.isNew
+          ? `Hi ${firstName}, your Starff worker account is ready. Activate it to set your password, complete your profile and see shifts.`
+          : `Hi ${firstName}, here's your link to the Starff worker portal.`,
+        actionUrl: auth.actionLink ?? this.candidatePortalUrl(),
+        actionLabel: auth.isNew ? 'Activate & set password' : 'Go to portal',
+      });
+    }
+
+    return { userId: newId, invited: auth.isNew, emailed: sendInvite };
   }
 
   // ────────────────────────────────────────────────────────────

@@ -41,4 +41,8 @@ export class CreateClientDto {
   @IsOptional()
   @IsEnum(ClientStatus)
   status?: ClientStatus;
+
+  // If a contact email is given, email them the portal invite now. Default false.
+  @IsOptional()
+  sendInvite?: boolean;
 }
