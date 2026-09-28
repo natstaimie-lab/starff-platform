@@ -9,7 +9,7 @@ import { Icon } from '@/components/Icon';
 import { colors, radius } from '@/theme/tokens';
 import { useApi } from '@/lib/useApi';
 import { candidateApi } from '@/lib/endpoints';
-import type { Shift } from '@/lib/types';
+import type { Journey, Shift } from '@/lib/types';
 
 // Route options are typical estimates (no live-traffic API on device).
 const ROUTES = [
@@ -46,7 +46,19 @@ export function TravelScreen() {
       .sort((a, b) => +new Date(a.startAt) - +new Date(b.startAt))[0];
   }, [me]);
 
-  const route = ROUTES.find((r) => r.id === mode) ?? ROUTES[0];
+  // Live door-to-gate durations (Google Routes) — falls back to the estimates.
+  const journey = useApi<Journey | null>(
+    () => (nextShift ? candidateApi.journey(nextShift.id) : Promise.resolve(null)),
+    [nextShift?.id],
+  );
+  const liveRoutes = journey.data?.live ? journey.data.routes : undefined;
+  const live = !!journey.data?.live;
+  const routes = ROUTES.map((r) => {
+    const lr = liveRoutes?.[r.id as 'transit' | 'drive' | 'cycle'];
+    return lr ? { ...r, dur: lr.minutes, km: lr.km } : r;
+  });
+  const bestId = routes.slice().sort((a, b) => a.dur - b.dur)[0]?.id;
+  const route = routes.find((r) => r.id === mode) ?? routes[0];
   const prepTotal = PREP.reduce((a, p) => a + (skip.has(p.key) ? 0 : p.mins), 0);
 
   if (loading)
@@ -188,18 +200,26 @@ export function TravelScreen() {
 
         {/* Route options */}
         <SecHead title="Choose your route" />
+        {live ? (
+          <View style={styles.liveBadge}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveText}>Live traffic &amp; transit times</Text>
+          </View>
+        ) : null}
         <View style={{ gap: 9 }}>
-          {ROUTES.map((r) => {
+          {routes.map((r) => {
             const on = r.id === mode;
+            const km = (r as { km?: number | null }).km;
+            const isPick = live ? r.id === bestId : 'recommended' in r && r.recommended;
             return (
               <Pressable key={r.id} onPress={() => setMode(r.id)} style={[styles.troute, on && styles.trouteOn]}>
                 <IconTile name={r.icon} tone="orange" size={40} />
                 <View style={{ flex: 1 }}>
                   <View style={styles.trouteTitleRow}>
                     <Text style={styles.trouteTitle}>{r.mode}</Text>
-                    {'recommended' in r && r.recommended ? <Pill kind="green">AI pick</Pill> : null}
+                    {isPick ? <Pill kind="green">{live ? 'Fastest' : 'AI pick'}</Pill> : null}
                   </View>
-                  <Muted>{r.fare} · {r.sub}</Muted>
+                  <Muted>{km ? `${km} km · ` : ''}{r.fare} · {r.sub}</Muted>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={styles.trouteDur}>{r.dur}</Text>
@@ -242,7 +262,9 @@ export function TravelScreen() {
         </Card>
 
         <Muted style={{ textAlign: 'center', fontSize: 11 }}>
-          Route times are typical estimates. Always allow extra time for delays.
+          {live
+            ? 'Live traffic & transit times from Google Maps. Always allow extra time for delays.'
+            : 'Route times are typical estimates. Always allow extra time for delays.'}
         </Muted>
 
         <Button title={`Set wake-up reminder · ${fmt(wake)}`} icon="alarm" onPress={setReminder} />
@@ -264,6 +286,9 @@ function dotColor(kind: string) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -4, marginBottom: 2 },
+  liveDot: { width: 7, height: 7, borderRadius: 999, backgroundColor: colors.success },
+  liveText: { color: colors.success, fontSize: 11.5, fontWeight: '700' },
   cardLabel: { fontSize: 13.5, fontWeight: '700', color: colors.text },
   seg: { flexDirection: 'row', backgroundColor: colors.surfaceAlt, borderRadius: radius.control, padding: 4, gap: 4 },
   segBtn: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.chip },

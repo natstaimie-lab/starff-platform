@@ -12,6 +12,7 @@ import type {
   CandidateProfile,
   ClientOverview,
   ClientSubmission,
+  Journey,
   Notification,
   OpenJob,
   Shift,
@@ -62,6 +63,9 @@ export const candidateApi = {
   checkInShift: (id: string) => apiFetch(`/me/shifts/${id}/check-in`, { method: 'POST', idempotencyKey: idempotencyKey('checkin', id) }),
   checkOutShift: (id: string) => apiFetch(`/me/shifts/${id}/check-out`, { method: 'POST', idempotencyKey: idempotencyKey('checkout', id) }),
   reportLate: (id: string) => apiFetch(`/me/shifts/${id}/report-late`, { method: 'POST' }),
+
+  /** GET /me/shifts/:id/journey — live door-to-gate durations (Google Routes) or estimates. */
+  journey: (id: string) => apiFetch<Journey>(`/me/shifts/${id}/journey`),
 
   /** GET /me/invitations — job invitations Starff has sent this candidate (safe view). */
   invitations: () => apiFetch<CandidateInvitation[]>('/me/invitations'),

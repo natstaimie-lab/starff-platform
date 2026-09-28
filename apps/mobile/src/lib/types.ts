@@ -91,6 +91,11 @@ export interface Shift {
   breakMinutes?: number;
   payRate?: string | number;
   notes?: string | null;
+  // On-site check-in tracking (stamped by /me/shifts/:id/check-in|out|acknowledge).
+  acknowledgedAt?: string | null;
+  checkInAt?: string | null;
+  checkOutAt?: string | null;
+  lateReportedAt?: string | null;
   job?: Job | null;
   site?: ({ id?: string; name?: string | null } & Addr) | null;
 }
@@ -149,6 +154,19 @@ export interface OpenJob {
 export interface AiReply {
   configured: boolean;
   reply: string;
+}
+
+export interface JourneyRoute {
+  minutes: number;
+  km: number | null;
+}
+export interface Journey {
+  live: boolean;
+  reason?: string;
+  origin: string | null;
+  destination: string | null;
+  departAt?: string;
+  routes: { drive?: JourneyRoute; transit?: JourneyRoute; cycle?: JourneyRoute };
 }
 
 export interface Notification {

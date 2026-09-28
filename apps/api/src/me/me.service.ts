@@ -129,6 +129,98 @@ export class MeService {
     return { ok: true };
   }
 
+  // ── Live journey planning (Google Routes; degrades to estimates) ────────────
+
+  /** One route via Google Routes API. Returns null on any failure / no key. */
+  private async googleRoute(
+    origin: string,
+    destination: string,
+    travelMode: 'DRIVE' | 'TRANSIT' | 'BICYCLE' | 'WALK',
+    departureTime: Date,
+  ): Promise<{ minutes: number; km: number | null } | null> {
+    const key = process.env.GOOGLE_ROUTES_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
+    if (!key) return null;
+    const body: Record<string, unknown> = {
+      origin: { address: origin },
+      destination: { address: destination },
+      travelMode,
+      computeAlternativeRoutes: false,
+    };
+    // Live traffic for driving; real schedules for transit — both need a departure time.
+    if (travelMode === 'DRIVE') {
+      body.routingPreference = 'TRAFFIC_AWARE';
+      body.departureTime = departureTime.toISOString();
+    } else if (travelMode === 'TRANSIT') {
+      body.departureTime = departureTime.toISOString();
+    }
+    try {
+      const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': key,
+          'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters',
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) return null;
+      const json = (await res.json()) as { routes?: { duration?: string; distanceMeters?: number }[] };
+      const r = json.routes?.[0];
+      if (!r?.duration) return null;
+      const minutes = Math.round(parseInt(String(r.duration).replace('s', ''), 10) / 60);
+      const km = r.distanceMeters ? Number((r.distanceMeters / 1000).toFixed(1)) : null;
+      return { minutes: Math.max(1, minutes), km };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Real door-to-gate durations for the candidate's own shift, from their home
+   * postcode to the site. Uses Google Routes when GOOGLE_ROUTES_API_KEY is set,
+   * otherwise returns { live:false } so the app keeps its typical estimates.
+   */
+  async journey(userId: string, shiftId: string) {
+    const candidate = await this.candidateFor(userId);
+    const shift = await this.prisma.shift.findUnique({
+      where: { id: shiftId },
+      include: { site: true, job: { include: { client: true } } },
+    });
+    if (!shift || shift.candidateId !== candidate.id) throw new NotFoundException('Shift not found');
+
+    const key = process.env.GOOGLE_ROUTES_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
+    const origin = [candidate.addressLine1, candidate.city, candidate.postcode].filter(Boolean).join(', ');
+    const dest = shift.site
+      ? [shift.site.addressLine1, shift.site.city, shift.site.postcode].filter(Boolean).join(', ')
+      : shift.job?.client
+        ? [shift.job.client.addressLine1, shift.job.client.city, shift.job.client.postcode].filter(Boolean).join(', ')
+        : '';
+
+    if (!key || !origin || !dest) {
+      return {
+        live: false,
+        reason: !key ? 'no_key' : 'no_address',
+        origin: origin || null,
+        destination: dest || null,
+        routes: {} as Record<string, { minutes: number; km: number | null }>,
+      };
+    }
+
+    // Plan for ~1h before clock-in (or now, whichever is later) for realistic traffic/schedules.
+    const depart = new Date(Math.max(Date.now() + 60_000, shift.startAt.getTime() - 60 * 60_000));
+    const [drive, transit, cycle] = await Promise.all([
+      this.googleRoute(origin, dest, 'DRIVE', depart),
+      this.googleRoute(origin, dest, 'TRANSIT', depart),
+      this.googleRoute(origin, dest, 'BICYCLE', depart),
+    ]);
+    const routes: Record<string, { minutes: number; km: number | null }> = {};
+    if (drive) routes.drive = drive;
+    if (transit) routes.transit = transit;
+    if (cycle) routes.cycle = cycle;
+
+    return { live: Object.keys(routes).length > 0, origin, destination: dest, departAt: depart.toISOString(), routes };
+  }
+
   // ── Job invitations (admin → candidate; candidate confirms interest) ─────────
 
   /** Statuses that belong on the candidate's "shift offers" screen — from the
@@ -266,7 +358,7 @@ export class MeService {
         },
         timesheets: {
           orderBy: { createdAt: 'desc' },
-          include: { shift: { select: { startAt: true, payRate: true, job: { select: { title: true, client: { select: { name: true } } } } } } },
+          include: { shift: { select: { id: true, startAt: true, payRate: true, job: { select: { title: true, client: { select: { name: true } } } } } } },
         },
       },
     });

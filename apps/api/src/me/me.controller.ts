@@ -59,6 +59,12 @@ export class MeController {
     return this.me.reportLate(user.id, id);
   }
 
+  // Live door-to-gate journey durations (Google Routes; falls back to estimates).
+  @Get('shifts/:id/journey')
+  journey(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.me.journey(user.id, id);
+  }
+
   // ── Job invitations (admin invited this candidate; they confirm interest) ──
   @Get('invitations')
   invitations(@CurrentUser() user: AuthUser) {
