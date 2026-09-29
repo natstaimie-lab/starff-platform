@@ -16,7 +16,7 @@ type Client = {
   addressLine1?: string | null; city?: string | null; postcode?: string | null;
   billingEmail?: string | null; paymentTerms?: number | null;
   agreementAccepted?: boolean; agreementAcceptedAt?: string | null; signatureName?: string | null; signedAt?: string | null;
-  submittedAt?: string | null; registrationSource?: string | null;
+  submittedAt?: string | null; registrationSource?: string | null; createdAt?: string | null;
   contacts: Contact[]; sites: Site[]; jobs: { id: string }[];
 };
 
@@ -137,6 +137,7 @@ export default function ClientProfile() {
                   <div style={{ fontSize: 18, fontWeight: 800 }}>{c.name}</div>
                   <div className="dim" style={{ fontSize: 13 }}>{c.industry ?? '—'}</div>
                   <div style={{ marginTop: 6 }}><Badge tone={(statusTone[c.status] ?? 'neutral') as any}>{c.status}</Badge></div>
+                  <div className="dim" style={{ fontSize: 12, marginTop: 6 }}>Joined {fmt(c.createdAt)}</div>
                 </div>
               </div>
               <button onClick={openEdit} style={{ border: '1px solid var(--border-strong)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 13, padding: '7px 12px', borderRadius: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}>Edit company</button>
