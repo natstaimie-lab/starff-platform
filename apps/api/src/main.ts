@@ -48,6 +48,10 @@ async function bootstrap() {
     'https://starff-platform-admin.vercel.app',
     'https://starff-platform-candidate.vercel.app',
     'https://starff-platform-client.vercel.app',
+    // Custom subdomains (portals move here from the *.vercel.app URLs)
+    'https://admin.starff.co.uk',
+    'https://my.starff.co.uk',
+    'https://client.starff.co.uk',
     'https://starff.co.uk',
     'https://www.starff.co.uk',
     'http://localhost:3000',
