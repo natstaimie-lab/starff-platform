@@ -21,7 +21,7 @@ type Candidate = {
   bankAccountName?: string | null; bankSortCode?: string | null; bankAccountNumber?: string | null;
   healthDeclaration?: boolean; healthNotes?: string | null; consentGdpr?: boolean; consentGdprAt?: string | null;
   agreementAccepted?: boolean; signatureName?: string | null; signedAt?: string | null;
-  submittedAt?: string | null; registrationSource?: string | null;
+  submittedAt?: string | null; registrationSource?: string | null; createdAt?: string | null;
   loginEmail?: string | null; hasLogin?: boolean;
   documents: Doc[]; skills: { skill: { name: string } }[]; availability: { dayOfWeek: number }[];
   employmentHistory: Job[]; references: Ref[];
@@ -209,6 +209,7 @@ export default function CandidateProfile() {
                   <div style={{ fontSize: 18, fontWeight: 800 }}>{c.firstName} {c.lastName}</div>
                   <div className="dim" style={{ fontSize: 13 }}>{c.headline ?? '—'}</div>
                   <div style={{ marginTop: 6 }}><ComplianceBadge status={c.status.toLowerCase()} /></div>
+                  <div className="dim" style={{ fontSize: 12, marginTop: 6 }}>Joined {fmt(c.createdAt)}</div>
                 </div>
               </div>
               <button onClick={openEdit} style={{ border: '1px solid var(--border-strong)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 13, padding: '7px 12px', borderRadius: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}>Edit details</button>
