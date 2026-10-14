@@ -46,7 +46,10 @@ export function MfaGate({ email, onVerified }: { email?: string; onVerified: () 
             try { await supabase.auth.mfa.unenroll({ factorId: f.id }); } catch { /* ignore */ }
           }
         }
-        const { data: en, error: enErr } = await supabase.auth.mfa.enroll({ factorType: 'totp' });
+        // Unique friendly name: listFactors() hides unverified factors, so a stale
+        // blank one can't be cleaned up above and would collide on re-enrol. A
+        // unique name sidesteps the "friendly name already exists" error.
+        const { data: en, error: enErr } = await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName: `Authenticator ${Date.now()}` });
         if (enErr || !en) { setFatal(enErr?.message ?? 'Could not start MFA setup.'); setMode('error'); return; }
         setFactorId(en.id);
         setQr(en.totp.qr_code);
