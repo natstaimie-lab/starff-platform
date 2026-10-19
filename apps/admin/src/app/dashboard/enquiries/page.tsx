@@ -56,8 +56,20 @@ export default function EnquiriesPage() {
     finally { setBusy(null); }
   }
 
+  async function remove(id: string, name?: string) {
+    if (!confirm(`Permanently delete this enquiry${name ? ` from ${name}` : ''}? This cannot be undone.`)) return;
+    setBusy(id);
+    try {
+      await apiFetch(`/enquiries/${id}`, { method: 'DELETE' });
+      if (view?.id === id) setView(null);
+      await load();
+    } catch (e: any) { alert(e?.message || 'Could not delete this enquiry.'); }
+    finally { setBusy(null); }
+  }
+
   const btn = (bg: string): React.CSSProperties => ({ border: 'none', background: bg, color: '#fff', fontWeight: 700, fontSize: 12, padding: '6px 12px', borderRadius: 8, cursor: 'pointer' });
   const ghost: React.CSSProperties = { border: '1px solid var(--grey-200)', background: '#fff', color: 'var(--navy-900)', fontWeight: 700, fontSize: 12, padding: '6px 12px', borderRadius: 8, cursor: 'pointer' };
+  const danger: React.CSSProperties = { border: '1px solid var(--error-600, #DC2626)', background: '#fff', color: 'var(--error-600, #DC2626)', fontWeight: 700, fontSize: 12, padding: '6px 12px', borderRadius: 8, cursor: 'pointer' };
 
   const cols: Column<Enquiry>[] = [
     { key: 'type', header: 'Type', render: (r) => <Badge tone="info">{typeLabel[r.type] ?? r.type}</Badge> },
@@ -75,6 +87,7 @@ export default function EnquiriesPage() {
             <span style={{ display: 'inline-flex', gap: 8 }}>
               <button onClick={() => setView(r)} style={ghost}>View</button>
               <button disabled={busy === r.id} onClick={() => setSpam(r.id, false)} style={btn('var(--green, #16A34A)')}>{busy === r.id ? '…' : 'Not spam'}</button>
+              <button disabled={busy === r.id} onClick={() => remove(r.id, r.name)} style={danger} title="Delete permanently">{busy === r.id ? '…' : 'Delete'}</button>
             </span>
           );
         }
@@ -83,14 +96,23 @@ export default function EnquiriesPage() {
             <span style={{ display: 'inline-flex', gap: 8 }}>
               <button onClick={() => setView(r)} style={btn('var(--navy-900)')}>View</button>
               <button disabled={busy === r.id} onClick={() => setSpam(r.id, true)} style={ghost} title="Mark as spam">Spam</button>
+              <button disabled={busy === r.id} onClick={() => remove(r.id, r.name)} style={danger} title="Delete permanently">Delete</button>
             </span>
           );
         }
-        if (r.status === 'CONVERTED') return <span className="sub2">Converted</span>;
+        if (r.status === 'CONVERTED') {
+          return (
+            <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+              <span className="sub2">Converted</span>
+              <button disabled={busy === r.id} onClick={() => remove(r.id, r.name)} style={danger} title="Delete permanently">Delete</button>
+            </span>
+          );
+        }
         return (
           <span style={{ display: 'inline-flex', gap: 8 }}>
             <button disabled={busy === r.id} onClick={() => convert(r.id)} style={btn('var(--blue-500)')}>{busy === r.id ? '…' : 'Convert'}</button>
             <button disabled={busy === r.id} onClick={() => setSpam(r.id, true)} style={ghost} title="Mark as spam">Spam</button>
+            <button disabled={busy === r.id} onClick={() => remove(r.id, r.name)} style={danger} title="Delete permanently">Delete</button>
           </span>
         );
       },
@@ -148,6 +170,7 @@ export default function EnquiriesPage() {
               {view.message || '(no message provided)'}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+              <button disabled={busy === view.id} onClick={() => remove(view.id, view.name)} style={{ ...danger, marginRight: 'auto' }} title="Delete permanently">{busy === view.id ? '…' : 'Delete'}</button>
               {view.email && (
                 <a href={`mailto:${view.email}?subject=${encodeURIComponent('Re: Your enquiry to Starff')}`} style={{ ...btn('var(--orange-500)'), textDecoration: 'none', display: 'inline-block' }}>Reply by email</a>
               )}

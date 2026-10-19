@@ -144,6 +144,14 @@ export class EnquiriesService {
     });
   }
 
+  /** Permanently delete an enquiry (raw form submission — safe to discard). */
+  async remove(id: string) {
+    const enquiry = await this.prisma.enquiry.findUnique({ where: { id } });
+    if (!enquiry) throw new NotFoundException('Enquiry not found');
+    await this.prisma.enquiry.delete({ where: { id } });
+    return { ok: true };
+  }
+
   /**
    * Turn an enquiry into a real record with a real login, reusing the tested
    * registration flow (which creates the Supabase account + emails a secure

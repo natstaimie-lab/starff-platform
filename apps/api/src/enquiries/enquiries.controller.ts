@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   Param,
@@ -61,5 +62,12 @@ export class EnquiriesController {
   @Roles(Role.ADMIN, Role.RECRUITER)
   convert(@Param('id') id: string) {
     return this.enquiries.convert(id);
+  }
+
+  // Staff only — permanently delete an enquiry (spam/junk clean-up).
+  @Delete(':id')
+  @Roles(Role.ADMIN, Role.RECRUITER)
+  remove(@Param('id') id: string) {
+    return this.enquiries.remove(id);
   }
 }
