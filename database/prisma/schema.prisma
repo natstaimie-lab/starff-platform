@@ -256,8 +256,34 @@ model Candidate {
   references         CandidateReference[]
   reliabilityIncidents ReliabilityIncident[]
   ratings              CandidateRating[]
+  agreements           CandidateAgreement[]
 
   @@index([status])
+}
+
+/// One worker document (Terms of Engagement, KID, 48-hour opt-out) as accepted
+/// — or, for the optional opt-out, declined — by a worker. The exact wording is
+/// snapshotted at sign-time so the signed document can be reproduced as agreed.
+model CandidateAgreement {
+  id            String    @id @default(cuid())
+  candidateId   String
+  candidate     Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  docKey        String // terms-of-engagement | key-information-document | opt-out-48-hour
+  title         String
+  version       String
+  accepted      Boolean   @default(false)
+  declined      Boolean   @default(false) // optional docs the worker chose not to sign
+  signatureName String? // typed e-signature
+  agreementText String?   @db.Text // snapshot of the exact wording accepted
+  confirmation  String?   @db.Text // the statement the worker confirmed
+  acceptedAt    DateTime?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([candidateId, docKey])
+  @@index([candidateId])
 }
 
 /// One rating of a worker — from a client after a shift, or a staff assessment.

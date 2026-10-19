@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
+import { supabase } from '@/lib/supabaseClient';
 import { useRole } from '@/lib/useRole';
 import { Card, Avatar, Badge, ComplianceBadge } from '@/components/ui';
 import { Modal, Field, TextInput, Button } from '@/components/Modal';
@@ -13,6 +14,11 @@ import * as Ic from '@/components/icons';
 type Doc = { id: string; type: string; fileName?: string; status: string; expiryDate?: string; createdAt: string };
 type Job = { id: string; employer: string; jobTitle?: string | null; startDate?: string | null; endDate?: string | null; current: boolean; reasonForLeaving?: string | null };
 type Ref = { id: string; name: string; relationship?: string | null; company?: string | null; email?: string | null; phone?: string | null };
+type WorkerAgreement = {
+  key: string; title: string; optional: boolean; currentVersion: string;
+  accepted: boolean; declined: boolean; signatureName?: string | null;
+  acceptedAt?: string | null; signedVersion?: string | null; outdated: boolean;
+};
 type Candidate = {
   id: string; firstName: string; lastName: string; status: string;
   headline?: string; city?: string; postcode?: string; phone?: string;
@@ -69,8 +75,32 @@ export default function CandidateProfile() {
   const [inviteMsg, setInviteMsg] = useState('');
   const [inviting, setInviting] = useState(false);
 
+  const [agreements, setAgreements] = useState<WorkerAgreement[]>([]);
+  const [dlDoc, setDlDoc] = useState<string | null>(null);
+
   const load = () => apiFetch<Candidate>(`/candidates/${id}`).then(setC).catch((e) => setError(e.message));
-  useEffect(() => { load(); }, [id]);
+  const loadAgreements = () =>
+    apiFetch<{ documents: WorkerAgreement[] }>(`/candidates/${id}/agreements`)
+      .then((r) => setAgreements(r.documents))
+      .catch(() => setAgreements([]));
+  useEffect(() => { load(); loadAgreements(); }, [id]);
+
+  async function downloadDoc(key: string, name: string) {
+    setDlDoc(key);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/candidates/${id}/agreements/${key}/pdf`, {
+        headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
+      });
+      if (!res.ok) throw new Error('Could not generate the document PDF.');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) { alert(e.message); } finally { setDlDoc(null); }
+  }
 
   function openEdit() {
     if (!c) return;
@@ -231,6 +261,40 @@ export default function CandidateProfile() {
                 <button onClick={openInvite} className="aibtn" style={{ width: '100%', justifyContent: 'center', background: 'var(--blue-500)', color: '#fff', border: 'none' }}>Invite to portal</button>
               </>
             )}
+          </Card>
+
+          {/* Signed worker documents */}
+          <Card title="Signed documents">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {agreements.map((a) => (
+                <div key={a.key} style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: 10 }}>
+                  <div className="fx ac" style={{ justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13 }}>{a.title}</span>
+                    {a.accepted
+                      ? <Badge tone={a.outdated ? 'warning' : 'success'}>{a.outdated ? 'Signed (old version)' : 'Signed'}</Badge>
+                      : a.declined
+                        ? <Badge tone="neutral">Declined</Badge>
+                        : <Badge tone={a.optional ? 'neutral' : 'warning'}>{a.optional ? 'Not signed (optional)' : 'Not signed'}</Badge>}
+                  </div>
+                  {a.accepted && (
+                    <div className="dim" style={{ fontSize: 12, marginTop: 4 }}>
+                      {a.signatureName} · {fmt(a.acceptedAt)}
+                    </div>
+                  )}
+                  {a.accepted && (
+                    <button
+                      onClick={() => downloadDoc(a.key, `${c.firstName}-${c.lastName}-${a.key}.pdf`.replace(/[^a-z0-9.-]+/gi, '-').toLowerCase())}
+                      disabled={dlDoc === a.key}
+                      className="fx ac"
+                      style={{ marginTop: 8, gap: 6, border: '1px solid var(--border-strong)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12.5, padding: '7px 11px', borderRadius: 10, cursor: 'pointer' }}
+                    >
+                      <Ic.FileText width={15} /> {dlDoc === a.key ? 'Preparing…' : 'Download signed PDF'}
+                    </button>
+                  )}
+                </div>
+              ))}
+              {agreements.length === 0 && <p className="dim" style={{ fontSize: 13 }}>No worker documents on record yet.</p>}
+            </div>
           </Card>
 
           {/* Registration review */}

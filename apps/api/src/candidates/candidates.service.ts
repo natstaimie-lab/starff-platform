@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -6,12 +7,14 @@ import {
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { DocumentStatus, Prisma, Role } from '@prisma/client';
+import PDFDocument from 'pdfkit';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../auth/current-user.decorator';
 import { CreateCandidateDto } from './dto/create-candidate.dto';
 import { UpdateCandidateDto } from './dto/update-candidate.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RegistrationService } from '../registration/registration.service';
+import { WORKER_DOCUMENTS, getWorkerDoc, workerAgreementSnapshot } from '../me/worker-documents';
 
 @Injectable()
 export class CandidatesService {
@@ -248,5 +251,106 @@ export class CandidatesService {
       .createSignedUrl(doc.fileUrl, 300);
     if (error) throw new NotFoundException('Could not open document');
     return { url: data.signedUrl };
+  }
+
+  // ── Worker documents (admin view of what a worker has signed) ──
+
+  /** A worker's signed-document status, for the admin candidate detail page. */
+  async agreements(candidateId: string) {
+    const candidate = await this.prisma.candidate.findUnique({ where: { id: candidateId } });
+    if (!candidate) throw new NotFoundException('Candidate not found');
+    const records = await this.prisma.candidateAgreement.findMany({ where: { candidateId } });
+    const byKey = new Map(records.map((r) => [r.docKey, r]));
+    return {
+      documents: WORKER_DOCUMENTS.map((doc) => {
+        const rec = byKey.get(doc.key);
+        return {
+          key: doc.key,
+          title: doc.title,
+          optional: doc.optional,
+          currentVersion: doc.version,
+          accepted: rec?.accepted ?? false,
+          declined: rec?.declined ?? false,
+          signatureName: rec?.signatureName ?? null,
+          acceptedAt: rec?.acceptedAt ?? null,
+          signedVersion: rec?.version ?? null,
+          outdated: !!rec?.accepted && rec.version !== doc.version,
+        };
+      }),
+    };
+  }
+
+  /** Generate the signed PDF for one worker document the worker has accepted. */
+  async agreementPdf(candidateId: string, key: string): Promise<{ buffer: Buffer; filename: string }> {
+    const candidate = await this.prisma.candidate.findUnique({ where: { id: candidateId } });
+    if (!candidate) throw new NotFoundException('Candidate not found');
+    const doc = getWorkerDoc(key);
+    if (!doc) throw new NotFoundException('Unknown document');
+    const record = await this.prisma.candidateAgreement.findUnique({
+      where: { candidateId_docKey: { candidateId, docKey: key } },
+    });
+    if (!record || !record.accepted) {
+      throw new BadRequestException('This worker has not signed this document yet.');
+    }
+
+    const body = record.agreementText || workerAgreementSnapshot(doc);
+    const version = record.version || doc.version;
+    const workerName = `${candidate.firstName} ${candidate.lastName}`.trim();
+    const fmt = (d?: Date | null) =>
+      d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+
+    const ORANGE = '#F47A20', INK = '#0B1F3A', MUTED = '#5A6B82', LINE = '#CBD6E4';
+    const pdf = new PDFDocument({ size: 'A4', margin: 56 });
+    const chunks: Buffer[] = [];
+    pdf.on('data', (c: Buffer) => chunks.push(c));
+    const finished = new Promise<Buffer>((resolve) => pdf.on('end', () => resolve(Buffer.concat(chunks))));
+
+    pdf.fillColor(ORANGE).font('Helvetica-Bold').fontSize(22).text('STARFF');
+    pdf.fillColor(INK).font('Helvetica-Bold').fontSize(15).text(doc.title);
+    pdf.fillColor(MUTED).font('Helvetica').fontSize(9).text(`Document version ${version}`);
+    pdf.moveDown(1.2);
+
+    pdf.fillColor(INK).font('Helvetica-Bold').fontSize(11).text('Worker');
+    pdf.font('Helvetica').fontSize(11).fillColor(INK).text(workerName || '—');
+    pdf.moveDown(1.2);
+
+    // Render the lightweight markdown, auto-paginating across pages.
+    for (const raw of body.split('\n')) {
+      const line = raw.trimEnd();
+      if (!line) { pdf.moveDown(0.45); continue; }
+      if (line.startsWith('### ')) {
+        pdf.moveDown(0.3).font('Helvetica-Bold').fontSize(11).fillColor(INK).text(line.slice(4));
+      } else if (line.startsWith('## ')) {
+        pdf.moveDown(0.5).font('Helvetica-Bold').fontSize(12.5).fillColor(INK).text(line.slice(3));
+      } else if (line.startsWith('# ')) {
+        pdf.moveDown(0.3).font('Helvetica-Bold').fontSize(13.5).fillColor(INK).text(line.slice(2));
+      } else if (line.startsWith('- ')) {
+        pdf.font('Helvetica').fontSize(9.5).fillColor(INK).text('•  ' + line.slice(2), { lineGap: 2, indent: 8 });
+      } else if (line.includes(' | ')) {
+        pdf.font('Helvetica').fontSize(9.5).fillColor(INK).text(line.split(' | ').join('  —  '), { lineGap: 2 });
+      } else {
+        pdf.font('Helvetica').fontSize(9.5).fillColor(INK).text(line, { lineGap: 2 });
+      }
+    }
+    pdf.moveDown(1.2);
+
+    pdf.strokeColor(LINE).moveTo(pdf.page.margins.left, pdf.y).lineTo(pdf.page.width - pdf.page.margins.right, pdf.y).stroke();
+    pdf.moveDown(0.7);
+    pdf.fillColor(INK).font('Helvetica-Bold').fontSize(11).text('Signature');
+    pdf.font('Helvetica').fontSize(11).fillColor(INK).text(`Signed by: ${record.signatureName ?? '—'}`);
+    pdf.fillColor(MUTED).fontSize(10).text(`Date signed: ${fmt(record.acceptedAt)}`);
+    pdf.moveDown(2);
+
+    pdf.fillColor(MUTED).fontSize(8).text(
+      'This document is a record of the agreement accepted electronically by the worker through Starff. ' +
+      'Starff Ltd, registered in England & Wales, company no. 17166246. Registered office: 66 Paul Street, London EC2A 4NA.',
+      { lineGap: 2 },
+    );
+    pdf.fillColor(MUTED).fontSize(8).text(`Generated ${fmt(new Date())}.`);
+
+    pdf.end();
+    const buffer = await finished;
+    const safeName = (workerName || 'worker').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    return { buffer, filename: `${safeName}-${key}.pdf` };
   }
 }

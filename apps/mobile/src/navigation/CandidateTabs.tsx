@@ -28,6 +28,7 @@ import { DocumentsScreen } from '@/screens/candidate/DocumentsScreen';
 import { VettingScreen } from '@/screens/candidate/VettingScreen';
 import { AvailabilityScreen } from '@/screens/candidate/AvailabilityScreen';
 import { DeclarationsScreen } from '@/screens/candidate/DeclarationsScreen';
+import { WorkerDocumentsScreen } from '@/screens/candidate/WorkerDocumentsScreen';
 import { PayrollScreen } from '@/screens/candidate/PayrollScreen';
 import { ProfileEditScreen } from '@/screens/candidate/ProfileEditScreen';
 import { PaymentScreen } from '@/screens/candidate/PaymentScreen';
@@ -67,6 +68,7 @@ function ProfileStack() {
       <ProfileStackNav.Screen name="Documents" component={DocumentsScreen} />
       <ProfileStackNav.Screen name="Availability" component={AvailabilityScreen} />
       <ProfileStackNav.Screen name="Declarations" component={DeclarationsScreen} />
+      <ProfileStackNav.Screen name="WorkerDocuments" component={WorkerDocumentsScreen} />
       <ProfileStackNav.Screen name="Payroll" component={PayrollScreen} />
       <ProfileStackNav.Screen name="Payment" component={PaymentScreen} />
     </ProfileStackNav.Navigator>

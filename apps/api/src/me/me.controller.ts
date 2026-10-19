@@ -136,6 +136,26 @@ export class MeController {
     return this.me.removeReference(user.id, id);
   }
 
+  // ── Worker documents (Terms of Engagement, KID, 48-hour opt-out) ──
+  @Get('documents/terms')
+  workerDocuments(@CurrentUser() user: AuthUser) {
+    return this.me.workerDocuments(user.id);
+  }
+
+  @Post('documents/:key/accept')
+  acceptDocument(
+    @CurrentUser() user: AuthUser,
+    @Param('key') key: string,
+    @Body() dto: { signatureName?: string },
+  ) {
+    return this.me.acceptWorkerDocument(user.id, key, dto?.signatureName);
+  }
+
+  @Post('documents/:key/decline')
+  declineDocument(@CurrentUser() user: AuthUser, @Param('key') key: string) {
+    return this.me.declineWorkerDocument(user.id, key);
+  }
+
   // ── Declarations, consent, agreement & e-signature ──
   @Put('declarations')
   setDeclarations(

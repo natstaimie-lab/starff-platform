@@ -114,6 +114,33 @@ export const candidateApi = {
   /** PUT /me/declarations — GDPR consent, agreement, e-signature. */
   setDeclarations: (input: Record<string, unknown>) =>
     apiFetch('/me/declarations', { method: 'PUT', body: input }),
+
+  /** GET /me/documents/terms — worker documents + this worker's sign status. */
+  workerDocuments: () => apiFetch<{ documents: WorkerDoc[] }>('/me/documents/terms'),
+
+  /** POST /me/documents/:key/accept — e-sign a worker document. */
+  acceptDocument: (key: string, signatureName: string) =>
+    apiFetch(`/me/documents/${key}/accept`, { method: 'POST', body: { signatureName } }),
+
+  /** POST /me/documents/:key/decline — decline an optional document (opt-out). */
+  declineDocument: (key: string) =>
+    apiFetch(`/me/documents/${key}/decline`, { method: 'POST' }),
+};
+
+export type WorkerDoc = {
+  key: string;
+  title: string;
+  optional: boolean;
+  version: string;
+  confirmation: string;
+  text: string;
+  status: {
+    accepted: boolean;
+    declined: boolean;
+    signatureName: string | null;
+    acceptedAt: string | null;
+    outdated: boolean;
+  };
 };
 
 // ── Client / employer (role CLIENT) ───────────────────────────────────────

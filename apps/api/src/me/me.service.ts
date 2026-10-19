@@ -8,6 +8,11 @@ import { ApplicationStatus, Role, ShiftStatus, TimesheetStatus } from '@prisma/c
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AuditService } from '../audit/audit.service';
+import {
+  WORKER_DOCUMENTS,
+  getWorkerDoc,
+  workerAgreementSnapshot,
+} from './worker-documents';
 
 @Injectable()
 export class MeService {
@@ -536,5 +541,103 @@ export class MeService {
     }
 
     return this.prisma.candidate.update({ where: { id: candidate.id }, data });
+  }
+
+  // ── Worker documents (Terms of Engagement, KID, 48-hour opt-out) ──
+
+  /** The documents a worker must read, plus this worker's acceptance status. */
+  async workerDocuments(userId: string) {
+    const candidate = await this.candidateFor(userId);
+    const records = await this.prisma.candidateAgreement.findMany({
+      where: { candidateId: candidate.id },
+    });
+    const byKey = new Map(records.map((r) => [r.docKey, r]));
+    return {
+      documents: WORKER_DOCUMENTS.map((doc) => {
+        const rec = byKey.get(doc.key);
+        return {
+          key: doc.key,
+          title: doc.title,
+          optional: doc.optional,
+          version: doc.version,
+          confirmation: doc.confirmation,
+          text: doc.text,
+          status: {
+            accepted: rec?.accepted ?? false,
+            declined: rec?.declined ?? false,
+            signatureName: rec?.signatureName ?? null,
+            acceptedAt: rec?.acceptedAt ?? null,
+            // worker re-accepts if they signed an older version
+            outdated: !!rec?.accepted && rec.version !== doc.version,
+          },
+        };
+      }),
+    };
+  }
+
+  /** Worker e-signs a document. `signatureName` is their typed signature. */
+  async acceptWorkerDocument(userId: string, key: string, signatureName?: string) {
+    const candidate = await this.candidateFor(userId);
+    const doc = getWorkerDoc(key);
+    if (!doc) throw new NotFoundException('Unknown document');
+    const name = signatureName?.trim();
+    if (!name) throw new BadRequestException('A typed signature (your full name) is required to sign.');
+
+    const now = new Date();
+    const data = {
+      title: doc.title,
+      version: doc.version,
+      accepted: true,
+      declined: false,
+      signatureName: name,
+      agreementText: workerAgreementSnapshot(doc),
+      confirmation: doc.confirmation,
+      acceptedAt: now,
+    };
+    const record = await this.prisma.candidateAgreement.upsert({
+      where: { candidateId_docKey: { candidateId: candidate.id, docKey: doc.key } },
+      update: data,
+      create: { candidateId: candidate.id, docKey: doc.key, ...data },
+    });
+    await this.audit.log({
+      actorId: candidate.userId,
+      action: 'candidate.document.accepted',
+      entity: 'Candidate',
+      entityId: candidate.id,
+      meta: { docKey: doc.key, version: doc.version, signatureName: name },
+    });
+    return { ok: true, key: doc.key, acceptedAt: record.acceptedAt };
+  }
+
+  /** Worker declines an OPTIONAL document (only the 48-hour opt-out). */
+  async declineWorkerDocument(userId: string, key: string) {
+    const candidate = await this.candidateFor(userId);
+    const doc = getWorkerDoc(key);
+    if (!doc) throw new NotFoundException('Unknown document');
+    if (!doc.optional) throw new BadRequestException('This document is required and cannot be declined.');
+
+    const data = {
+      title: doc.title,
+      version: doc.version,
+      accepted: false,
+      declined: true,
+      signatureName: null,
+      agreementText: null,
+      confirmation: doc.confirmation,
+      acceptedAt: null,
+    };
+    await this.prisma.candidateAgreement.upsert({
+      where: { candidateId_docKey: { candidateId: candidate.id, docKey: doc.key } },
+      update: data,
+      create: { candidateId: candidate.id, docKey: doc.key, ...data },
+    });
+    await this.audit.log({
+      actorId: candidate.userId,
+      action: 'candidate.document.declined',
+      entity: 'Candidate',
+      entityId: candidate.id,
+      meta: { docKey: doc.key, version: doc.version },
+    });
+    return { ok: true, key: doc.key };
   }
 }

@@ -7,7 +7,9 @@ import {
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { DocumentStatus, Role } from '@prisma/client';
 import { CandidatesService } from './candidates.service';
@@ -109,6 +111,27 @@ export class CandidatesController {
   @Roles(Role.ADMIN, Role.RECRUITER)
   docUrl(@Param('id') id: string, @Param('docId') docId: string) {
     return this.candidates.documentUrl(id, docId);
+  }
+
+  // Staff — a worker's signed-document status (Terms of Engagement, KID, opt-out).
+  @Get(':id/agreements')
+  @Roles(Role.ADMIN, Role.RECRUITER)
+  agreements(@Param('id') id: string) {
+    return this.candidates.agreements(id);
+  }
+
+  // Staff — download a signed worker document as a PDF.
+  @Get(':id/agreements/:key/pdf')
+  @Roles(Role.ADMIN, Role.RECRUITER)
+  async agreementPdf(
+    @Param('id') id: string,
+    @Param('key') key: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.candidates.agreementPdf(id, key);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
   }
 
   // Archive / restore (soft-delete). Day-to-day staff action — reversible.

@@ -34,6 +34,7 @@ export function CandidateProfileScreen() {
     { icon: 'user', label: 'Personal details', value: me?.phone ?? 'Add phone', to: 'ProfileEdit' },
     { icon: 'calendar', label: 'Availability', value: `${me?.availability?.length ?? 0} days set`, to: 'Availability' },
     { icon: 'writing-sign', label: 'Agreements & signature', value: 'Consent & e-signature', to: 'Declarations' },
+    { icon: 'file-text', label: 'Worker documents', value: 'Terms, Key Info, opt-out', to: 'WorkerDocuments' },
     { icon: 'coin', label: 'Earnings', value: 'From approved hours', to: 'Payroll' },
     { icon: 'credit-card', label: 'Payment details', value: (me as any)?.bankAccountNumber ? `••••${String((me as any).bankAccountNumber).slice(-4)}` : 'Add bank details', to: 'Payment' },
   ] as const;

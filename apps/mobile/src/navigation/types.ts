@@ -28,6 +28,7 @@ export type ProfileStackParamList = {
   Documents: undefined;
   Availability: undefined;
   Declarations: undefined;
+  WorkerDocuments: undefined;
   Payroll: undefined;
   Payment: undefined;
 };
