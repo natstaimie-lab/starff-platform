@@ -1,10 +1,11 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { AppBar, ActionButton, ScreenScroll } from '@/components/Screen';
 import { Card, Pill, Muted, SecHead, LoadingState, ErrorState, EmptyState } from '@/components/ui';
 import { Avatar, WeekStrip } from '@/components/cards';
-import { colors } from '@/theme/tokens';
+import { Icon } from '@/components/Icon';
+import { colors, radius } from '@/theme/tokens';
 import { useApi } from '@/lib/useApi';
 import { candidateApi } from '@/lib/endpoints';
 import type { Timesheet, TimesheetStatus } from '@/lib/types';
@@ -34,6 +35,18 @@ export function CandidateHoursScreen() {
   const todayDow = new Date().getDay();
   const week = order.map((d) => ({ dn: DOW[d], dd: '', hours: byDay.get(d) ?? 0, today: d === todayDow }));
 
+  // Shortcut to the real day-selection screen (lives under the Profile tab).
+  const AvailabilityShortcut = () => (
+    <Pressable style={styles.availRow} onPress={() => nav.navigate('Profile', { screen: 'Availability', initial: false })}>
+      <View style={styles.availIcon}><Icon name="calendar" size={18} color={colors.orange} /></View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.availTitle}>Set your availability</Text>
+        <Muted>Choose the days you can work</Muted>
+      </View>
+      <Icon name="chevron-right" size={18} color={colors.textFaint} />
+    </Pressable>
+  );
+
   return (
     <View style={styles.root}>
       <AppBar
@@ -46,37 +59,44 @@ export function CandidateHoursScreen() {
           <LoadingState />
         ) : error ? (
           <ErrorState message={error} onRetry={reload} />
-        ) : timesheets.length === 0 ? (
-          <EmptyState icon="clock" title="No timesheets yet" subtitle="Once you complete a shift you can submit your hours here for approval." />
         ) : (
           <>
-            <WeekStrip days={week} />
+            <AvailabilityShortcut />
 
-            <Card tight>
-              <SecHead title="This period" />
-              <View style={{ marginTop: 8 }}>
-                {timesheets.map((t: Timesheet) => (
-                  <View key={t.id} style={styles.tsRow}>
-                    <Avatar initials={initials(t.shift?.job?.client?.name)} tone="orange" size={36} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.role}>{t.shift?.job?.title ?? 'Shift'}</Text>
-                      <Muted>{t.shift?.startAt ? formatDate(t.shift.startAt) : ''}</Muted>
-                    </View>
-                    <View style={{ alignItems: 'flex-end', gap: 3 }}>
-                      <Text style={styles.hrs}>{Number(t.hoursWorked ?? 0).toFixed(1)} hrs</Text>
-                      <Pill kind={TS_PILL[t.status] ?? 'gray'}>{label(t.status)}</Pill>
-                    </View>
+            {timesheets.length === 0 ? (
+              <EmptyState icon="clock" title="No timesheets yet" subtitle="Once you complete a shift you can submit your hours here for approval." />
+            ) : (
+              <>
+                <Text style={styles.stripLabel}>Hours worked this week</Text>
+                <WeekStrip days={week} />
+
+                <Card tight>
+                  <SecHead title="This period" />
+                  <View style={{ marginTop: 8 }}>
+                    {timesheets.map((t: Timesheet) => (
+                      <View key={t.id} style={styles.tsRow}>
+                        <Avatar initials={initials(t.shift?.job?.client?.name)} tone="orange" size={36} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.role}>{t.shift?.job?.title ?? 'Shift'}</Text>
+                          <Muted>{t.shift?.startAt ? formatDate(t.shift.startAt) : ''}</Muted>
+                        </View>
+                        <View style={{ alignItems: 'flex-end', gap: 3 }}>
+                          <Text style={styles.hrs}>{Number(t.hoursWorked ?? 0).toFixed(1)} hrs</Text>
+                          <Pill kind={TS_PILL[t.status] ?? 'gray'}>{label(t.status)}</Pill>
+                        </View>
+                      </View>
+                    ))}
                   </View>
-                ))}
-              </View>
-            </Card>
+                </Card>
 
-            <Card tight>
-              <PayRow label="Hours logged" value={`${totalHours.toFixed(1)} hrs`} />
-              <PayRow label="Est. pay" value={`£${totalPay.toFixed(2)}`} />
-              <PayRow label="Holiday pay 12.07%" value={`£${holiday.toFixed(2)}`} />
-              <PayRow label="Total gross" value={`£${(totalPay + holiday).toFixed(2)}`} strong />
-            </Card>
+                <Card tight>
+                  <PayRow label="Hours logged" value={`${totalHours.toFixed(1)} hrs`} />
+                  <PayRow label="Est. pay" value={`£${totalPay.toFixed(2)}`} />
+                  <PayRow label="Holiday pay 12.07%" value={`£${holiday.toFixed(2)}`} />
+                  <PayRow label="Total gross" value={`£${(totalPay + holiday).toFixed(2)}`} strong />
+                </Card>
+              </>
+            )}
           </>
         )}
       </ScreenScroll>
@@ -106,6 +126,20 @@ function formatDate(iso: string) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  availRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.control, padding: 12, marginBottom: 14,
+  },
+  availIcon: {
+    width: 38, height: 38, borderRadius: 10, backgroundColor: colors.orangeBg,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  availTitle: { fontSize: 13.5, fontWeight: '700', color: colors.text },
+  stripLabel: {
+    fontSize: 11, fontWeight: '700', color: colors.textMuted,
+    textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8,
+  },
   tsRow: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.border },
   role: { fontSize: 13, fontWeight: '700', color: colors.text },
   hrs: { fontSize: 13, fontWeight: '700', color: colors.orange },
