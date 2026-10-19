@@ -17,12 +17,19 @@ type Contact = { id: string; firstName: string; lastName: string; email: string;
 const inputStyle: React.CSSProperties = { width: '100%', height: 40, padding: '0 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', fontSize: 14, outline: 'none' };
 const errStyle: React.CSSProperties = { color: 'var(--error-600)', fontSize: 12, marginTop: 4 };
 const emailBad = (v: string) => !!v.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
-const AGREEMENT = [
-  'The information provided about our company is accurate and we are authorised to enter this agreement.',
-  'We will provide a safe working environment and site induction for workers Starff places with us.',
-  'We agree to Starff’s terms of business, including charge rates and payment terms once confirmed.',
-  'We will approve timesheets promptly and settle invoices within the agreed payment terms.',
-];
+// Render the lightweight markdown the API serves (# headings, - bullets, "a | b" rows).
+function renderTerms(text: string) {
+  return text.split('\n').map((raw, i) => {
+    const line = raw.trimEnd();
+    if (!line) return <div key={i} style={{ height: 6 }} />;
+    if (line.startsWith('### ')) return <div key={i} style={{ fontWeight: 700, fontSize: 13, marginTop: 8 }}>{line.slice(4)}</div>;
+    if (line.startsWith('## ')) return <div key={i} style={{ fontWeight: 800, fontSize: 14, marginTop: 12 }}>{line.slice(3)}</div>;
+    if (line.startsWith('# ')) return <div key={i} style={{ fontWeight: 800, fontSize: 15, marginTop: 4 }}>{line.slice(2)}</div>;
+    if (line.startsWith('- ')) return <div key={i} style={{ display: 'flex', gap: 8, marginTop: 3 }}><span>•</span><span>{line.slice(2)}</span></div>;
+    if (line.includes(' | ')) { const cells = line.split(' | '); return <div key={i} style={{ display: 'flex', gap: 10, marginTop: 3 }}><span style={{ fontWeight: 600, minWidth: 150 }}>{cells[0]}</span><span>{cells.slice(1).join(' ')}</span></div>; }
+    return <p key={i} style={{ margin: '4px 0' }}>{line}</p>;
+  });
+}
 
 export default function CompanySetupPage() {
   const [c, setC] = useState<Client | null>(null);
@@ -38,6 +45,7 @@ export default function CompanySetupPage() {
   const [savingA, setSavingA] = useState(false);
   const [savedA, setSavedA] = useState(false);
   const [error, setError] = useState('');
+  const [terms, setTerms] = useState<{ version: string; text: string } | null>(null);
 
   const load = () => {
     apiFetch<{ client: Client }>('/client/me').then(({ client }) => {
@@ -52,6 +60,7 @@ export default function CompanySetupPage() {
     }).catch((e) => setError(e.message));
     apiFetch<Loc[]>('/client/locations').then(setLocs).catch(() => {});
     apiFetch<Contact[]>('/client/contacts').then(setContacts).catch(() => {});
+    apiFetch<{ version: string; text: string }>('/client/terms').then(setTerms).catch(() => {});
   };
   useEffect(() => { load(); }, []);
 
@@ -151,14 +160,13 @@ export default function CompanySetupPage() {
       </Card>
 
       <Card title="Terms & agreement" subtitle="Please read, then sign to confirm.">
-        <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '12px 14px', background: 'var(--surface-sunken, #f6f8fb)', marginBottom: 14 }}>
-          <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {AGREEMENT.map((t, i) => <li key={i} style={{ fontSize: 13.5, lineHeight: 1.5 }}>{t}</li>)}
-          </ul>
+        <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '14px 16px', background: 'var(--surface-sunken, #f6f8fb)', marginBottom: 6, maxHeight: 360, overflowY: 'auto', fontSize: 12.5, lineHeight: 1.55, color: 'var(--text-primary, #0B1F3A)' }}>
+          {terms ? renderTerms(terms.text) : <p className="dim" style={{ fontSize: 13 }}>Loading the terms…</p>}
         </div>
+        {terms && <p className="dim" style={{ fontSize: 11.5, marginBottom: 14 }}>Terms of Business version {terms.version} — please scroll and read in full before accepting.</p>}
         <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 14, marginBottom: 12 }}>
           <input type="checkbox" checked={agree} onChange={(e) => { setAgree(e.target.checked); setSavedA(false); }} style={{ marginTop: 3 }} />
-          <span>I am authorised to accept Starff’s terms of business on behalf of {c.name}.</span>
+          <span>I have read and I accept these Terms of Business, and I am authorised to accept them on behalf of {c.name}.</span>
         </label>
         <label style={{ display: 'block' }}>
           <span style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 5 }}>Type your full name to sign</span>

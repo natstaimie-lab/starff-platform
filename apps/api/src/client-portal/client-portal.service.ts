@@ -811,6 +811,11 @@ export class ClientPortalService {
     });
   }
 
+  /** The current Terms of Business the client must accept (for the portal to display). */
+  getAgreementTerms() {
+    return { version: CLIENT_AGREEMENT.version, title: CLIENT_AGREEMENT.title, text: CLIENT_AGREEMENT.text };
+  }
+
   // ── Onboarding: agreement & e-signature (with genuine timestamps) ──
   async setAgreement(userId: string, dto: { agreementAccepted?: boolean; signatureName?: string }) {
     const { client } = await this.clientFor(userId);

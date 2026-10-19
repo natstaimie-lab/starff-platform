@@ -201,6 +201,13 @@ export class ClientPortalController {
     return this.svc.updateProfile(u.id, dto);
   }
 
+  // The Terms of Business text to display before the client accepts.
+  @Get('terms')
+  @Roles()
+  terms() {
+    return this.svc.getAgreementTerms();
+  }
+
   @Put('agreement')
   setAgreement(@CurrentUser() u: AuthUser, @Body() dto: { agreementAccepted?: boolean; signatureName?: string }) {
     return this.svc.setAgreement(u.id, dto);

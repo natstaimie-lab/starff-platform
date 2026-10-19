@@ -94,9 +94,25 @@ export class ClientsService {
     if (addr) doc.fillColor(MUTED).fontSize(10).text(addr);
     doc.moveDown(1.2);
 
-    doc.fillColor(INK).font('Helvetica-Bold').fontSize(11).text('Terms accepted');
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(10.5).fillColor(INK).text(body, { lineGap: 3 });
+    // Render the lightweight markdown (headings / bullets / "a | b" table rows),
+    // letting pdfkit auto-paginate across as many pages as the terms need.
+    for (const raw of body.split('\n')) {
+      const line = raw.trimEnd();
+      if (!line) { doc.moveDown(0.45); continue; }
+      if (line.startsWith('### ')) {
+        doc.moveDown(0.3).font('Helvetica-Bold').fontSize(11).fillColor(INK).text(line.slice(4));
+      } else if (line.startsWith('## ')) {
+        doc.moveDown(0.5).font('Helvetica-Bold').fontSize(12.5).fillColor(INK).text(line.slice(3));
+      } else if (line.startsWith('# ')) {
+        doc.moveDown(0.3).font('Helvetica-Bold').fontSize(13.5).fillColor(INK).text(line.slice(2));
+      } else if (line.startsWith('- ')) {
+        doc.font('Helvetica').fontSize(9.5).fillColor(INK).text('•  ' + line.slice(2), { lineGap: 2, indent: 8 });
+      } else if (line.includes(' | ')) {
+        doc.font('Helvetica').fontSize(9.5).fillColor(INK).text(line.split(' | ').join('  —  '), { lineGap: 2 });
+      } else {
+        doc.font('Helvetica').fontSize(9.5).fillColor(INK).text(line, { lineGap: 2 });
+      }
+    }
     doc.moveDown(1.2);
 
     doc.strokeColor(LINE).moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).stroke();
