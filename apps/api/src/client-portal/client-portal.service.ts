@@ -10,6 +10,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { AuditService } from '../audit/audit.service';
 import { ReliabilityService } from '../reliability/reliability.service';
 import { RatingsService } from '../ratings/ratings.service';
+import { CLIENT_AGREEMENT, clientAgreementSnapshot } from './client-agreement';
 
 @Injectable()
 export class ClientPortalService {
@@ -818,6 +819,11 @@ export class ClientPortalService {
     if (dto.agreementAccepted !== undefined) {
       data.agreementAccepted = !!dto.agreementAccepted;
       data.agreementAcceptedAt = dto.agreementAccepted ? (client.agreementAcceptedAt ?? now) : null;
+      // Snapshot the exact terms wording + version at the moment of acceptance.
+      if (dto.agreementAccepted) {
+        data.agreementText = clientAgreementSnapshot(client.name);
+        data.agreementVersion = CLIENT_AGREEMENT.version;
+      }
     }
     if (dto.signatureName !== undefined) {
       const name = dto.signatureName?.trim() || null;

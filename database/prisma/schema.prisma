@@ -395,6 +395,8 @@ model Client {
   agreementAcceptedAt DateTime?
   signatureName       String?         // typed e-signature (authorised signatory)
   signedAt            DateTime?
+  agreementText       String?         @db.Text // snapshot of the exact terms accepted at sign-time
+  agreementVersion    String?                  // version id of the terms that were accepted
 
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt

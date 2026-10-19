@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto, ClientContactDto } from './dto/update-client.dto';
 import { RegistrationService } from '../registration/registration.service';
+import { CLIENT_AGREEMENT, clientAgreementSnapshot } from '../client-portal/client-agreement';
+import PDFDocument from 'pdfkit';
 
 @Injectable()
 export class ClientsService {
@@ -56,6 +58,66 @@ export class ClientsService {
     });
     if (!client) throw new NotFoundException('Client not found');
     return client;
+  }
+
+  /**
+   * Generate a signed Terms of Business PDF for a client who has accepted.
+   * Uses the exact wording snapshotted at sign-time (falling back to the current
+   * wording for clients who accepted before snapshots were stored).
+   */
+  async agreementPdf(id: string): Promise<{ buffer: Buffer; filename: string }> {
+    const client = await this.prisma.client.findUnique({ where: { id } });
+    if (!client) throw new NotFoundException('Client not found');
+    if (!client.agreementAccepted) {
+      throw new BadRequestException('This client has not accepted the agreement yet.');
+    }
+    const body = client.agreementText || clientAgreementSnapshot(client.name);
+    const version = client.agreementVersion || CLIENT_AGREEMENT.version;
+    const fmt = (d?: Date | null) =>
+      d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+
+    const ORANGE = '#F47A20', INK = '#0B1F3A', MUTED = '#5A6B82', LINE = '#CBD6E4';
+    const doc = new PDFDocument({ size: 'A4', margin: 56 });
+    const chunks: Buffer[] = [];
+    doc.on('data', (c: Buffer) => chunks.push(c));
+    const done = new Promise<Buffer>((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
+
+    doc.fillColor(ORANGE).font('Helvetica-Bold').fontSize(22).text('STARFF');
+    doc.fillColor(INK).font('Helvetica-Bold').fontSize(15).text('Client Terms of Business Agreement');
+    doc.fillColor(MUTED).font('Helvetica').fontSize(9).text(`Agreement version ${version}`);
+    doc.moveDown(1.2);
+
+    doc.fillColor(INK).font('Helvetica-Bold').fontSize(11).text('Client');
+    doc.font('Helvetica').fontSize(11).fillColor(INK).text(client.name);
+    if (client.companyRegNo) doc.fillColor(MUTED).fontSize(10).text(`Company reg. no. ${client.companyRegNo}`);
+    const addr = [client.addressLine1, client.city, client.postcode].filter(Boolean).join(', ');
+    if (addr) doc.fillColor(MUTED).fontSize(10).text(addr);
+    doc.moveDown(1.2);
+
+    doc.fillColor(INK).font('Helvetica-Bold').fontSize(11).text('Terms accepted');
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(10.5).fillColor(INK).text(body, { lineGap: 3 });
+    doc.moveDown(1.2);
+
+    doc.strokeColor(LINE).moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).stroke();
+    doc.moveDown(0.7);
+    doc.fillColor(INK).font('Helvetica-Bold').fontSize(11).text('Signature');
+    doc.font('Helvetica').fontSize(11).fillColor(INK).text(`Signed by: ${client.signatureName ?? '—'}`);
+    doc.fillColor(MUTED).fontSize(10).text(`Date signed: ${fmt(client.signedAt)}`);
+    doc.fillColor(MUTED).fontSize(10).text(`Agreement accepted: ${fmt(client.agreementAcceptedAt)}`);
+    doc.moveDown(2);
+
+    doc.fillColor(MUTED).fontSize(8).text(
+      'This document is a record of the agreement accepted electronically through the Starff client portal. ' +
+      'Starff Ltd, registered in England & Wales, company no. 17166246. Registered office: 66 Paul Street, London EC2A 4NA.',
+      { lineGap: 2 },
+    );
+    doc.fillColor(MUTED).fontSize(8).text(`Generated ${fmt(new Date())}.`);
+
+    doc.end();
+    const buffer = await done;
+    const safe = client.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'client';
+    return { buffer, filename: `starff-agreement-${safe}.pdf` };
   }
 
   /** Admin edit of the company record. Partial update. */

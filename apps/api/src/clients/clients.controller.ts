@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { ClientsService } from './clients.service';
@@ -26,6 +27,18 @@ export class ClientsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.clients.findOne(id);
+  }
+
+  // Download the client's signed Terms of Business as a PDF.
+  @Get(':id/agreement/pdf')
+  async agreementPdf(@Param('id') id: string, @Res() res: Response) {
+    const { buffer, filename } = await this.clients.agreementPdf(id);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': String(buffer.length),
+    });
+    res.end(buffer);
   }
 
   // Edit the company record.

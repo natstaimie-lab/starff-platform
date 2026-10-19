@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
+import { supabase } from '@/lib/supabaseClient';
 import { useRole } from '@/lib/useRole';
 import { Card, Avatar, Badge } from '@/components/ui';
 import { Modal, Field, TextInput, SelectInput, Button } from '@/components/Modal';
@@ -48,8 +49,28 @@ export default function ClientProfile() {
   const [contact, setContact] = useState({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', sendInvite: false });
   const [savingContact, setSavingContact] = useState(false);
   const [busyContact, setBusyContact] = useState<string | null>(null);
+  const [dlAgreement, setDlAgreement] = useState(false);
 
   const load = () => apiFetch<Client>(`/clients/${id}`).then(setC).catch((e) => setError(e.message));
+
+  async function downloadAgreement() {
+    if (!c) return;
+    setDlAgreement(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/clients/${id}/agreement/pdf`, {
+        headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
+      });
+      if (!res.ok) throw new Error('Could not generate the agreement PDF.');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `starff-agreement-${c.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) { alert(e.message); } finally { setDlAgreement(false); }
+  }
   useEffect(() => { load(); }, [id]);
 
   const CO_FIELDS = ['name', 'industry', 'companyRegNo', 'addressLine1', 'city', 'postcode', 'billingEmail', 'paymentTerms'] as const;
@@ -184,6 +205,15 @@ export default function ClientProfile() {
           <Card title="Terms & agreement">
             <Row k="Terms accepted" v={c.agreementAccepted ? <Badge tone="success">Accepted {fmt(c.agreementAcceptedAt)}</Badge> : <span className="dim">Not accepted</span>} />
             <Row k="Signature" v={c.signatureName ? `${c.signatureName} · ${fmt(c.signedAt)}` : '—'} />
+            {c.agreementAccepted && (
+              <button
+                onClick={downloadAgreement}
+                disabled={dlAgreement}
+                style={{ marginTop: 12, width: '100%', border: '1px solid var(--border-strong)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 13, padding: '9px 12px', borderRadius: 10, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+              >
+                <Ic.FileText width={15} /> {dlAgreement ? 'Preparing…' : 'Download signed agreement (PDF)'}
+              </button>
+            )}
           </Card>
         </div>
 
