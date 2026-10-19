@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { createClient } from '@supabase/supabase-js';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClientDto } from './dto/create-client.dto';
-import { UpdateClientDto, ClientContactDto } from './dto/update-client.dto';
+import { UpdateClientDto, ClientContactDto, ClientSiteDto } from './dto/update-client.dto';
 import { RegistrationService } from '../registration/registration.service';
 import { CLIENT_AGREEMENT, clientAgreementSnapshot } from '../client-portal/client-agreement';
 import PDFDocument from 'pdfkit';
@@ -128,6 +128,31 @@ export class ClientsService {
       throw new BadRequestException('Company name cannot be empty.');
     }
     return this.prisma.client.update({ where: { id }, data: dto });
+  }
+
+  /** Add a hiring location / site to a client. */
+  async addLocation(id: string, dto: ClientSiteDto) {
+    const client = await this.prisma.client.findUnique({ where: { id } });
+    if (!client) throw new NotFoundException('Client not found');
+    if (!dto.name?.trim()) throw new BadRequestException('Location name is required.');
+    return this.prisma.clientSite.create({
+      data: { clientId: id, name: dto.name.trim(), addressLine1: dto.addressLine1, city: dto.city, postcode: dto.postcode },
+    });
+  }
+
+  /** Remove a hiring location — blocked if any bookings are tied to it. */
+  async removeLocation(id: string, siteId: string) {
+    const site = await this.prisma.clientSite.findFirst({ where: { id: siteId, clientId: id } });
+    if (!site) throw new NotFoundException('Location not found');
+    const [jobs, shifts] = await Promise.all([
+      this.prisma.job.count({ where: { siteId } }),
+      this.prisma.shift.count({ where: { siteId } }),
+    ]);
+    if (jobs > 0 || shifts > 0) {
+      throw new BadRequestException('This location has bookings linked to it and cannot be removed.');
+    }
+    await this.prisma.clientSite.delete({ where: { id: siteId } });
+    return { removed: true };
   }
 
   /** Add an authorised contact to a client; optionally invite them to the portal. */

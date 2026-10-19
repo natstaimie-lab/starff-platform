@@ -68,3 +68,21 @@ export class ClientContactDto {
   @IsOptional()
   sendInvite?: boolean;
 }
+
+/** Admin add of a client hiring location / site. */
+export class ClientSiteDto {
+  @IsString()
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  addressLine1?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  postcode?: string;
+}

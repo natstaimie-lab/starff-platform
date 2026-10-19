@@ -50,6 +50,10 @@ export default function ClientProfile() {
   const [savingContact, setSavingContact] = useState(false);
   const [busyContact, setBusyContact] = useState<string | null>(null);
   const [dlAgreement, setDlAgreement] = useState(false);
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [location, setLocation] = useState({ name: '', addressLine1: '', city: '', postcode: '' });
+  const [savingLocation, setSavingLocation] = useState(false);
+  const [busyLocation, setBusyLocation] = useState<string | null>(null);
 
   const load = () => apiFetch<Client>(`/clients/${id}`).then(setC).catch((e) => setError(e.message));
 
@@ -105,6 +109,20 @@ export default function ClientProfile() {
     setBusyContact(ctId);
     try { await apiFetch(`/clients/${id}/contacts/${ctId}/invite`, { method: 'POST' }); await load(); alert('Invite sent.'); }
     catch (e: any) { alert(e.message); } finally { setBusyContact(null); }
+  }
+  async function addLocation() {
+    if (!location.name.trim()) return;
+    setSavingLocation(true); setError('');
+    try {
+      await apiFetch(`/clients/${id}/locations`, { method: 'POST', body: JSON.stringify(location) });
+      setLocationOpen(false); setLocation({ name: '', addressLine1: '', city: '', postcode: '' }); await load();
+    } catch (e: any) { setError(e.message); } finally { setSavingLocation(false); }
+  }
+  async function removeLocation(siteId: string) {
+    if (!confirm('Remove this hiring location?')) return;
+    setBusyLocation(siteId);
+    try { await apiFetch(`/clients/${id}/locations/${siteId}`, { method: 'DELETE' }); await load(); }
+    catch (e: any) { alert(e.message); } finally { setBusyLocation(null); }
   }
   async function removeContact(ctId: string) {
     if (!confirm('Remove this contact and their portal login? This cannot be undone for that person.')) return;
@@ -174,11 +192,17 @@ export default function ClientProfile() {
             <Row k="Source" v={c.registrationSource ?? '—'} />
           </Card>
 
-          <Card title={`Hiring locations (${c.sites.length})`}>
+          <Card
+            title={`Hiring locations (${c.sites.length})`}
+            action={<button onClick={() => setLocationOpen(true)} style={{ border: '1px solid var(--border-strong)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12.5, padding: '6px 10px', borderRadius: 9, cursor: 'pointer' }}>+ Add location</button>}
+          >
             {c.sites.length === 0 ? <p className="dim" style={{ fontSize: 13.5 }}>None added.</p> : c.sites.map((s) => (
-              <div key={s.id} style={{ padding: '9px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                <div className="nm">{s.name}</div>
-                <div className="sub2">{[s.addressLine1, s.city, s.postcode].filter(Boolean).join(', ') || '—'}</div>
+              <div key={s.id} className="fx ac jb" style={{ padding: '9px 0', borderBottom: '1px solid var(--border-subtle)', gap: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div className="nm">{s.name}</div>
+                  <div className="sub2">{[s.addressLine1, s.city, s.postcode].filter(Boolean).join(', ') || '—'}</div>
+                </div>
+                <button disabled={busyLocation === s.id} onClick={() => removeLocation(s.id)} style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--error-600)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap' }}>Remove</button>
               </div>
             ))}
           </Card>
@@ -311,6 +335,25 @@ export default function ClientProfile() {
             <input type="checkbox" checked={contact.sendInvite} onChange={(e) => setContact({ ...contact, sendInvite: e.target.checked })} style={{ marginTop: 2 }} />
             <span>Email them a portal invite now<br /><span className="dim" style={{ fontSize: 12 }}>Secure set-password link to the client portal. Leave unticked to record them only — you can invite later.</span></span>
           </label>
+        </Modal>
+      )}
+
+      {locationOpen && (
+        <Modal
+          title="Add hiring location"
+          subtitle="A site where this client books staff"
+          onClose={() => setLocationOpen(false)}
+          footer={<>
+            <Button variant="outline" onClick={() => setLocationOpen(false)}>Cancel</Button>
+            <Button onClick={addLocation} disabled={savingLocation || !location.name.trim()}>{savingLocation ? 'Saving…' : 'Add location'}</Button>
+          </>}
+        >
+          <Field label="Location name"><TextInput value={location.name} onChange={(e) => setLocation({ ...location, name: e.target.value })} placeholder="Birmingham Depot" /></Field>
+          <Field label="Address line 1"><TextInput value={location.addressLine1} onChange={(e) => setLocation({ ...location, addressLine1: e.target.value })} /></Field>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="City"><TextInput value={location.city} onChange={(e) => setLocation({ ...location, city: e.target.value })} /></Field>
+            <Field label="Postcode"><TextInput value={location.postcode} onChange={(e) => setLocation({ ...location, postcode: e.target.value })} /></Field>
+          </div>
         </Modal>
       )}
     </div>

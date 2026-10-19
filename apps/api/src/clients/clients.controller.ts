@@ -4,7 +4,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { ClientsService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
-import { UpdateClientDto, ClientContactDto } from './dto/update-client.dto';
+import { UpdateClientDto, ClientContactDto, ClientSiteDto } from './dto/update-client.dto';
 import { Roles } from '../auth/roles.decorator';
 
 @ApiTags('clients')
@@ -66,6 +66,17 @@ export class ClientsController {
   @Delete(':id/contacts/:contactId')
   removeContact(@Param('id') id: string, @Param('contactId') contactId: string) {
     return this.clients.removeContact(id, contactId);
+  }
+
+  // ── Hiring locations (sites) ──
+  @Post(':id/locations')
+  addLocation(@Param('id') id: string, @Body() dto: ClientSiteDto) {
+    return this.clients.addLocation(id, dto);
+  }
+
+  @Delete(':id/locations/:siteId')
+  removeLocation(@Param('id') id: string, @Param('siteId') siteId: string) {
+    return this.clients.removeLocation(id, siteId);
   }
 
   // Archive / restore (soft-delete). Day-to-day staff action — reversible.
