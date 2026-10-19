@@ -15,11 +15,9 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
-# Secrets — never commit real environment files
-.env
-.env.local
-.env.staging
-.env.production
+# Secrets — never commit real environment files (incl. .bak backups)
+.env*
+!.env.example
 
 # macOS
 .DS_Store
