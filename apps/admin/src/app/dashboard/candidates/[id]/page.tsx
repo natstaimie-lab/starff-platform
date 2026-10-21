@@ -77,6 +77,8 @@ export default function CandidateProfile() {
 
   const [agreements, setAgreements] = useState<WorkerAgreement[]>([]);
   const [dlDoc, setDlDoc] = useState<string | null>(null);
+  const [docUrls, setDocUrls] = useState<Record<string, string>>({});
+  const [lightbox, setLightbox] = useState<string | null>(null);
 
   const load = () => apiFetch<Candidate>(`/candidates/${id}`).then(setC).catch((e) => setError(e.message));
   const loadAgreements = () =>
@@ -84,6 +86,23 @@ export default function CandidateProfile() {
       .then((r) => setAgreements(r.documents))
       .catch(() => setAgreements([]));
   useEffect(() => { load(); loadAgreements(); }, [id]);
+
+  // Fetch a short-lived signed URL for each document so we can preview them inline.
+  const docIds = (c?.documents ?? []).map((d) => d.id).join(',');
+  useEffect(() => {
+    const docs = c?.documents ?? [];
+    if (!docs.length) return;
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(docs.map(async (d) => {
+        try { const { url } = await apiFetch<{ url: string }>(`/candidates/${id}/documents/${d.id}/url`); return [d.id, url] as const; }
+        catch { return [d.id, ''] as const; }
+      }));
+      if (!cancelled) setDocUrls(Object.fromEntries(entries));
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docIds, id]);
 
   async function downloadDoc(key: string, name: string) {
     setDlDoc(key);
@@ -187,6 +206,19 @@ export default function CandidateProfile() {
   const pct = Math.round((verifiedCount / REQUIRED.length) * 100);
   const extras = c.documents.filter((d) => !REQUIRED.some((r) => r.type === d.type));
 
+  const isPdf = (name?: string) => (name ?? '').toLowerCase().endsWith('.pdf');
+  // Inline preview tile: image thumbnail (click to enlarge) or a PDF tile (click to open).
+  const DocThumb = ({ d }: { d: Doc }) => {
+    const url = docUrls[d.id];
+    const box: React.CSSProperties = { width: 52, height: 52, borderRadius: 8, border: '1px solid var(--border-subtle)', flexShrink: 0 };
+    if (!url) return <div style={{ ...box, background: 'var(--surface-sunken)' }} />;
+    if (isPdf(d.fileName)) return (
+      <button onClick={() => window.open(url, '_blank')} title="Open PDF" style={{ ...box, background: 'var(--surface-sunken)', color: 'var(--text-secondary)', fontSize: 10, fontWeight: 800, cursor: 'pointer' }}>PDF</button>
+    );
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt={d.fileName ?? d.type} onClick={() => setLightbox(url)} style={{ ...box, objectFit: 'cover', cursor: 'zoom-in' }} />;
+  };
+
   const DocActions = ({ d }: { d: Doc }) => (
     <div style={{ display: 'flex', gap: 6 }}>
       <button onClick={() => view(d.id)} style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>View</button>
@@ -210,9 +242,12 @@ export default function CandidateProfile() {
           {REQUIRED.map((r) => {
             const doc = c.documents.find((d) => d.type === r.type);
             return (
-              <div key={r.type} className="fx ac jb" style={{ padding: '11px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                <div><div className="nm">{r.label}</div><div className="sub2">{doc ? (doc.fileName ?? 'uploaded') : 'Not uploaded'}</div></div>
-                <div className="fx ac" style={{ gap: 10 }}><ComplianceBadge status={docStatus(doc)} />{doc && <DocActions d={doc} />}</div>
+              <div key={r.type} className="fx ac jb" style={{ padding: '11px 0', borderBottom: '1px solid var(--border-subtle)', gap: 10 }}>
+                <div className="fx ac" style={{ gap: 11, minWidth: 0 }}>
+                  {doc && <DocThumb d={doc} />}
+                  <div style={{ minWidth: 0 }}><div className="nm">{r.label}</div><div className="sub2" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc ? (doc.fileName ?? 'uploaded') : 'Not uploaded'}</div></div>
+                </div>
+                <div className="fx ac" style={{ gap: 10, flexShrink: 0 }}><ComplianceBadge status={docStatus(doc)} />{doc && <DocActions d={doc} />}</div>
               </div>
             );
           })}
@@ -220,9 +255,12 @@ export default function CandidateProfile() {
             <>
               <div className="sub2" style={{ marginTop: 14, marginBottom: 6, fontWeight: 700 }}>Other documents</div>
               {extras.map((d) => (
-                <div key={d.id} className="fx ac jb" style={{ padding: '10px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                  <div><div className="nm">{typeLabel[d.type] ?? d.type}</div><div className="sub2">{d.fileName ?? 'uploaded'}</div></div>
-                  <div className="fx ac" style={{ gap: 10 }}><ComplianceBadge status={docStatus(d)} /><DocActions d={d} /></div>
+                <div key={d.id} className="fx ac jb" style={{ padding: '10px 0', borderBottom: '1px solid var(--border-subtle)', gap: 10 }}>
+                  <div className="fx ac" style={{ gap: 11, minWidth: 0 }}>
+                    <DocThumb d={d} />
+                    <div style={{ minWidth: 0 }}><div className="nm">{typeLabel[d.type] ?? d.type}</div><div className="sub2" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fileName ?? 'uploaded'}</div></div>
+                  </div>
+                  <div className="fx ac" style={{ gap: 10, flexShrink: 0 }}><ComplianceBadge status={docStatus(d)} /><DocActions d={d} /></div>
                 </div>
               ))}
             </>
@@ -493,6 +531,13 @@ export default function CandidateProfile() {
           <Field label="Email address"><TextInput type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="worker@email.com" /></Field>
           {inviteMsg && <p style={{ fontSize: 13, color: inviteMsg.startsWith('Invite') ? 'var(--success-600)' : 'var(--error-600)' }}>{inviteMsg}</p>}
         </Modal>
+      )}
+
+      {lightbox && (
+        <div onClick={() => setLightbox(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(11,31,58,0.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, zIndex: 60, cursor: 'zoom-out' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={lightbox} alt="Document" style={{ maxWidth: '92%', maxHeight: '92%', borderRadius: 10, boxShadow: '0 24px 70px rgba(0,0,0,0.45)' }} />
+        </div>
       )}
     </div>
   );
