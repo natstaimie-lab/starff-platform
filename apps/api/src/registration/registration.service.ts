@@ -5,6 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import {
   CandidateStatus,
@@ -769,5 +770,71 @@ export class RegistrationService {
       actionUrl: this.clientPortalUrl(),
     });
     return { submittedAt: updated.submittedAt, status: updated.status, progress };
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // REGISTRATION REMINDERS (recover sign-ups that stall)
+  // ────────────────────────────────────────────────────────────
+
+  /**
+   * Nudge workers who registered but never finished: a "you're nearly there"
+   * email + in-app notification back to the portal. Guard-railed so it can never
+   * spam — at most {@link MAX_REMINDERS} nudges per person, none within 48h of the
+   * last, only to real email addresses, and only once they're a day past sign-up.
+   * Best-effort: a single failure never stops the rest. Returns the count sent.
+   */
+  async sendRegistrationReminders(): Promise<{ reminded: number }> {
+    const MAX_REMINDERS = 3;
+    const now = new Date();
+    const staleAfter = new Date(now.getTime() - 24 * 60 * 60 * 1000); // registered > 24h ago
+    const cooloff = new Date(now.getTime() - 48 * 60 * 60 * 1000); // last nudge > 48h ago
+
+    const candidates = await this.prisma.candidate.findMany({
+      where: {
+        submittedAt: null,
+        archivedAt: null,
+        status: { in: [CandidateStatus.NEW, CandidateStatus.SCREENING] },
+        createdAt: { lte: staleAfter },
+        reminderCount: { lt: MAX_REMINDERS },
+        OR: [{ lastReminderAt: null }, { lastReminderAt: { lte: cooloff } }],
+      },
+      include: { user: { select: { email: true } } },
+      take: 200,
+    });
+
+    let reminded = 0;
+    for (const c of candidates) {
+      const email = c.user?.email;
+      // Skip placeholder logins (walk-ins added without a real address).
+      if (!email || email.endsWith('@candidate.local') || email.endsWith('@placeholder.starff')) continue;
+      await this.notifications
+        .send({
+          to: email,
+          userId: c.userId,
+          kind: 'REGISTRATION_REMINDER',
+          subject: 'Finish your Starff registration',
+          body: `Hi ${c.firstName}, you're nearly there. A few quick steps — your right to work, documents and availability — and we can start matching you to shifts. It only takes a few minutes.`,
+          actionUrl: this.candidatePortalUrl(),
+          actionLabel: 'Finish my registration',
+        })
+        .catch(() => {});
+      await this.prisma.candidate.update({
+        where: { id: c.id },
+        data: { lastReminderAt: now, reminderCount: (c.reminderCount ?? 0) + 1 },
+      });
+      reminded++;
+    }
+    if (reminded) this.logger.log(`Sent ${reminded} registration reminder(s).`);
+    return { reminded };
+  }
+
+  /** Daily at 10:00 London time — nudge stalled registrations. */
+  @Cron('0 10 * * *', { name: 'registration-reminders', timeZone: 'Europe/London' })
+  async runRegistrationRemindersCron(): Promise<void> {
+    try {
+      await this.sendRegistrationReminders();
+    } catch (e) {
+      this.logger.warn(`registration reminder cron failed: ${(e as Error).message}`);
+    }
   }
 }

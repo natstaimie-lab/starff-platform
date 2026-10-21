@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { CandidatesModule } from './candidates/candidates.module';
@@ -35,6 +36,8 @@ import { ReliabilityModule } from './reliability/reliability.module';
     // brute force is stopped. Costlier routes (e.g. the AI assistant) set
     // tighter per-route limits with @Throttle.
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 300 }]),
+    // In-process scheduler for background jobs (e.g. registration reminders).
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuditModule,
     AuthModule,

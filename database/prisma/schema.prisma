@@ -218,6 +218,8 @@ model Candidate {
   registrationSource RegistrationSource? // where they first registered
   submittedAt        DateTime?           // set when they submit for review
   archivedAt         DateTime?           // soft-delete: hidden from lists, recoverable
+  lastReminderAt     DateTime?           // last "finish your registration" nudge sent
+  reminderCount      Int       @default(0) // how many nudges sent (capped)
 
   // ── Phase 2 onboarding: emergency contact ──
   emergencyName          String?

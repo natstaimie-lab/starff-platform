@@ -93,4 +93,12 @@ export class RegistrationController {
   ) {
     return this.registration.reviewClient(id, dto.action, dto.note);
   }
+
+  // Staff — run the "finish your registration" nudge now, on demand. (It also
+  // runs automatically every morning.) Returns how many reminders were sent.
+  @Post('reminders/run')
+  @Roles(Role.ADMIN, Role.RECRUITER)
+  runReminders() {
+    return this.registration.sendRegistrationReminders();
+  }
 }
