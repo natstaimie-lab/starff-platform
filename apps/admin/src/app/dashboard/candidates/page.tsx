@@ -51,9 +51,24 @@ export default function CandidatesPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
+  const [chasing, setChasing] = useState(false);
 
   const load = () => apiFetch<Candidate[]>('/candidates').then(setRows).catch((e) => setError(e.message)).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
+
+  // Nudge everyone who registered but never finished (same rules as the daily
+  // auto-reminder: 24h+ old, not submitted, capped at 3, one per 48h).
+  async function chaseIncomplete() {
+    setChasing(true);
+    try {
+      const { reminded } = await apiFetch<{ reminded: number }>('/registration/reminders/run', { method: 'POST' });
+      alert(reminded > 0
+        ? `Sent ${reminded} reminder${reminded === 1 ? '' : 's'} to workers who haven't finished registering.`
+        : 'No reminders to send right now — everyone eligible has been nudged recently (or has finished).');
+    } catch (e: any) {
+      alert(e?.message || 'Could not send reminders.');
+    } finally { setChasing(false); }
+  }
 
   async function save() {
     if (!form.firstName.trim() || !form.lastName.trim()) return;
@@ -92,9 +107,14 @@ export default function CandidatesPage() {
     <Card
       title="Candidates"
       action={
-        <button className="aibtn" style={{ background: 'var(--blue-500)', color: '#fff', border: 'none' }} onClick={() => setOpen(true)}>
-          <Ic.Plus width={16} /> Add Candidate
-        </button>
+        <span style={{ display: 'inline-flex', gap: 8 }}>
+          <button className="aibtn" style={{ background: 'var(--surface-card)', color: 'var(--text-secondary)', border: '1px solid var(--border-strong)' }} onClick={chaseIncomplete} disabled={chasing} title="Email everyone who registered but hasn't finished">
+            <Ic.Bell width={15} /> {chasing ? 'Sending…' : 'Chase incomplete'}
+          </button>
+          <button className="aibtn" style={{ background: 'var(--blue-500)', color: '#fff', border: 'none' }} onClick={() => setOpen(true)}>
+            <Ic.Plus width={16} /> Add Candidate
+          </button>
+        </span>
       }
     >
       {error ? <p style={{ color: 'var(--error-600)', fontSize: 13 }}>{error}</p>
