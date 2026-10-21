@@ -1,6 +1,7 @@
 import {
   IsBoolean,
   IsEmail,
+  IsIn,
   IsOptional,
   IsString,
   IsUUID,
@@ -48,4 +49,10 @@ export class CreateCandidateDto {
   @IsOptional()
   @IsBoolean()
   sendInvite?: boolean;
+
+  // Where the sign-up came from, for the staff "new sign-up" alert.
+  // PORTAL (candidate web portal), MOBILE (app), or WEBSITE (from starff.co.uk).
+  @IsOptional()
+  @IsIn(['WEBSITE', 'MOBILE', 'PORTAL'])
+  source?: string;
 }

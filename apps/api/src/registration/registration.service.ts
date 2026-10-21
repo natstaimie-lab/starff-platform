@@ -175,6 +175,16 @@ export class RegistrationService {
           },
         });
 
+    // Alert staff that a new worker has registered from the website (best-effort).
+    if (!existing) {
+      await this.notifications.notifyStaffSignup({
+        name: `${firstName} ${lastName}`,
+        audience: 'worker',
+        source,
+        link: `/dashboard/candidates/${candidate.id}`,
+      });
+    }
+
     // 3. Attach any documents already uploaded — skip duplicates by type+path.
     let attached = 0;
     for (const d of dto.documents ?? []) {
@@ -280,6 +290,7 @@ export class RegistrationService {
     }
 
     // 3. Create the client if still none, else fill blanks.
+    const isNewClient = !client;
     if (!client) {
       client = await this.prisma.client.create({
         data: {
@@ -334,6 +345,16 @@ export class RegistrationService {
       actionUrl: activationUrl ?? portalUrl,
       actionLabel: isNewAccount ? 'Activate & continue' : 'Continue onboarding',
     });
+
+    // Alert staff that a new employer has registered from the website.
+    if (isNewClient) {
+      await this.notifications.notifyStaffSignup({
+        name: client.name,
+        audience: 'employer',
+        source,
+        link: `/dashboard/clients/${client.id}`,
+      });
+    }
 
     return {
       userId: user.id,

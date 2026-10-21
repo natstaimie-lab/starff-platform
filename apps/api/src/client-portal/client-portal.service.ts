@@ -101,6 +101,13 @@ export class ClientPortalService {
         isPrimary: true,
       },
     });
+    // Alert staff that a new employer signed up on the mobile app.
+    await this.notifications.notifyStaffSignup({
+      name: client.name,
+      audience: 'employer',
+      source: 'MOBILE',
+      link: `/dashboard/clients/${client.id}`,
+    });
     return { client, contact };
   }
 

@@ -30,11 +30,11 @@ export const candidateApi = {
     email: string;
     firstName: string;
     lastName: string;
-    registrationSource?: 'MOBILE';
+    source?: 'MOBILE';
   }) =>
     apiFetch<CandidateProfile>('/candidates', {
       method: 'POST',
-      body: { registrationSource: 'MOBILE', ...input },
+      body: { source: 'MOBILE', ...input },
     }),
 
   /** PATCH /candidates/:id — update own profile / onboarding fields. */

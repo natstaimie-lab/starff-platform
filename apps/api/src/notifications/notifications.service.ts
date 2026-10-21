@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -35,6 +36,7 @@ export type NotifyKind =
   | 'RELIABILITY_REVIEW'
   | 'INVOICE_SENT'
   | 'INVOICE_DISPUTED'
+  | 'NEW_SIGNUP'
   | 'REGISTRATION_RECEIVED';
 
 interface NotifyInput {
@@ -119,6 +121,50 @@ export class NotificationsService {
       // Log and swallow — the caller decides whether to queue a retry.
       this.logger.error(`email send failed for ${input.kind} → ${input.to}: ${(e as Error).message}`);
       return { inApp, emailed: false, error: (e as Error).message };
+    }
+  }
+
+  /**
+   * Tell every active staff member that a new worker or employer has signed up,
+   * including where they came from. Best-effort — never throws, never blocks the
+   * sign-up. Shows in the admin notification bell (title + body + time).
+   */
+  async notifyStaffSignup(input: {
+    name: string;
+    audience: 'worker' | 'employer';
+    source?: string | null; // RegistrationSource: WEBSITE | MOBILE | PORTAL | ADMIN
+    link?: string;
+  }): Promise<void> {
+    try {
+      const staff = await this.prisma.user.findMany({
+        where: { role: { in: [Role.ADMIN, Role.RECRUITER] }, isActive: true },
+        select: { id: true, email: true },
+      });
+      if (!staff.length) return;
+      const who = input.audience === 'worker' ? 'a worker' : 'an employer';
+      const where = this.sourceLabel(input.source);
+      const name = input.name.trim() || (input.audience === 'worker' ? 'A new worker' : 'A new employer');
+      const subject = `New ${input.audience} sign-up — ${name}`;
+      const body = `${name} just signed up as ${who}${where ? ` from ${where}` : ''}.`;
+      await Promise.all(
+        staff.map((s) =>
+          this.send({ to: s.email, userId: s.id, kind: 'NEW_SIGNUP', subject, body, actionUrl: input.link })
+            .catch(() => {}),
+        ),
+      );
+    } catch (e) {
+      this.logger.warn(`staff sign-up notification failed: ${(e as Error).message}`);
+    }
+  }
+
+  /** Human-readable label for where a sign-up came from. */
+  private sourceLabel(src?: string | null): string | null {
+    switch (src) {
+      case 'WEBSITE': return 'the website';
+      case 'MOBILE': return 'the mobile app';
+      case 'PORTAL': return 'the portal';
+      case 'ADMIN': return 'the office (added by staff)';
+      default: return null;
     }
   }
 

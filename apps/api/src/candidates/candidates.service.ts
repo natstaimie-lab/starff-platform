@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
-import { DocumentStatus, Prisma, Role } from '@prisma/client';
+import { DocumentStatus, Prisma, RegistrationSource, Role } from '@prisma/client';
 import PDFDocument from 'pdfkit';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthUser } from '../auth/current-user.decorator';
@@ -45,8 +45,16 @@ export class CandidatesService {
       });
       const existing = await this.prisma.candidate.findUnique({ where: { userId: dto.userId } });
       if (existing) return existing;
+      const source = (dto.source as RegistrationSource) ?? RegistrationSource.PORTAL;
       const candidate = await this.prisma.candidate.create({
-        data: { userId: dto.userId, firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone, city: dto.city, postcode: dto.postcode, headline: dto.headline },
+        data: { userId: dto.userId, firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone, city: dto.city, postcode: dto.postcode, headline: dto.headline, registrationSource: source },
+      });
+      // Alert staff a new worker just signed up (best-effort; never blocks).
+      await this.notifications.notifyStaffSignup({
+        name: `${dto.firstName} ${dto.lastName}`,
+        audience: 'worker',
+        source,
+        link: `/dashboard/candidates/${candidate.id}`,
       });
       if (realEmail) {
         await this.notifications

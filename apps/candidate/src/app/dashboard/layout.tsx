@@ -24,6 +24,7 @@ async function ensureProfile(): Promise<string> {
         email: u.email,
         firstName: (u.user_metadata?.firstName as string) ?? 'New',
         lastName: (u.user_metadata?.lastName as string) ?? 'Candidate',
+        source: 'PORTAL',
       }),
     });
     const me = await apiFetch<any>('/me');

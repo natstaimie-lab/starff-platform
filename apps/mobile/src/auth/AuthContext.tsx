@@ -186,7 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: s.user.email ?? '',
         firstName: (meta.firstName as string) ?? '',
         lastName: (meta.lastName as string) ?? '',
-        registrationSource: 'MOBILE',
+        source: 'MOBILE',
       });
 
       // Apply the registration-wizard onboarding ONCE per device, so we never
