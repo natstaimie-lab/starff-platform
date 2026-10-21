@@ -9,6 +9,7 @@ import * as Ic from '@/components/icons';
 type Doc = { id: string; type: string; fileName?: string; status: string; createdAt: string };
 
 const TYPES = [
+  { v: 'SELFIE', l: 'Identity photo (selfie)' },
   { v: 'RIGHT_TO_WORK', l: 'Right to Work' },
   { v: 'ID', l: 'Proof of ID' },
   { v: 'DBS_CHECK', l: 'DBS Certificate' },
@@ -53,9 +54,20 @@ export default function DocumentsPage() {
           <select value={type} onChange={(e) => setType(e.target.value)} style={{ height: 40, padding: '0 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', fontSize: 14 }}>
             {TYPES.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
           </select>
-          <input ref={fileRef} type="file" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} disabled={busy} style={{ fontSize: 13 }} />
+          <input
+            ref={fileRef}
+            type="file"
+            accept={type === 'SELFIE' ? 'image/*' : 'image/*,application/pdf'}
+            capture={type === 'SELFIE' ? 'user' : undefined}
+            onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
+            disabled={busy}
+            style={{ fontSize: 13 }}
+          />
           {busy && <span className="mut" style={{ fontSize: 13 }}>Uploading…</span>}
         </div>
+        {type === 'SELFIE' && (
+          <p className="mut" style={{ fontSize: 12.5, marginTop: 8 }}>On a phone this opens your front camera — take a clear, well-lit photo of your face so we can match it to your ID.</p>
+        )}
         {error && <p style={{ color: 'var(--error-600)', fontSize: 13, marginTop: 10 }}>{error}</p>}
       </Card>
 

@@ -42,13 +42,14 @@ const EDITABLE = [
 type EditKey = typeof EDITABLE[number];
 
 const REQUIRED = [
+  { type: 'SELFIE', label: 'Identity photo (selfie)' },
   { type: 'RIGHT_TO_WORK', label: 'Right to Work' },
   { type: 'ID', label: 'Proof of ID' },
   { type: 'DBS_CHECK', label: 'DBS Check' },
   { type: 'CV', label: 'CV / Work History' },
 ];
 const typeLabel: Record<string, string> = {
-  RIGHT_TO_WORK: 'Right to Work', ID: 'Proof of ID', DBS_CHECK: 'DBS Check', CV: 'CV / Work History',
+  SELFIE: 'Identity photo', RIGHT_TO_WORK: 'Right to Work', ID: 'Proof of ID', DBS_CHECK: 'DBS Check', CV: 'CV / Work History',
   CERTIFICATE: 'Certificate', QUALIFICATION: 'Qualification', LICENCE: 'Licence', REFERENCE: 'Reference', CONTRACT: 'Contract', OTHER: 'Other',
 };
 const STATUSES = ['NEW', 'SCREENING', 'COMPLIANT', 'ACTIVE', 'INACTIVE', 'REJECTED'];

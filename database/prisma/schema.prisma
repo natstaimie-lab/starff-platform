@@ -67,6 +67,7 @@ enum DocumentType {
   CONTRACT
   QUALIFICATION
   LICENCE
+  SELFIE
   OTHER
 }
 

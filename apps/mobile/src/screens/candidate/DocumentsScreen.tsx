@@ -13,6 +13,7 @@ import { uploadCandidateDocument, PickedFile } from '@/lib/storage';
 import type { DocumentStatus } from '@/lib/types';
 
 const DOC_TYPES = [
+  { type: 'SELFIE', label: 'Identity selfie' },
   { type: 'RIGHT_TO_WORK', label: 'Right to work' },
   { type: 'ID', label: 'ID' },
   { type: 'DBS_CHECK', label: 'DBS' },
@@ -65,7 +66,11 @@ export function DocumentsScreen() {
       Alert.alert('Camera access needed', 'Enable camera access to photograph documents.');
       return;
     }
-    const res = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+    // Selfie uses the front camera for an identity photo; everything else uses the rear.
+    const res = await ImagePicker.launchCameraAsync({
+      quality: 0.7,
+      cameraType: type === 'SELFIE' ? ImagePicker.CameraType.front : ImagePicker.CameraType.back,
+    });
     if (!res.canceled && res.assets[0]) {
       const a = res.assets[0];
       await doUpload({ uri: a.uri, name: a.fileName ?? `photo_${Date.now()}.jpg`, mimeType: a.mimeType ?? 'image/jpeg' });
@@ -85,6 +90,14 @@ export function DocumentsScreen() {
 
   const pickSource = () => {
     const label = DOC_TYPES.find((d) => d.type === type)?.label ?? 'document';
+    // A selfie must be a live photo — no file picker.
+    if (type === 'SELFIE') {
+      Alert.alert('Take your identity selfie', 'Hold your phone at eye level, face the camera in good light, and make sure your whole face is visible.', [
+        { text: 'Open camera', onPress: takePhoto },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+      return;
+    }
     Alert.alert(`Upload ${label}`, 'Choose a source', [
       { text: 'Take photo', onPress: takePhoto },
       { text: 'Choose file', onPress: chooseFile },
