@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { cleanSectors } from '../common/sectors';
 import {
   CandidateStatus,
   ClientStatus,
@@ -171,6 +172,7 @@ export class RegistrationService {
             city: dto.city,
             postcode: dto.postcode,
             headline: dto.sector,
+            preferredSectors: cleanSectors(dto.preferredSectors),
             status: CandidateStatus.NEW,
             registrationSource: source,
           },
@@ -182,6 +184,7 @@ export class RegistrationService {
         name: `${firstName} ${lastName}`,
         audience: 'worker',
         source,
+        lookingFor: candidate.preferredSectors,
         link: `/dashboard/candidates/${candidate.id}`,
       });
     }

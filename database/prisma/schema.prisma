@@ -213,6 +213,7 @@ model Candidate {
   bio                String?
   rating             Float?              // internal 0–5 rating
   maxTravelMiles     Int?
+  preferredSectors   String[]  @default([]) // what work they're looking for (sign-up)
 
   // ── registration / onboarding tracking (additive, all nullable) ──
   registrationSource RegistrationSource? // where they first registered

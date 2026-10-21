@@ -133,6 +133,7 @@ export class NotificationsService {
     name: string;
     audience: 'worker' | 'employer';
     source?: string | null; // RegistrationSource: WEBSITE | MOBILE | PORTAL | ADMIN
+    lookingFor?: string[]; // sectors the worker is looking for
     link?: string;
   }): Promise<void> {
     try {
@@ -144,8 +145,9 @@ export class NotificationsService {
       const who = input.audience === 'worker' ? 'a worker' : 'an employer';
       const where = this.sourceLabel(input.source);
       const name = input.name.trim() || (input.audience === 'worker' ? 'A new worker' : 'A new employer');
+      const wants = input.lookingFor?.length ? ` Looking for: ${input.lookingFor.join(', ')}.` : '';
       const subject = `New ${input.audience} sign-up — ${name}`;
-      const body = `${name} just signed up as ${who}${where ? ` from ${where}` : ''}.`;
+      const body = `${name} just signed up as ${who}${where ? ` from ${where}` : ''}.${wants}`;
       await Promise.all(
         staff.map((s) =>
           this.send({ to: s.email, userId: s.id, kind: 'NEW_SIGNUP', subject, body, actionUrl: input.link })

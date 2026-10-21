@@ -14,10 +14,17 @@ type Candidate = {
   emergencyName?: string; emergencyPhone?: string;
   bankAccountName?: string; bankSortCode?: string; bankAccountNumber?: string;
   healthDeclaration?: boolean; consentGdpr?: boolean; agreementAccepted?: boolean; signatureName?: string;
-  registrationSource?: string | null; submittedAt?: string | null;
+  registrationSource?: string | null; submittedAt?: string | null; preferredSectors?: string[];
   documents?: Doc[]; _count?: { availability: number; employmentHistory: number; references: number };
 };
 const empty = { firstName: '', lastName: '', headline: '', city: '', postcode: '', phone: '', email: '', sendInvite: false };
+
+// Canonical sectors (kept in sync with apps/api/src/common/sectors.ts).
+const SECTORS = [
+  'Warehouse & Logistics', 'Driving & Delivery', 'Construction & Trades',
+  'Industrial & Manufacturing', 'Security', 'Cleaning', 'Hospitality & Catering',
+  'Care & Healthcare', 'Events', 'Office & Admin',
+];
 
 const SOURCE_LABEL: Record<string, string> = { WEBSITE: 'Website', MOBILE: 'Mobile app', PORTAL: 'Portal', ADMIN: 'Admin' };
 
@@ -52,6 +59,7 @@ export default function CandidatesPage() {
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
   const [chasing, setChasing] = useState(false);
+  const [sectorFilter, setSectorFilter] = useState('');
 
   const load = () => apiFetch<Candidate[]>('/candidates').then(setRows).catch((e) => setError(e.message)).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
@@ -83,7 +91,13 @@ export default function CandidatesPage() {
 
   const cols: Column<Candidate>[] = [
     { key: 'name', header: 'Candidate', render: (r) => <Link href={`/dashboard/candidates/${r.id}`} className="namecell" style={{ textDecoration: 'none', color: 'inherit' }}><Avatar name={`${r.firstName} ${r.lastName}`} size={30} /><span className="nm" style={{ color: 'var(--text-link)' }}>{r.firstName} {r.lastName}</span></Link> },
-    { key: 'headline', header: 'Headline', render: (r) => <span className="dim">{r.headline ?? '—'}</span> },
+    { key: 'lookingFor', header: 'Looking for', render: (r) => (
+      (r.preferredSectors && r.preferredSectors.length)
+        ? <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>{r.preferredSectors.map((s) => (
+            <span key={s} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: 'var(--blue-100, #e7efff)', color: 'var(--blue-700, #1d4ed8)', whiteSpace: 'nowrap' }}>{s}</span>
+          ))}</span>
+        : <span className="dim">{r.headline ?? '—'}</span>
+    ) },
     { key: 'source', header: 'Source', render: (r) => <span className="dim">{r.registrationSource ? SOURCE_LABEL[r.registrationSource] ?? r.registrationSource : '—'}</span> },
     {
       key: 'progress', header: 'Registration',
@@ -107,7 +121,11 @@ export default function CandidatesPage() {
     <Card
       title="Candidates"
       action={
-        <span style={{ display: 'inline-flex', gap: 8 }}>
+        <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+          <select value={sectorFilter} onChange={(e) => setSectorFilter(e.target.value)} style={{ border: '1px solid var(--border-strong)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600, padding: '7px 10px', borderRadius: 8, cursor: 'pointer' }} title="Filter by what they're looking for">
+            <option value="">All sectors</option>
+            {SECTORS.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
           <button className="aibtn" style={{ background: 'var(--surface-card)', color: 'var(--text-secondary)', border: '1px solid var(--border-strong)' }} onClick={chaseIncomplete} disabled={chasing} title="Email everyone who registered but hasn't finished">
             <Ic.Bell width={15} /> {chasing ? 'Sending…' : 'Chase incomplete'}
           </button>
@@ -117,10 +135,14 @@ export default function CandidatesPage() {
         </span>
       }
     >
-      {error ? <p style={{ color: 'var(--error-600)', fontSize: 13 }}>{error}</p>
-        : loading ? <p className="dim">Loading…</p>
-        : rows.length === 0 ? <p className="dim">No candidates yet.</p>
-        : <DataTable columns={cols} rows={rows} />}
+      {(() => {
+        const shown = sectorFilter ? rows.filter((r) => r.preferredSectors?.includes(sectorFilter)) : rows;
+        return error ? <p style={{ color: 'var(--error-600)', fontSize: 13 }}>{error}</p>
+          : loading ? <p className="dim">Loading…</p>
+          : rows.length === 0 ? <p className="dim">No candidates yet.</p>
+          : shown.length === 0 ? <p className="dim">No candidates looking for {sectorFilter}.</p>
+          : <DataTable columns={cols} rows={shown} />;
+      })()}
 
       {open && (
         <Modal

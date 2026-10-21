@@ -27,7 +27,7 @@ type Candidate = {
   bankAccountName?: string | null; bankSortCode?: string | null; bankAccountNumber?: string | null;
   healthDeclaration?: boolean; healthNotes?: string | null; consentGdpr?: boolean; consentGdprAt?: string | null;
   agreementAccepted?: boolean; signatureName?: string | null; signedAt?: string | null;
-  submittedAt?: string | null; registrationSource?: string | null; createdAt?: string | null;
+  submittedAt?: string | null; registrationSource?: string | null; createdAt?: string | null; preferredSectors?: string[];
   loginEmail?: string | null; hasLogin?: boolean;
   documents: Doc[]; skills: { skill: { name: string } }[]; availability: { dayOfWeek: number }[];
   employmentHistory: Job[]; references: Ref[];
@@ -238,6 +238,16 @@ export default function CandidateProfile() {
                 <div>
                   <div style={{ fontSize: 18, fontWeight: 800 }}>{c.firstName} {c.lastName}</div>
                   <div className="dim" style={{ fontSize: 13 }}>{c.headline ?? '—'}</div>
+                  {c.preferredSectors && c.preferredSectors.length > 0 && (
+                    <div style={{ marginTop: 6 }}>
+                      <div className="dim" style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 3 }}>Looking for</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {c.preferredSectors.map((s) => (
+                          <span key={s} style={{ fontSize: 11.5, fontWeight: 600, padding: '2px 9px', borderRadius: 999, background: 'var(--blue-100, #e7efff)', color: 'var(--blue-700, #1d4ed8)' }}>{s}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div style={{ marginTop: 6 }}><ComplianceBadge status={c.status.toLowerCase()} /></div>
                   <div className="dim" style={{ fontSize: 12, marginTop: 6 }}>Joined {fmt(c.createdAt)}</div>
                 </div>

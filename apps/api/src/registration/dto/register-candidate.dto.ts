@@ -49,6 +49,12 @@ export class RegisterCandidateDto {
   @IsString()
   sector?: string;
 
+  /** The work sectors the candidate is looking for (from the canonical list). */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  preferredSectors?: string[];
+
   @IsOptional()
   @IsEnum(RegistrationSource)
   source?: RegistrationSource;

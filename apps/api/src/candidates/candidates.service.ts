@@ -15,6 +15,7 @@ import { UpdateCandidateDto } from './dto/update-candidate.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RegistrationService } from '../registration/registration.service';
 import { WORKER_DOCUMENTS, getWorkerDoc, workerAgreementSnapshot } from '../me/worker-documents';
+import { cleanSectors } from '../common/sectors';
 
 @Injectable()
 export class CandidatesService {
@@ -47,13 +48,14 @@ export class CandidatesService {
       if (existing) return existing;
       const source = (dto.source as RegistrationSource) ?? RegistrationSource.PORTAL;
       const candidate = await this.prisma.candidate.create({
-        data: { userId: dto.userId, firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone, city: dto.city, postcode: dto.postcode, headline: dto.headline, registrationSource: source },
+        data: { userId: dto.userId, firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone, city: dto.city, postcode: dto.postcode, headline: dto.headline, preferredSectors: cleanSectors(dto.preferredSectors), registrationSource: source },
       });
       // Alert staff a new worker just signed up (best-effort; never blocks).
       await this.notifications.notifyStaffSignup({
         name: `${dto.firstName} ${dto.lastName}`,
         audience: 'worker',
         source,
+        lookingFor: candidate.preferredSectors,
         link: `/dashboard/candidates/${candidate.id}`,
       });
       if (realEmail) {

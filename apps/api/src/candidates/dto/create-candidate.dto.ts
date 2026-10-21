@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsBoolean,
   IsEmail,
   IsIn,
@@ -55,4 +56,10 @@ export class CreateCandidateDto {
   @IsOptional()
   @IsIn(['WEBSITE', 'MOBILE', 'PORTAL'])
   source?: string;
+
+  // The work sectors the candidate is looking for (from the canonical list).
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  preferredSectors?: string[];
 }
