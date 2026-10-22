@@ -50,6 +50,7 @@ export class CandidatesController {
   @Get()
   @Roles(Role.ADMIN, Role.RECRUITER)
   findAll(
+    @CurrentUser() user: AuthUser,
     @Query('status') status?: string,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
@@ -60,7 +61,7 @@ export class CandidatesController {
       skip: skip ? Number(skip) : undefined,
       take: take ? Number(take) : undefined,
       includeArchived: includeArchived === 'true',
-    });
+    }, user);
   }
 
   // A candidate fetches their own profile.
@@ -69,11 +70,11 @@ export class CandidatesController {
     return this.candidates.findByUserId(user.id);
   }
 
-  // Staff only — view one candidate in full.
+  // Staff — view one candidate. Recruiters get a redacted record (no bank/NI/health).
   @Get(':id')
   @Roles(Role.ADMIN, Role.RECRUITER)
-  findOne(@Param('id') id: string) {
-    return this.candidates.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.candidates.findOne(id, user);
   }
 
   // Owner (their own profile) or staff. Status changes are staff-only (enforced in the service).
@@ -94,9 +95,9 @@ export class CandidatesController {
     return this.candidates.attachLogin(id, dto);
   }
 
-  // Staff — verify / reject a candidate's compliance document.
+  // Verify / reject a compliance document — ADMIN only (compliance decision).
   @Patch(':id/documents/:docId')
-  @Roles(Role.ADMIN, Role.RECRUITER)
+  @Roles(Role.ADMIN)
   setDocStatus(
     @Param('id') id: string,
     @Param('docId') docId: string,
@@ -106,16 +107,16 @@ export class CandidatesController {
     return this.candidates.setDocumentStatus(id, docId, status, user.id);
   }
 
-  // Staff — get a short-lived link to view a private document file.
+  // Open a private document file — ADMIN only (contains ID/RTW/DBS imagery).
   @Get(':id/documents/:docId/url')
-  @Roles(Role.ADMIN, Role.RECRUITER)
+  @Roles(Role.ADMIN)
   docUrl(@Param('id') id: string, @Param('docId') docId: string) {
     return this.candidates.documentUrl(id, docId);
   }
 
-  // Staff — re-run the automated pre-check on a document.
+  // Re-run the automated pre-check on a document — ADMIN only (reads the file).
   @Post(':id/documents/:docId/recheck')
-  @Roles(Role.ADMIN, Role.RECRUITER)
+  @Roles(Role.ADMIN)
   recheckDoc(@Param('id') id: string, @Param('docId') docId: string) {
     return this.candidates.recheckDocument(id, docId);
   }

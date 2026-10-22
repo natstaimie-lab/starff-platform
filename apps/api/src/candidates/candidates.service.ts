@@ -136,13 +136,13 @@ export class CandidatesService {
   }
 
   // Admin/recruiter list with simple filtering + pagination.
-  findAll(params: { status?: string; skip?: number; take?: number; includeArchived?: boolean }) {
+  async findAll(params: { status?: string; skip?: number; take?: number; includeArchived?: boolean }, actor?: AuthUser) {
     const where: Prisma.CandidateWhereInput = {};
     if (params.status) {
       where.status = params.status as any;
     }
     if (!params.includeArchived) where.archivedAt = null; // hide archived by default
-    return this.prisma.candidate.findMany({
+    const rows = await this.prisma.candidate.findMany({
       where,
       skip: params.skip ?? 0,
       take: Math.min(params.take ?? 25, 100),
@@ -154,9 +154,34 @@ export class CandidatesService {
         _count: { select: { availability: true, employmentHistory: true, references: true } },
       },
     });
+    return rows.map((r) => this.redactForRole(r, actor?.role));
   }
 
-  async findOne(id: string) {
+  /**
+   * Role-aware redaction (least privilege). ADMIN sees everything. RECRUITER —
+   * who matches, books and chases — never sees financial, NI or health data, and
+   * can't reach the document files (only their type + status). Enforced here on
+   * the server so the sensitive fields are simply never sent, not just hidden.
+   */
+  private static readonly SENSITIVE = ['nationalInsurance', 'bankAccountName', 'bankSortCode', 'bankAccountNumber', 'healthNotes'] as const;
+
+  private redactForRole<T extends Record<string, any>>(candidate: T, role?: string): T {
+    // Only recruiters are restricted. Admins and the worker themselves see all.
+    if (role !== Role.RECRUITER) return candidate;
+    const c: any = { ...candidate };
+    c.nationalInsurance = null;
+    c.bankAccountName = null;
+    c.bankSortCode = null;
+    c.bankAccountNumber = null;
+    c.healthNotes = null;
+    if (Array.isArray(c.documents)) {
+      // Keep type/status/expiry/pre-check; strip the file so it can't be opened.
+      c.documents = c.documents.map((d: any) => ({ ...d, fileUrl: null, fileName: null }));
+    }
+    return c;
+  }
+
+  async findOne(id: string, actor?: AuthUser) {
     const candidate = await this.prisma.candidate.findUnique({
       where: { id },
       include: {
@@ -173,11 +198,11 @@ export class CandidatesService {
     // placeholder address. `hasLogin` = a real (non-placeholder) email is attached.
     const rawEmail = candidate.user?.email ?? null;
     const isPlaceholder = !rawEmail || rawEmail.endsWith('@candidate.local');
-    return {
+    return this.redactForRole({
       ...candidate,
       loginEmail: isPlaceholder ? null : rawEmail,
       hasLogin: !isPlaceholder,
-    };
+    }, actor?.role);
   }
 
   // A candidate can fetch their own profile via their user id.
@@ -195,7 +220,7 @@ export class CandidatesService {
    * change their `status` — only admins/recruiters can.
    */
   async update(id: string, dto: UpdateCandidateDto, actor: AuthUser) {
-    const candidate = await this.findOne(id);
+    const candidate = await this.findOne(id, actor);
 
     const isStaff = actor.role === Role.ADMIN || actor.role === Role.RECRUITER;
     const isOwner = candidate.userId === actor.id;
@@ -206,7 +231,13 @@ export class CandidatesService {
       throw new ForbiddenException('Only staff can change candidate status');
     }
 
-    return this.prisma.candidate.update({ where: { id }, data: dto });
+    // Recruiters can't see sensitive fields, so they can't write them either.
+    const data: any = { ...dto };
+    if (actor.role === Role.RECRUITER) {
+      for (const f of CandidatesService.SENSITIVE) delete data[f];
+    }
+    const updated = await this.prisma.candidate.update({ where: { id }, data });
+    return this.redactForRole(updated, actor.role);
   }
 
   /** Staff verifies / rejects one of a candidate's compliance documents. */

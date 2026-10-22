@@ -64,6 +64,7 @@ export default function CandidateProfile() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const role = useRole();
+  const isAdmin = role === 'ADMIN'; // recruiters don't see bank/NI/health or document files
   const [c, setC] = useState<Candidate | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
@@ -94,7 +95,7 @@ export default function CandidateProfile() {
   const docIds = (c?.documents ?? []).map((d) => d.id).join(',');
   useEffect(() => {
     const docs = c?.documents ?? [];
-    if (!docs.length) return;
+    if (!docs.length || !isAdmin) return; // document files are admin-only
     let cancelled = false;
     (async () => {
       const entries = await Promise.all(docs.map(async (d) => {
@@ -105,7 +106,7 @@ export default function CandidateProfile() {
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docIds, id]);
+  }, [docIds, id, isAdmin]);
 
   async function downloadDoc(key: string, name: string) {
     setDlDoc(key);
@@ -220,6 +221,7 @@ export default function CandidateProfile() {
   const DocThumb = ({ d }: { d: Doc }) => {
     const url = docUrls[d.id];
     const box: React.CSSProperties = { width: 52, height: 52, borderRadius: 8, border: '1px solid var(--border-subtle)', flexShrink: 0 };
+    if (!isAdmin) return <div style={{ ...box, background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Admin only"><Ic.Shield width={16} /></div>;
     if (!url) return <div style={{ ...box, background: 'var(--surface-sunken)' }} />;
     if (isPdf(d.fileName)) return (
       <button onClick={() => window.open(url, '_blank')} title="Open PDF" style={{ ...box, background: 'var(--surface-sunken)', color: 'var(--text-secondary)', fontSize: 10, fontWeight: 800, cursor: 'pointer' }}>PDF</button>
@@ -256,14 +258,14 @@ export default function CandidateProfile() {
     );
   };
 
-  const DocActions = ({ d }: { d: Doc }) => (
+  const DocActions = ({ d }: { d: Doc }) => (!isAdmin ? null : (
     <div style={{ display: 'flex', gap: 6 }}>
       <button onClick={() => recheck(d.id)} disabled={rechecking === d.id} title="Re-run the automated pre-check" style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>{rechecking === d.id ? '…' : 'Re-check'}</button>
       <button onClick={() => view(d.id)} style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>View</button>
       {d.status !== 'VERIFIED' && <button disabled={busy === d.id} onClick={() => setDoc(d.id, 'VERIFIED')} style={{ border: 'none', background: 'var(--success-100)', color: 'var(--success-600)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>Verify</button>}
       {d.status !== 'REJECTED' && <button disabled={busy === d.id} onClick={() => setDoc(d.id, 'REJECTED')} style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--error-600)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>Reject</button>}
     </div>
-  );
+  ));
   const Row = ({ k, v }: { k: string; v: React.ReactNode }) => (
     <div className="fx jb" style={{ padding: '8px 0', borderBottom: '1px solid var(--border-subtle)', fontSize: 13.5 }}><span className="dim">{k}</span><span style={{ fontWeight: 600, textAlign: 'right' }}>{v}</span></div>
   );
@@ -470,7 +472,7 @@ export default function CandidateProfile() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
         <Card title="Personal & contact">
           <Row k="Date of birth" v={fmt(c.dateOfBirth)} />
-          <Row k="National Insurance" v={c.nationalInsurance ?? '—'} />
+          {isAdmin && <Row k="National Insurance" v={c.nationalInsurance ?? '—'} />}
           <Row k="Address" v={[c.addressLine1, c.addressLine2, c.city, c.postcode].filter(Boolean).join(', ') || '—'} />
           <Row k="Phone" v={c.phone ?? '—'} />
         </Card>
@@ -479,7 +481,7 @@ export default function CandidateProfile() {
           <Row k="Phone" v={c.emergencyPhone ?? '—'} />
           <Row k="Relationship" v={c.emergencyRelationship ?? '—'} />
         </Card>
-        <Card title="Bank details" subtitle="For payroll">
+        {isAdmin && <Card title="Bank details" subtitle="For payroll">
           <Row k="Account name" v={c.bankAccountName ?? '—'} />
           <Row k="Sort code" v={c.bankSortCode ?? '—'} />
           <Row k="Account number" v={
@@ -502,7 +504,7 @@ export default function CandidateProfile() {
               )}
             </div>
           )}
-        </Card>
+        </Card>}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
@@ -558,19 +560,21 @@ export default function CandidateProfile() {
             <Field label="City"><TextInput value={edit.city} onChange={(e) => setEdit({ ...edit, city: e.target.value })} /></Field>
             <Field label="Postcode"><TextInput value={edit.postcode} onChange={(e) => setEdit({ ...edit, postcode: e.target.value })} /></Field>
           </div>
-          <Field label="National Insurance no."><TextInput value={edit.nationalInsurance} onChange={(e) => setEdit({ ...edit, nationalInsurance: e.target.value })} placeholder="QQ123456C" /></Field>
+          {isAdmin && <Field label="National Insurance no."><TextInput value={edit.nationalInsurance} onChange={(e) => setEdit({ ...edit, nationalInsurance: e.target.value })} placeholder="QQ123456C" /></Field>}
           <div style={{ fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-secondary)', marginTop: 4 }}>Emergency contact</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Field label="Name"><TextInput value={edit.emergencyName} onChange={(e) => setEdit({ ...edit, emergencyName: e.target.value })} /></Field>
             <Field label="Phone"><TextInput value={edit.emergencyPhone} onChange={(e) => setEdit({ ...edit, emergencyPhone: e.target.value })} /></Field>
           </div>
           <Field label="Relationship"><TextInput value={edit.emergencyRelationship} onChange={(e) => setEdit({ ...edit, emergencyRelationship: e.target.value })} placeholder="Partner, parent…" /></Field>
-          <div style={{ fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-secondary)', marginTop: 4 }}>Bank details (payroll)</div>
-          <Field label="Account name"><TextInput value={edit.bankAccountName} onChange={(e) => setEdit({ ...edit, bankAccountName: e.target.value })} /></Field>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Field label="Sort code"><TextInput value={edit.bankSortCode} onChange={(e) => setEdit({ ...edit, bankSortCode: e.target.value })} placeholder="00-00-00" /></Field>
-            <Field label="Account number"><TextInput value={edit.bankAccountNumber} onChange={(e) => setEdit({ ...edit, bankAccountNumber: e.target.value })} placeholder="12345678" /></Field>
-          </div>
+          {isAdmin && <>
+            <div style={{ fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-secondary)', marginTop: 4 }}>Bank details (payroll)</div>
+            <Field label="Account name"><TextInput value={edit.bankAccountName} onChange={(e) => setEdit({ ...edit, bankAccountName: e.target.value })} /></Field>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label="Sort code"><TextInput value={edit.bankSortCode} onChange={(e) => setEdit({ ...edit, bankSortCode: e.target.value })} placeholder="00-00-00" /></Field>
+              <Field label="Account number"><TextInput value={edit.bankAccountNumber} onChange={(e) => setEdit({ ...edit, bankAccountNumber: e.target.value })} placeholder="12345678" /></Field>
+            </div>
+          </>}
         </Modal>
       )}
 
