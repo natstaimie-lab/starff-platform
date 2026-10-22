@@ -80,6 +80,7 @@ export default function CandidateProfile() {
   const [dlDoc, setDlDoc] = useState<string | null>(null);
   const [docUrls, setDocUrls] = useState<Record<string, string>>({});
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [showBank, setShowBank] = useState(false);
 
   const load = () => apiFetch<Candidate>(`/candidates/${id}`).then(setC).catch((e) => setError(e.message));
   const loadAgreements = () =>
@@ -445,7 +446,26 @@ export default function CandidateProfile() {
         <Card title="Bank details" subtitle="For payroll">
           <Row k="Account name" v={c.bankAccountName ?? '—'} />
           <Row k="Sort code" v={c.bankSortCode ?? '—'} />
-          <Row k="Account number" v={maskAcct(c.bankAccountNumber)} />
+          <Row k="Account number" v={
+            c.bankAccountNumber
+              ? (showBank
+                  ? <span style={{ fontVariantNumeric: 'tabular-nums' }}>{c.bankAccountNumber}</span>
+                  : maskAcct(c.bankAccountNumber))
+              : '—'
+          } />
+          {c.bankAccountNumber && (
+            <div className="fx" style={{ gap: 10, marginTop: 10 }}>
+              <button onClick={() => setShowBank((s) => !s)} style={{ border: '1px solid var(--border-strong)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12.5, padding: '7px 11px', borderRadius: 9, cursor: 'pointer' }}>
+                {showBank ? 'Hide account number' : 'Reveal account number'}
+              </button>
+              {showBank && (
+                <button
+                  onClick={() => { navigator.clipboard?.writeText(`${c.bankSortCode ?? ''} ${c.bankAccountNumber ?? ''}`.trim()); }}
+                  style={{ border: '1px solid var(--border-strong)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12.5, padding: '7px 11px', borderRadius: 9, cursor: 'pointer' }}
+                >Copy sort code + number</button>
+              )}
+            </div>
+          )}
         </Card>
       </div>
 
