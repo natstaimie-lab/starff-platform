@@ -13,6 +13,7 @@ import {
   getWorkerDoc,
   workerAgreementSnapshot,
 } from './worker-documents';
+import { DocumentCheckService } from '../documents/document-check.service';
 
 @Injectable()
 export class MeService {
@@ -20,6 +21,7 @@ export class MeService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly audit: AuditService,
+    private readonly docCheck: DocumentCheckService,
   ) {}
 
   private async candidateFor(userId: string) {
@@ -431,7 +433,7 @@ export class MeService {
   /** Record a document the candidate uploaded (file already in Supabase Storage). */
   async addDocument(userId: string, dto: { type: string; fileUrl: string; fileName?: string }) {
     const candidate = await this.candidateFor(userId);
-    return this.prisma.candidateDocument.create({
+    const doc = await this.prisma.candidateDocument.create({
       data: {
         candidateId: candidate.id,
         type: dto.type as any,
@@ -439,6 +441,9 @@ export class MeService {
         fileName: dto.fileName,
       },
     });
+    // Kick off the automated pre-check (assist only — never auto-verifies).
+    this.docCheck.runInBackground(doc.id);
+    return doc;
   }
 
   // ── Employment history ──

@@ -11,7 +11,7 @@ import { Modal, Field, TextInput, Button } from '@/components/Modal';
 import { ReliabilityCard } from '@/components/ReliabilityCard';
 import * as Ic from '@/components/icons';
 
-type Doc = { id: string; type: string; fileName?: string; status: string; expiryDate?: string; createdAt: string };
+type Doc = { id: string; type: string; fileName?: string; status: string; expiryDate?: string; createdAt: string; aiCheckVerdict?: string | null; aiCheckSummary?: string | null; aiCheckedAt?: string | null };
 type Job = { id: string; employer: string; jobTitle?: string | null; startDate?: string | null; endDate?: string | null; current: boolean; reasonForLeaving?: string | null };
 type Ref = { id: string; name: string; relationship?: string | null; company?: string | null; email?: string | null; phone?: string | null };
 type WorkerAgreement = {
@@ -81,6 +81,7 @@ export default function CandidateProfile() {
   const [docUrls, setDocUrls] = useState<Record<string, string>>({});
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [showBank, setShowBank] = useState(false);
+  const [rechecking, setRechecking] = useState<string | null>(null);
 
   const load = () => apiFetch<Candidate>(`/candidates/${id}`).then(setC).catch((e) => setError(e.message));
   const loadAgreements = () =>
@@ -179,6 +180,12 @@ export default function CandidateProfile() {
     try { const { url } = await apiFetch<{ url: string }>(`/candidates/${id}/documents/${docId}/url`); window.open(url, '_blank'); }
     catch (e: any) { alert(e.message); }
   }
+  async function recheck(docId: string) {
+    setRechecking(docId);
+    try { await apiFetch(`/candidates/${id}/documents/${docId}/recheck`, { method: 'POST' }); await load(); }
+    catch (e: any) { alert(e?.message || 'Could not run the check.'); }
+    finally { setRechecking(null); }
+  }
   async function setStatus(status: string) {
     await apiFetch(`/candidates/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
     load();
@@ -221,8 +228,37 @@ export default function CandidateProfile() {
     return <img src={url} alt={d.fileName ?? d.type} onClick={() => setLightbox(url)} style={{ ...box, objectFit: 'cover', cursor: 'zoom-in' }} />;
   };
 
+  // Expiry flag (#1) — pure date logic, no AI.
+  const expiryInfo = (d: Doc): { text: string; color: string } | null => {
+    if (!d.expiryDate) return null;
+    const days = Math.ceil((new Date(d.expiryDate).getTime() - Date.now()) / 86400000);
+    if (days < 0) return { text: `Expired ${fmt(d.expiryDate)}`, color: 'var(--error-600)' };
+    if (days <= 30) return { text: `Expires ${fmt(d.expiryDate)} (${days}d)`, color: 'var(--orange-600)' };
+    return null;
+  };
+  const verdictColor = (v?: string | null) => (v === 'PASS' ? 'var(--success-600)' : v === 'FAIL' ? 'var(--error-600)' : 'var(--orange-600)');
+  const verdictLabel = (v?: string | null) => (v === 'PASS' ? 'Auto-check: looks good' : v === 'FAIL' ? 'Auto-check: problem' : 'Auto-check: review');
+
+  // The pre-check line under a document (#1 expiry + #2 AI verdict/summary).
+  const AiLine = ({ d }: { d: Doc }) => {
+    const exp = expiryInfo(d);
+    if (!exp && !d.aiCheckVerdict) return null;
+    return (
+      <div style={{ marginTop: 5, fontSize: 11.5, lineHeight: 1.45 }}>
+        {exp && <div style={{ color: exp.color, fontWeight: 700 }}>⚠ {exp.text}</div>}
+        {d.aiCheckVerdict && (
+          <div style={{ color: verdictColor(d.aiCheckVerdict) }}>
+            <b>{verdictLabel(d.aiCheckVerdict)}.</b>{' '}
+            <span style={{ color: 'var(--text-secondary)' }}>{d.aiCheckSummary}</span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const DocActions = ({ d }: { d: Doc }) => (
     <div style={{ display: 'flex', gap: 6 }}>
+      <button onClick={() => recheck(d.id)} disabled={rechecking === d.id} title="Re-run the automated pre-check" style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>{rechecking === d.id ? '…' : 'Re-check'}</button>
       <button onClick={() => view(d.id)} style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>View</button>
       {d.status !== 'VERIFIED' && <button disabled={busy === d.id} onClick={() => setDoc(d.id, 'VERIFIED')} style={{ border: 'none', background: 'var(--success-100)', color: 'var(--success-600)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>Verify</button>}
       {d.status !== 'REJECTED' && <button disabled={busy === d.id} onClick={() => setDoc(d.id, 'REJECTED')} style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--error-600)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>Reject</button>}
@@ -247,7 +283,7 @@ export default function CandidateProfile() {
               <div key={r.type} className="fx ac jb" style={{ padding: '11px 0', borderBottom: '1px solid var(--border-subtle)', gap: 10 }}>
                 <div className="fx ac" style={{ gap: 11, minWidth: 0 }}>
                   {doc && <DocThumb d={doc} />}
-                  <div style={{ minWidth: 0 }}><div className="nm">{r.label}</div><div className="sub2" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc ? (doc.fileName ?? 'uploaded') : 'Not uploaded'}</div></div>
+                  <div style={{ minWidth: 0 }}><div className="nm">{r.label}</div><div className="sub2" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc ? (doc.fileName ?? 'uploaded') : 'Not uploaded'}</div>{doc && <AiLine d={doc} />}</div>
                 </div>
                 <div className="fx ac" style={{ gap: 10, flexShrink: 0 }}><ComplianceBadge status={docStatus(doc)} />{doc && <DocActions d={doc} />}</div>
               </div>
@@ -260,7 +296,7 @@ export default function CandidateProfile() {
                 <div key={d.id} className="fx ac jb" style={{ padding: '10px 0', borderBottom: '1px solid var(--border-subtle)', gap: 10 }}>
                   <div className="fx ac" style={{ gap: 11, minWidth: 0 }}>
                     <DocThumb d={d} />
-                    <div style={{ minWidth: 0 }}><div className="nm">{typeLabel[d.type] ?? d.type}</div><div className="sub2" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fileName ?? 'uploaded'}</div></div>
+                    <div style={{ minWidth: 0 }}><div className="nm">{typeLabel[d.type] ?? d.type}</div><div className="sub2" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.fileName ?? 'uploaded'}</div><AiLine d={d} /></div>
                   </div>
                   <div className="fx ac" style={{ gap: 10, flexShrink: 0 }}><ComplianceBadge status={docStatus(d)} /><DocActions d={d} /></div>
                 </div>

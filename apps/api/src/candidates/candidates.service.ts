@@ -16,6 +16,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { RegistrationService } from '../registration/registration.service';
 import { WORKER_DOCUMENTS, getWorkerDoc, workerAgreementSnapshot } from '../me/worker-documents';
 import { cleanSectors } from '../common/sectors';
+import { DocumentCheckService } from '../documents/document-check.service';
 
 @Injectable()
 export class CandidatesService {
@@ -23,7 +24,19 @@ export class CandidatesService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly registration: RegistrationService,
+    private readonly docCheck: DocumentCheckService,
   ) {}
+
+  /** Staff — re-run the automated pre-check on one document. */
+  async recheckDocument(candidateId: string, docId: string) {
+    const doc = await this.prisma.candidateDocument.findUnique({ where: { id: docId } });
+    if (!doc || doc.candidateId !== candidateId) throw new NotFoundException('Document not found');
+    await this.docCheck.check(docId);
+    return this.prisma.candidateDocument.findUnique({
+      where: { id: docId },
+      select: { aiCheckVerdict: true, aiCheckSummary: true, aiCheckedAt: true },
+    });
+  }
 
   /**
    * Create a candidate profile. Also creates the User row (as CANDIDATE) if it

@@ -24,6 +24,7 @@ import { AuditModule } from './audit/audit.module';
 import { MatchingModule } from './matching/matching.module';
 import { ApplicationsModule } from './applications/applications.module';
 import { ReliabilityModule } from './reliability/reliability.module';
+import { DocumentCheckModule } from './documents/document-check.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { ReliabilityModule } from './reliability/reliability.module';
     MatchingModule,
     ApplicationsModule,
     ReliabilityModule,
+    DocumentCheckModule,
   ],
   providers: [
     // Apply the rate limiter globally to every route.

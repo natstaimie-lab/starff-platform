@@ -113,6 +113,13 @@ export class CandidatesController {
     return this.candidates.documentUrl(id, docId);
   }
 
+  // Staff — re-run the automated pre-check on a document.
+  @Post(':id/documents/:docId/recheck')
+  @Roles(Role.ADMIN, Role.RECRUITER)
+  recheckDoc(@Param('id') id: string, @Param('docId') docId: string) {
+    return this.candidates.recheckDocument(id, docId);
+  }
+
   // Staff — a worker's signed-document status (Terms of Engagement, KID, opt-out).
   @Get(':id/agreements')
   @Roles(Role.ADMIN, Role.RECRUITER)

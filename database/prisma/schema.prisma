@@ -356,6 +356,11 @@ model CandidateDocument {
   verifiedAt   DateTime?
   notes        String?
 
+  // Automated pre-check (assists the admin; never auto-verifies).
+  aiCheckVerdict String?      // PASS | WARN | FAIL
+  aiCheckSummary String?      @db.Text
+  aiCheckedAt    DateTime?
+
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
