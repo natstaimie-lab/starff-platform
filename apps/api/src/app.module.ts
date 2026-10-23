@@ -25,6 +25,7 @@ import { MatchingModule } from './matching/matching.module';
 import { ApplicationsModule } from './applications/applications.module';
 import { ReliabilityModule } from './reliability/reliability.module';
 import { DocumentCheckModule } from './documents/document-check.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { DocumentCheckModule } from './documents/document-check.module';
     ReliabilityModule,
     DocumentCheckModule,
   ],
+  controllers: [HealthController],
   providers: [
     // Apply the rate limiter globally to every route.
     { provide: APP_GUARD, useClass: ThrottlerGuard },

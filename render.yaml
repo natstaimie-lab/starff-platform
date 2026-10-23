@@ -1,0 +1,54 @@
+# Render blueprint for the Starff API (migration off Railway).
+# Render reads this when you connect the repo as a Blueprint. It builds ONLY
+# apps/api from the monorepo. Secrets (sync: false) are NOT stored here — Render
+# prompts you for each one in the dashboard, so nothing sensitive lives in git.
+services:
+  - type: web
+    name: starff-api
+    runtime: node
+    region: frankfurt            # closest EU region to Supabase (eu-west-1)
+    plan: starter                # always-on ($7/mo). Do NOT use free — it sleeps.
+    branch: main
+    autoDeploy: true
+    buildCommand: npm install && npm run db:generate && npm run build --workspace @starff/api
+    startCommand: node apps/api/dist/main.js
+    healthCheckPath: /api/v1/health
+    envVars:
+      # ── Non-secret config (safe to keep here) ──
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      - key: MAIL_FROM
+        value: "Starff <noreply@starff.co.uk>"
+      - key: SUPABASE_URL
+        value: "https://vtmafvssthoypwgcjtkm.supabase.co"
+      - key: CORS_ORIGINS
+        value: "https://admin.starff.co.uk,https://my.starff.co.uk,https://client.starff.co.uk,https://starff.co.uk"
+      - key: ADMIN_PORTAL_URL
+        value: "https://admin.starff.co.uk"
+      - key: CANDIDATE_PORTAL_URL
+        value: "https://my.starff.co.uk"
+      - key: CLIENT_PORTAL_URL
+        value: "https://client.starff.co.uk"
+      # ── Secrets / deliberate values — Render prompts for these (use the
+      #    ROTATED values from .env.rotation.staging; copy REQUIRE_STAFF_MFA
+      #    from Railway's Variables tab to keep login behaviour identical) ──
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: WORDPRESS_WEBHOOK_SECRET
+        sync: false
+      - key: GOOGLE_ROUTES_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: REQUIRE_STAFF_MFA
+        sync: false
