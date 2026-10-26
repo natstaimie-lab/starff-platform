@@ -7,12 +7,18 @@ import * as Ic from '@/components/icons';
 
 type Me = {
   id: string; firstName: string; lastName: string; status: string;
-  headline?: string; phone?: string;
+  headline?: string; phone?: string; preferredSectors?: string[];
   dateOfBirth?: string | null; nationalInsurance?: string | null;
   addressLine1?: string | null; addressLine2?: string | null; city?: string | null; postcode?: string | null;
   emergencyName?: string | null; emergencyPhone?: string | null; emergencyRelationship?: string | null;
   bankAccountName?: string | null; bankSortCode?: string | null; bankAccountNumber?: string | null;
 };
+
+const SECTORS = [
+  'Warehouse & Logistics', 'Driving & Delivery', 'Construction & Trades',
+  'Industrial & Manufacturing', 'Security', 'Cleaning', 'Hospitality & Catering',
+  'Care & Healthcare', 'Events', 'Office & Admin',
+];
 
 const FIELDS = [
   'headline', 'phone', 'dateOfBirth', 'nationalInsurance',
@@ -28,6 +34,7 @@ const blank: Form = FIELDS.reduce((a, k) => ({ ...a, [k]: '' }), {} as Form);
 export default function ProfilePage() {
   const [me, setMe] = useState<Me | null>(null);
   const [form, setForm] = useState<Form>(blank);
+  const [sectors, setSectors] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -35,6 +42,7 @@ export default function ProfilePage() {
   useEffect(() => {
     apiFetch<Me>('/me').then((m) => {
       setMe(m);
+      setSectors(m.preferredSectors ?? []);
       const next = { ...blank };
       for (const k of FIELDS) {
         const v = (m as any)[k];
@@ -45,6 +53,7 @@ export default function ProfilePage() {
   }, []);
 
   function set(k: FieldKey, v: string) { setForm((f) => ({ ...f, [k]: v })); setSaved(false); }
+  function toggleSector(s: string) { setSectors((p) => (p.includes(s) ? p.filter((x) => x !== s) : [...p, s])); setSaved(false); }
 
   async function save() {
     if (!me) return;
@@ -58,6 +67,7 @@ export default function ProfilePage() {
           body[k] = form[k];
         }
       }
+      (body as any).preferredSectors = sectors;
       await apiFetch(`/candidates/${me.id}`, { method: 'PATCH', body: JSON.stringify(body) });
       setSaved(true);
     } catch (e: any) { setError(e.message); } finally { setSaving(false); }
@@ -68,6 +78,23 @@ export default function ProfilePage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 760 }}>
+      <Card title="What work are you looking for?" subtitle="Pick the sectors you want shifts in — this is how we match you to the right jobs.">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {SECTORS.map((s) => {
+            const on = sectors.includes(s);
+            return (
+              <button type="button" key={s} onClick={() => toggleSector(s)} style={{
+                fontSize: 13, fontWeight: 600, padding: '8px 13px', borderRadius: 999, cursor: 'pointer',
+                border: `1px solid ${on ? 'var(--orange-500)' : 'var(--border-strong)'}`,
+                background: on ? 'var(--orange-500)' : 'var(--surface-card)',
+                color: on ? '#fff' : 'var(--text-secondary)',
+              }}>{s}</button>
+            );
+          })}
+        </div>
+        {sectors.length === 0 && <p className="dim" style={{ fontSize: 12.5, marginTop: 10 }}>Tap all that apply — you can pick more than one.</p>}
+      </Card>
+
       <Card title="Personal details" subtitle="Your basic information — used across your bookings and payslips.">
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
           <Avatar name={`${me.firstName} ${me.lastName}`} size={52} />

@@ -18,6 +18,7 @@ type Progress = {
 
 // Where each onboarding section is completed, and a short hint.
 const META: Record<string, { href: string; hint: string; icon: ReactNode }> = {
+  sectors: { href: '/dashboard/profile', hint: 'The kind of work you want (warehouse, driving, care…)', icon: <Ic.Briefcase width={17} /> },
   contact: { href: '/dashboard/profile', hint: 'Phone number, city and postcode', icon: <Ic.User width={17} /> },
   personal: { href: '/dashboard/profile', hint: 'Date of birth and National Insurance number', icon: <Ic.User width={17} /> },
   emergency: { href: '/dashboard/profile', hint: 'Someone we can contact in an emergency', icon: <Ic.User width={17} /> },

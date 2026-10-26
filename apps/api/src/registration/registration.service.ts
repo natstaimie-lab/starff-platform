@@ -595,6 +595,7 @@ export class RegistrationService {
 
     const hasDoc = (t: DocumentType) => c.documents.some((d) => d.type === t);
     const sections: ProgressSection[] = [
+      { key: 'sectors', label: 'What work you want', done: (c.preferredSectors?.length ?? 0) > 0 },
       { key: 'contact', label: 'Contact & address', done: !!(c.phone && c.city && c.postcode) },
       { key: 'personal', label: 'Personal details', done: !!(c.dateOfBirth && c.nationalInsurance) },
       { key: 'emergency', label: 'Emergency contact', done: !!(c.emergencyName && c.emergencyPhone) },

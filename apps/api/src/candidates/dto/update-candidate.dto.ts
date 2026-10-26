@@ -1,4 +1,4 @@
-import { IsBoolean, IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
 import { CandidateStatus } from '@prisma/client';
 
 export class UpdateCandidateDto {
@@ -37,6 +37,12 @@ export class UpdateCandidateDto {
   @IsOptional()
   @IsString()
   bio?: string;
+
+  // What work the candidate is looking for (canonical sector list).
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  preferredSectors?: string[];
 
   // ── Phase 2 onboarding fields (candidate-editable) ──
   @IsOptional()

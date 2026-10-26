@@ -236,6 +236,7 @@ export class CandidatesService {
     if (actor.role === Role.RECRUITER) {
       for (const f of CandidatesService.SENSITIVE) delete data[f];
     }
+    if (data.preferredSectors !== undefined) data.preferredSectors = cleanSectors(data.preferredSectors);
     const updated = await this.prisma.candidate.update({ where: { id }, data });
     return this.redactForRole(updated, actor.role);
   }
