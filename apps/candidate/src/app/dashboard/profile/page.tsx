@@ -17,7 +17,7 @@ type Me = {
 const SECTORS = [
   'Warehouse & Logistics', 'Driving & Delivery', 'Construction & Trades',
   'Industrial & Manufacturing', 'Security', 'Cleaning', 'Hospitality & Catering',
-  'Care & Healthcare', 'Events', 'Office & Admin',
+  'Events',
 ];
 
 const FIELDS = [

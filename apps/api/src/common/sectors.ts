@@ -12,9 +12,7 @@ export const SECTORS = [
   'Security',
   'Cleaning',
   'Hospitality & Catering',
-  'Care & Healthcare',
   'Events',
-  'Office & Admin',
 ] as const;
 
 export type Sector = (typeof SECTORS)[number];
