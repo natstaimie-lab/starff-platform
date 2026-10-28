@@ -32,6 +32,13 @@ export default function DocumentsPage() {
   const load = () => apiFetch<{ documents: Doc[] }>('/me').then((me) => setDocs(me.documents ?? [])).catch(() => {}).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
 
+  // Preselect a document type when linked here with ?type= (e.g. from the
+  // onboarding checklist's "Identity photo (selfie)" step).
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('type');
+    if (t && TYPES.some((x) => x.v === t)) setType(t);
+  }, []);
+
   async function upload(file: File) {
     setBusy(true); setError('');
     try {

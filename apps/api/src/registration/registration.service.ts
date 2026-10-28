@@ -604,6 +604,7 @@ export class RegistrationService {
       { key: 'references', label: 'References', done: c.references.length > 0 },
       { key: 'right-to-work', label: 'Right to work', done: hasDoc(DocumentType.RIGHT_TO_WORK) },
       { key: 'identity', label: 'Proof of identity', done: hasDoc(DocumentType.ID) },
+      { key: 'selfie', label: 'Identity photo (selfie)', done: hasDoc(DocumentType.SELFIE) },
       { key: 'cv', label: 'CV', done: hasDoc(DocumentType.CV) },
       { key: 'availability', label: 'Availability', done: c.availability.length > 0 },
       { key: 'health', label: 'Health & safety declaration', done: c.healthDeclaration === true },

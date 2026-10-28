@@ -27,6 +27,7 @@ const META: Record<string, { href: string; hint: string; icon: ReactNode }> = {
   references: { href: '/dashboard/work-history', hint: 'People who can vouch for you', icon: <Ic.Users width={17} /> },
   'right-to-work': { href: '/dashboard/documents', hint: 'Upload your Right to Work document', icon: <Ic.Shield width={17} /> },
   identity: { href: '/dashboard/documents', hint: 'Upload photo ID (passport or driving licence)', icon: <Ic.FileText width={17} /> },
+  selfie: { href: '/dashboard/documents?type=SELFIE', hint: 'Take a selfie so we can match it to your ID', icon: <Ic.User width={17} /> },
   cv: { href: '/dashboard/documents', hint: 'Upload your current CV', icon: <Ic.FileText width={17} /> },
   availability: { href: '/dashboard/availability', hint: 'Set the days and times you can work', icon: <Ic.Calendar width={17} /> },
   health: { href: '/dashboard/declarations', hint: 'Confirm you’re fit to work safely', icon: <Ic.Shield width={17} /> },
