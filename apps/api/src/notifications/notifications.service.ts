@@ -37,6 +37,8 @@ export type NotifyKind =
   | 'INVOICE_SENT'
   | 'INVOICE_DISPUTED'
   | 'NEW_SIGNUP'
+  | 'SELFIE_REQUIRED'
+  | 'COMPLETE_REGISTRATION'
   | 'REGISTRATION_RECEIVED';
 
 interface NotifyInput {

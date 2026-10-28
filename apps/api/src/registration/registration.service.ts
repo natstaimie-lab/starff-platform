@@ -833,6 +833,74 @@ export class RegistrationService {
     return { reminded };
   }
 
+  /**
+   * Nudge candidates who still haven't provided the now-required selfie, split by
+   * how far along they are:
+   *   SCREENING → "add your selfie" (they've completed the rest of the form)
+   *   NEW       → "finish your registration" (lists remaining steps incl. selfie)
+   * Idempotent: a candidate who already received that message is skipped, so this
+   * is safe to re-run. Real email addresses only; archived candidates excluded.
+   */
+  async notifyIncomplete(): Promise<{ selfie: number; complete: number; skipped: number }> {
+    const candidates = await this.prisma.candidate.findMany({
+      where: { archivedAt: null, documents: { none: { type: DocumentType.SELFIE } } },
+      include: { user: { select: { id: true, email: true } } },
+      take: 1000,
+    });
+
+    const prior = await this.prisma.notification.findMany({
+      where: { type: { in: ['selfie_required', 'complete_registration'] } },
+      select: { userId: true, type: true },
+    });
+    const already = new Set(prior.map((n) => `${n.userId}:${n.type}`));
+
+    const portal = this.candidatePortalUrl();
+    const selfieLink = `${portal}/dashboard/documents?type=SELFIE`;
+    const onboardingLink = `${portal}/dashboard/onboarding`;
+
+    let selfie = 0;
+    let complete = 0;
+    let skipped = 0;
+    for (const c of candidates) {
+      const email = c.user?.email;
+      if (!email || email.endsWith('@candidate.local') || email.endsWith('@placeholder.starff')) { skipped++; continue; }
+
+      if (c.status === CandidateStatus.SCREENING) {
+        if (already.has(`${c.userId}:selfie_required`)) { skipped++; continue; }
+        await this.notifications
+          .send({
+            to: email,
+            userId: c.userId,
+            kind: 'SELFIE_REQUIRED',
+            subject: 'One more step: add a selfie to finish your Starff registration',
+            body: `Hi ${c.firstName}, you're all but done — we just need a quick selfie to match you to your ID and complete your registration. It takes about 30 seconds from your phone.`,
+            actionUrl: selfieLink,
+            actionLabel: 'Add my selfie',
+          })
+          .catch(() => {});
+        selfie++;
+      } else if (c.status === CandidateStatus.NEW) {
+        if (already.has(`${c.userId}:complete_registration`)) { skipped++; continue; }
+        await this.notifications
+          .send({
+            to: email,
+            userId: c.userId,
+            kind: 'COMPLETE_REGISTRATION',
+            subject: 'Finish your Starff registration — a few quick steps left',
+            body: `Hi ${c.firstName}, you're nearly there. A few steps left — your details, documents (Right to Work & ID), availability and a new quick selfie — then sign your agreement and we can start matching you to shifts.`,
+            actionUrl: onboardingLink,
+            actionLabel: 'Finish my registration',
+          })
+          .catch(() => {});
+        complete++;
+      } else {
+        skipped++; // other statuses (already approved, etc.) — not targeted
+      }
+    }
+    this.logger.log(`notifyIncomplete: selfie=${selfie} complete=${complete} skipped=${skipped}`);
+    return { selfie, complete, skipped };
+  }
+
   /** Daily at 10:00 London time — nudge stalled registrations. */
   @Cron('0 10 * * *', { name: 'registration-reminders', timeZone: 'Europe/London' })
   async runRegistrationRemindersCron(): Promise<void> {

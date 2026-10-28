@@ -101,4 +101,13 @@ export class RegistrationController {
   runReminders() {
     return this.registration.sendRegistrationReminders();
   }
+
+  // Staff — notify candidates still missing the required selfie: screening get a
+  // "add your selfie" ask, new/incomplete get a "finish your registration"
+  // nudge. Idempotent (skips anyone already told). Returns per-group counts.
+  @Post('notify-incomplete')
+  @Roles(Role.ADMIN, Role.RECRUITER)
+  notifyIncomplete() {
+    return this.registration.notifyIncomplete();
+  }
 }

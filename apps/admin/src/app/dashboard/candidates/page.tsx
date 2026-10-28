@@ -63,6 +63,7 @@ export default function CandidatesPage() {
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
   const [chasing, setChasing] = useState(false);
+  const [notifying, setNotifying] = useState(false);
   const [sectorFilter, setSectorFilter] = useState('');
 
   const load = () => apiFetch<Candidate[]>('/candidates').then(setRows).catch((e) => setError(e.message)).finally(() => setLoading(false));
@@ -80,6 +81,23 @@ export default function CandidatesPage() {
     } catch (e: any) {
       alert(e?.message || 'Could not send reminders.');
     } finally { setChasing(false); }
+  }
+
+  // Notify candidates still missing the required selfie: screening get an
+  // "add your selfie" ask, new/incomplete get a "finish registration" nudge.
+  // Idempotent — re-running skips anyone already told.
+  async function requestSelfies() {
+    if (!confirm('Email candidates who still need a selfie?\n\n• Screening candidates get an "add your selfie" message.\n• New/incomplete candidates get a "finish your registration" message (which now includes the selfie).\n\nAnyone already notified is skipped.')) return;
+    setNotifying(true);
+    try {
+      const r = await apiFetch<{ selfie: number; complete: number; skipped: number }>('/registration/notify-incomplete', { method: 'POST' });
+      const total = r.selfie + r.complete;
+      alert(total > 0
+        ? `Sent ${total} message${total === 1 ? '' : 's'}:\n• ${r.selfie} selfie ask (screening)\n• ${r.complete} finish-registration (new)\n${r.skipped ? `\n${r.skipped} skipped (already notified or no email).` : ''}`
+        : `No one to notify — everyone eligible has been told already${r.skipped ? ` (${r.skipped} skipped)` : ''}.`);
+    } catch (e: any) {
+      alert(e?.message || 'Could not send.');
+    } finally { setNotifying(false); }
   }
 
   async function save() {
@@ -132,6 +150,9 @@ export default function CandidatesPage() {
           </select>
           <button className="aibtn" style={{ background: 'var(--surface-card)', color: 'var(--text-secondary)', border: '1px solid var(--border-strong)' }} onClick={chaseIncomplete} disabled={chasing} title="Email everyone who registered but hasn't finished">
             <Ic.Bell width={15} /> {chasing ? 'Sending…' : 'Chase incomplete'}
+          </button>
+          <button className="aibtn" style={{ background: 'var(--surface-card)', color: 'var(--text-secondary)', border: '1px solid var(--border-strong)' }} onClick={requestSelfies} disabled={notifying} title="Email candidates still missing a selfie (screening: add selfie; new: finish registration)">
+            <Ic.User width={15} /> {notifying ? 'Sending…' : 'Request selfies'}
           </button>
           <button className="aibtn" style={{ background: 'var(--blue-500)', color: '#fff', border: 'none' }} onClick={() => setOpen(true)}>
             <Ic.Plus width={16} /> Add Candidate
