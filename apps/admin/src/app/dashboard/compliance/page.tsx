@@ -23,7 +23,16 @@ export default function CompliancePage() {
   const [filter, setFilter] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch<Cand[]>('/candidates').then(setRows).catch((e) => setError(e.message)).finally(() => setLoading(false));
+    // first=true shows the skeleton + surfaces errors; the 15s background polls
+    // refresh silently so compliance statuses update without a manual refresh.
+    const load = (first = false) =>
+      apiFetch<Cand[]>('/candidates')
+        .then(setRows)
+        .catch((e) => { if (first) setError(e.message); })
+        .finally(() => { if (first) setLoading(false); });
+    load(true);
+    const i = setInterval(() => load(), 15000);
+    return () => clearInterval(i);
   }, []);
 
   const total = rows.length || 1;

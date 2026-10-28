@@ -67,7 +67,9 @@ export default function CandidatesPage() {
   const [sectorFilter, setSectorFilter] = useState('');
 
   const load = () => apiFetch<Candidate[]>('/candidates').then(setRows).catch((e) => setError(e.message)).finally(() => setLoading(false));
-  useEffect(() => { load(); }, []);
+  // Auto-refresh the list every 15s so new sign-ups and completed registrations
+  // appear without a manual refresh. Silent — doesn't re-flash the skeleton.
+  useEffect(() => { load(); const i = setInterval(load, 15000); return () => clearInterval(i); }, []);
 
   // Nudge everyone who registered but never finished (same rules as the daily
   // auto-reminder: 24h+ old, not submitted, capped at 3, one per 48h).

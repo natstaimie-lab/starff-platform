@@ -298,7 +298,15 @@ export default function JobDetail() {
         if (RECRUITING_STAGES.includes(job.status)) loadRecs();
       })
       .catch((e) => setError(e.message));
-  useEffect(() => { load(); apiFetch<Analysis>(`/jobs/${id}/analysis`).then(setAnalysis).catch(() => {}); }, [id]);
+  useEffect(() => {
+    load();
+    apiFetch<Analysis>(`/jobs/${id}/analysis`).then(setAnalysis).catch(() => {});
+    // Silent status poll every 20s: refresh the job itself (stage, rates saved
+    // elsewhere) but NOT the shortlist — re-scoring would flash and clear any
+    // candidates you've ticked, and reseeding the rate inputs would fight typing.
+    const i = setInterval(() => { apiFetch<Job>(`/jobs/${id}`).then(setJ).catch(() => {}); }, 20000);
+    return () => clearInterval(i);
+  }, [id]);
 
   async function approve() {
     setBusy(true);

@@ -52,6 +52,9 @@ export default function BookingsPage() {
   useEffect(() => {
     load();
     apiFetch<ClientOpt[]>('/clients').then((cs) => setClients(cs.map((c) => ({ id: c.id, name: c.name })))).catch(() => {});
+    // Auto-refresh the jobs list every 15s (silent — doesn't re-flash the skeleton).
+    const i = setInterval(load, 15000);
+    return () => clearInterval(i);
   }, []);
 
   async function save() {

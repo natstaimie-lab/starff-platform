@@ -34,7 +34,16 @@ export default function EnquiriesPage() {
     return apiFetch<Enquiry[]>(`/enquiries${t === 'spam' ? '?spam=true' : ''}`)
       .then(setRows).catch((e) => setError(e.message)).finally(() => setLoading(false));
   };
-  useEffect(() => { load(tab); /* eslint-disable-next-line */ }, [tab]);
+  useEffect(() => {
+    load(tab);
+    // Silent background refresh so new enquiries land on their own — fetch
+    // straight into rows without toggling the loading skeleton.
+    const silent = () =>
+      apiFetch<Enquiry[]>(`/enquiries${tab === 'spam' ? '?spam=true' : ''}`).then(setRows).catch(() => {});
+    const i = setInterval(silent, 15000);
+    return () => clearInterval(i);
+    /* eslint-disable-next-line */
+  }, [tab]);
 
   async function convert(id: string) {
     setBusy(id);
