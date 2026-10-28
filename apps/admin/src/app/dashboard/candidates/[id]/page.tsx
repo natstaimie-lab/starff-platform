@@ -28,7 +28,7 @@ type Candidate = {
   healthDeclaration?: boolean; healthNotes?: string | null; consentGdpr?: boolean; consentGdprAt?: string | null;
   agreementAccepted?: boolean; signatureName?: string | null; signedAt?: string | null;
   submittedAt?: string | null; registrationSource?: string | null; createdAt?: string | null; preferredSectors?: string[];
-  loginEmail?: string | null; hasLogin?: boolean;
+  userId?: string; loginEmail?: string | null; hasLogin?: boolean;
   documents: Doc[]; skills: { skill: { name: string } }[]; availability: { dayOfWeek: number }[];
   employmentHistory: Job[]; references: Ref[];
 };
@@ -82,6 +82,9 @@ export default function CandidateProfile() {
   const [docUrls, setDocUrls] = useState<Record<string, string>>({});
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [showBank, setShowBank] = useState(false);
+  const [msgDraft, setMsgDraft] = useState('');
+  const [msgSending, setMsgSending] = useState(false);
+  const [msgSent, setMsgSent] = useState(false);
   const [rechecking, setRechecking] = useState<string | null>(null);
 
   const load = () => apiFetch<Candidate>(`/candidates/${id}`).then(setC).catch((e) => setError(e.message));
@@ -158,6 +161,18 @@ export default function CandidateProfile() {
       await load();
       setTimeout(() => setInviteOpen(false), 1400);
     } catch (e: any) { setInviteMsg(e?.message ?? 'Could not send the invite.'); } finally { setInviting(false); }
+  }
+
+  // Message the candidate directly — lands in their portal Messages and alerts them.
+  async function sendMessage() {
+    const body = msgDraft.trim();
+    if (!body || !c?.userId) return;
+    setMsgSending(true); setMsgSent(false);
+    try {
+      await apiFetch(`/messages/member/${c.userId}`, { method: 'POST', body: JSON.stringify({ body }) });
+      setMsgDraft(''); setMsgSent(true);
+      setTimeout(() => setMsgSent(false), 3000);
+    } catch (e: any) { alert(e?.message ?? 'Could not send the message.'); } finally { setMsgSending(false); }
   }
 
   async function archive() {
@@ -350,6 +365,27 @@ export default function CandidateProfile() {
               </>
             )}
           </Card>
+
+          {/* Message the candidate directly — lands in their portal */}
+          {c.hasLogin && (
+            <Card title={`Message ${c.firstName}`} subtitle="Sends to their portal — they're alerted by notification (and email for a new thread).">
+              <textarea
+                value={msgDraft}
+                onChange={(e) => { setMsgDraft(e.target.value); setMsgSent(false); }}
+                placeholder={`Write a message to ${c.firstName}…`}
+                rows={3}
+                style={{ width: '100%', resize: 'vertical', padding: '10px 12px', border: '1px solid var(--border-strong)', borderRadius: 10, fontSize: 13.5, fontFamily: 'inherit', outline: 'none', marginBottom: 8 }}
+              />
+              <div className="fx ac" style={{ gap: 10, justifyContent: 'space-between' }}>
+                {msgSent
+                  ? <span style={{ color: 'var(--success-600)', fontSize: 12.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}><Ic.Check width={14} /> Sent to their portal</span>
+                  : <span className="dim" style={{ fontSize: 12 }}>They'll see it in Messages.</span>}
+                <button onClick={sendMessage} disabled={msgSending || !msgDraft.trim()} className="aibtn" style={{ background: 'var(--blue-500)', color: '#fff', border: 'none', opacity: (msgSending || !msgDraft.trim()) ? 0.6 : 1 }}>
+                  <Ic.Message width={15} /> {msgSending ? 'Sending…' : 'Send message'}
+                </button>
+              </div>
+            </Card>
+          )}
 
           {/* Signed worker documents */}
           <Card title="Signed documents">

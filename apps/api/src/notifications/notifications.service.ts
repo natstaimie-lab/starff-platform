@@ -38,6 +38,7 @@ export type NotifyKind =
   | 'INVOICE_DISPUTED'
   | 'NEW_SIGNUP'
   | 'SELFIE_REQUIRED'
+  | 'NEW_MESSAGE'
   | 'REGISTRATION_RECEIVED';
 
 interface NotifyInput {
@@ -49,6 +50,8 @@ interface NotifyInput {
   actionLabel?: string;
   /** if we know the platform user, also drop an in-app notification */
   userId?: string;
+  /** set false to send in-app + push only, skipping the email (default true) */
+  email?: boolean;
 }
 
 @Injectable()
@@ -90,6 +93,11 @@ export class NotificationsService {
         input.body,
         input.actionUrl ? { link: input.actionUrl } : undefined,
       );
+    }
+
+    // Caller asked for in-app + push only (e.g. a chatty message thread).
+    if (input.email === false) {
+      return { inApp, emailed: false };
     }
 
     // 2. Email via Resend — no-ops cleanly when the key isn't configured yet.

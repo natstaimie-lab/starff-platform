@@ -42,4 +42,12 @@ export class MessagesController {
   staffSend(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body('body') body: string) {
     return this.messages.staffSend(u.id, id, body);
   }
+
+  // Start (or continue) a conversation with a member by their user id — staff
+  // reaching out first, not just replying. Lands in the member's portal.
+  @Post('member/:userId')
+  @Roles(Role.ADMIN, Role.RECRUITER)
+  staffStart(@CurrentUser() u: AuthUser, @Param('userId') userId: string, @Body('body') body: string) {
+    return this.messages.staffStart(u.id, userId, body);
+  }
 }
