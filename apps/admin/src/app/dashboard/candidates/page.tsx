@@ -23,16 +23,19 @@ const empty = { firstName: '', lastName: '', headline: '', city: '', postcode: '
 const SECTORS = [
   'Warehouse & Logistics', 'Driving & Delivery', 'Construction & Trades',
   'Industrial & Manufacturing', 'Security', 'Cleaning', 'Hospitality & Catering',
-  'Care & Healthcare', 'Events', 'Office & Admin',
+  'Events',
 ];
 
 const SOURCE_LABEL: Record<string, string> = { WEBSITE: 'Website', MOBILE: 'Mobile app', PORTAL: 'Portal', ADMIN: 'Admin' };
 
-// Same 6-section rule as the API's registration progress, computed client-side
-// from the fields the candidates list already returns.
+// Same 15-section rule as the API's registration progress
+// (apps/api/src/registration/registration.service.ts), computed client-side
+// from the fields the candidates list already returns — so the % here matches
+// what the candidate sees on their own onboarding checklist.
 function progressPct(c: Candidate): number {
   const hasDoc = (t: string) => c.documents?.some((d) => d.type === t) ?? false;
   const sections = [
+    (c.preferredSectors?.length ?? 0) > 0,
     !!(c.phone && c.city && c.postcode),
     !!(c.dateOfBirth && c.nationalInsurance),
     !!(c.emergencyName && c.emergencyPhone),
@@ -41,6 +44,7 @@ function progressPct(c: Candidate): number {
     (c._count?.references ?? 0) > 0,
     hasDoc('RIGHT_TO_WORK'),
     hasDoc('ID'),
+    hasDoc('SELFIE'),
     hasDoc('CV'),
     (c._count?.availability ?? 0) > 0,
     c.healthDeclaration === true,
