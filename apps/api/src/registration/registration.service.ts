@@ -818,7 +818,7 @@ export class RegistrationService {
           userId: c.userId,
           kind: 'REGISTRATION_REMINDER',
           subject: 'Finish your Starff registration',
-          body: `Hi ${c.firstName}, you're nearly there. A few quick steps — your right to work, documents and availability — and we can start matching you to shifts. It only takes a few minutes.`,
+          body: `Hi ${c.firstName}, you're nearly there. A few quick steps — your right to work, ID, a quick selfie and availability — and we can start matching you to shifts. It only takes a few minutes.`,
           actionUrl: this.candidatePortalUrl(),
           actionLabel: 'Finish my registration',
         })
@@ -833,72 +833,80 @@ export class RegistrationService {
     return { reminded };
   }
 
+  /** True when every registration step EXCEPT the selfie is complete — i.e. the
+   * candidate's one remaining action is to take their selfie. Mirrors the section
+   * rules in candidateProgress(). */
+  private completeExceptSelfie(c: any): boolean {
+    const hasDoc = (t: DocumentType) => c.documents.some((d: any) => d.type === t);
+    return (
+      (c.preferredSectors?.length ?? 0) > 0 &&
+      !!(c.phone && c.city && c.postcode) &&
+      !!(c.dateOfBirth && c.nationalInsurance) &&
+      !!(c.emergencyName && c.emergencyPhone) &&
+      !!(c.bankAccountName && c.bankSortCode && c.bankAccountNumber) &&
+      c.employmentHistory.length > 0 &&
+      c.references.length > 0 &&
+      hasDoc(DocumentType.RIGHT_TO_WORK) &&
+      hasDoc(DocumentType.ID) &&
+      hasDoc(DocumentType.CV) &&
+      c.availability.length > 0 &&
+      c.healthDeclaration === true &&
+      c.consentGdpr === true &&
+      c.agreementAccepted === true && !!c.signatureName
+    );
+  }
+
   /**
-   * Nudge candidates who still haven't provided the now-required selfie, split by
-   * how far along they are:
-   *   SCREENING → "add your selfie" (they've completed the rest of the form)
-   *   NEW       → "finish your registration" (lists remaining steps incl. selfie)
-   * Idempotent: a candidate who already received that message is skipped, so this
-   * is safe to re-run. Real email addresses only; archived candidates excluded.
+   * "Add your selfie" ask — targets only candidates whose single remaining step
+   * is the selfie (everything else done). People with other steps outstanding are
+   * left to the general "finish your registration" reminder (sendRegistrationReminders),
+   * which now mentions the selfie too. Idempotent (skips anyone already asked);
+   * real email addresses only; archived excluded.
    */
-  async notifyIncomplete(): Promise<{ selfie: number; complete: number; skipped: number }> {
+  async notifyIncomplete(): Promise<{ selfie: number; skipped: number }> {
     const candidates = await this.prisma.candidate.findMany({
       where: { archivedAt: null, documents: { none: { type: DocumentType.SELFIE } } },
-      include: { user: { select: { id: true, email: true } } },
+      include: {
+        user: { select: { id: true, email: true } },
+        documents: true,
+        employmentHistory: true,
+        references: true,
+        availability: true,
+      },
       take: 1000,
     });
 
     const prior = await this.prisma.notification.findMany({
-      where: { type: { in: ['selfie_required', 'complete_registration'] } },
-      select: { userId: true, type: true },
+      where: { type: 'selfie_required' },
+      select: { userId: true },
     });
-    const already = new Set(prior.map((n) => `${n.userId}:${n.type}`));
+    const already = new Set(prior.map((n) => n.userId));
 
-    const portal = this.candidatePortalUrl();
-    const selfieLink = `${portal}/dashboard/documents?type=SELFIE`;
-    const onboardingLink = `${portal}/dashboard/onboarding`;
+    const selfieLink = `${this.candidatePortalUrl()}/dashboard/documents?type=SELFIE`;
 
     let selfie = 0;
-    let complete = 0;
     let skipped = 0;
     for (const c of candidates) {
       const email = c.user?.email;
       if (!email || email.endsWith('@candidate.local') || email.endsWith('@placeholder.starff')) { skipped++; continue; }
+      if (already.has(c.userId)) { skipped++; continue; }
+      if (!this.completeExceptSelfie(c)) { skipped++; continue; } // other gaps → Chase incomplete handles them
 
-      if (c.status === CandidateStatus.SCREENING) {
-        if (already.has(`${c.userId}:selfie_required`)) { skipped++; continue; }
-        await this.notifications
-          .send({
-            to: email,
-            userId: c.userId,
-            kind: 'SELFIE_REQUIRED',
-            subject: 'One more step: add a selfie to finish your Starff registration',
-            body: `Hi ${c.firstName}, you're all but done — we just need a quick selfie to match you to your ID and complete your registration. It takes about 30 seconds from your phone.`,
-            actionUrl: selfieLink,
-            actionLabel: 'Add my selfie',
-          })
-          .catch(() => {});
-        selfie++;
-      } else if (c.status === CandidateStatus.NEW) {
-        if (already.has(`${c.userId}:complete_registration`)) { skipped++; continue; }
-        await this.notifications
-          .send({
-            to: email,
-            userId: c.userId,
-            kind: 'COMPLETE_REGISTRATION',
-            subject: 'Finish your Starff registration — a few quick steps left',
-            body: `Hi ${c.firstName}, you're nearly there. A few steps left — your details, documents (Right to Work & ID), availability and a new quick selfie — then sign your agreement and we can start matching you to shifts.`,
-            actionUrl: onboardingLink,
-            actionLabel: 'Finish my registration',
-          })
-          .catch(() => {});
-        complete++;
-      } else {
-        skipped++; // other statuses (already approved, etc.) — not targeted
-      }
+      await this.notifications
+        .send({
+          to: email,
+          userId: c.userId,
+          kind: 'SELFIE_REQUIRED',
+          subject: 'One more step: add a selfie to finish your Starff registration',
+          body: `Hi ${c.firstName}, you're all but done — we just need a quick selfie to match you to your ID and complete your registration. It takes about 30 seconds from your phone.`,
+          actionUrl: selfieLink,
+          actionLabel: 'Add my selfie',
+        })
+        .catch(() => {});
+      selfie++;
     }
-    this.logger.log(`notifyIncomplete: selfie=${selfie} complete=${complete} skipped=${skipped}`);
-    return { selfie, complete, skipped };
+    this.logger.log(`notifyIncomplete (selfie-only): selfie=${selfie} skipped=${skipped}`);
+    return { selfie, skipped };
   }
 
   /** Daily at 10:00 London time — nudge stalled registrations. */
