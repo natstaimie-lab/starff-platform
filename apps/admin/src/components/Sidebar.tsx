@@ -32,6 +32,7 @@ const sections: Section[] = [
     label: 'Compliance',
     items: [
       { key: 'compliance', label: 'Compliance', href: '/dashboard/compliance', icon: <Ic.ClipboardCheck /> },
+      { key: 'deletions', label: 'Account deletions', href: '/dashboard/deletions', icon: <Ic.AlertCircle /> },
     ],
   },
   {

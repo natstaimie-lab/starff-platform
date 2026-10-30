@@ -39,7 +39,7 @@ export type NotifyKind =
   | 'NEW_SIGNUP'
   | 'SELFIE_REQUIRED'
   | 'NEW_MESSAGE'
-  | 'REGISTRATION_RECEIVED';
+  | 'ACCOUNT_DELETION_REQUEST';
 
 interface NotifyInput {
   to: string;

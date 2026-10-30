@@ -13,7 +13,7 @@ import {
 import { Icon } from '@/components/Icon';
 import { colors } from '@/theme/tokens';
 import { useApi } from '@/lib/useApi';
-import { candidateApi } from '@/lib/endpoints';
+import { candidateApi, accountApi } from '@/lib/endpoints';
 import { useAuth } from '@/auth/AuthContext';
 import { PushToggleRow } from '@/components/PushToggleRow';
 
@@ -44,6 +44,44 @@ export function CandidateProfileScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign out', style: 'destructive', onPress: signOut },
     ]);
+
+  // In-app account deletion (required by the App Store / Play Store). Two-step
+  // confirm, then the API disables the account immediately and the team erases
+  // what the law doesn't require us to keep.
+  const finalDeleteConfirm = () =>
+    Alert.alert(
+      'Confirm deletion',
+      'Are you sure? Your account will be disabled straight away and this cannot be undone from the app.',
+      [
+        { text: 'Keep my account', style: 'cancel' },
+        {
+          text: 'Delete account',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await accountApi.requestDeletion();
+              Alert.alert(
+                'Account deletion requested',
+                'Your account has been disabled and our team will complete the deletion. You’ll now be signed out.',
+                [{ text: 'OK', onPress: signOut }],
+              );
+            } catch (e: any) {
+              Alert.alert('Something went wrong', e?.message || 'Please try again, or email privacy@starff.co.uk.');
+            }
+          },
+        },
+      ],
+    );
+
+  const confirmDeleteAccount = () =>
+    Alert.alert(
+      'Delete your account?',
+      'This closes your Starff account and signs you out — you’ll lose access to shifts, messages and your profile.\n\nSome records (such as right-to-work and pay records) must be kept for a period required by law; everything else will be erased by our team.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Continue', style: 'destructive', onPress: finalDeleteConfirm },
+      ],
+    );
 
   const onToggleBiometric = async (on: boolean) => {
     if (on && !biometricAvailable) {
@@ -120,6 +158,10 @@ export function CandidateProfileScreen() {
             </Card>
 
             <Button title="Sign out" kind="ghost" icon="logout" onPress={confirmSignOut} />
+
+            <Pressable onPress={confirmDeleteAccount} style={styles.deleteBtn} hitSlop={8}>
+              <Text style={styles.deleteTxt}>Delete my account</Text>
+            </Pressable>
           </>
         )}
       </ScreenScroll>
@@ -152,4 +194,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   liTitle: { fontSize: 13.5, fontWeight: '700', color: colors.text },
+  deleteBtn: { alignItems: 'center', paddingVertical: 14, marginTop: 2 },
+  deleteTxt: { color: colors.error, fontWeight: '700', fontSize: 13.5 },
 });

@@ -180,6 +180,13 @@ model User {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
+  // In-app account deletion (App Store / Play requirement). A user requests
+  // deletion from the app: we deactivate immediately and flag the account;
+  // admin completes erasure honouring statutory retention (RTW/payroll).
+  deletionRequestedAt DateTime?
+  deletionHandledAt   DateTime?
+  deletionReason      String?
+
   candidate     Candidate?
   clientContact ClientContact?
   notifications Notification[]

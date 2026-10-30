@@ -243,6 +243,20 @@ export const messagesApi = {
     apiFetch('/messages/thread', { method: 'POST', body: { body } }),
 };
 
+// ── Shared: account (roles CANDIDATE + CLIENT) ─────────────────────────────
+export const accountApi = {
+  /**
+   * POST /account/deletion-request — start deleting your own account. The API
+   * deactivates it immediately and notifies the Starff team to complete erasure
+   * (keeping only what the law requires). The caller should sign out after this.
+   */
+  requestDeletion: (reason?: string) =>
+    apiFetch<{ ok: boolean; requestedAt: string; alreadyRequested: boolean }>(
+      '/account/deletion-request',
+      { method: 'POST', body: { reason } },
+    ),
+};
+
 // ── Shared: notifications + push (any authenticated user) ───────────────────
 export const notificationsApi = {
   /** GET /notifications — the current user's notifications, newest first. */
