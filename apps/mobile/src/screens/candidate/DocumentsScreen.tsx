@@ -88,12 +88,20 @@ export function DocumentsScreen() {
     }
   };
 
+  // High-value identity docs use the guided, framed capture (align-in-frame +
+  // review). A licence/ID card is two-sided; a passport photo page and the
+  // selfie are single. Everything else keeps the quick photo-or-file picker.
+  const guided = (docType: string, label: string, mode: 'single' | 'card' | 'selfie') =>
+    nav.navigate('DocumentCapture', { docType, label, mode });
+
   const pickSource = () => {
     const label = DOC_TYPES.find((d) => d.type === type)?.label ?? 'document';
-    // A selfie must be a live photo — no file picker.
-    if (type === 'SELFIE') {
-      Alert.alert('Take your identity selfie', 'Hold your phone at eye level, face the camera in good light, and make sure your whole face is visible.', [
-        { text: 'Open camera', onPress: takePhoto },
+    if (type === 'SELFIE') { guided('SELFIE', 'Identity selfie', 'selfie'); return; }
+    if (type === 'LICENCE') { guided('LICENCE', 'Driving licence', 'card'); return; }
+    if (type === 'ID') {
+      Alert.alert('What are you photographing?', 'A passport is one photo page. An ID or residence card has a front and a back.', [
+        { text: 'Passport', onPress: () => guided('ID', 'Passport', 'single') },
+        { text: 'ID / residence card', onPress: () => guided('ID', 'ID card', 'card') },
         { text: 'Cancel', style: 'cancel' },
       ]);
       return;
@@ -148,6 +156,15 @@ export function DocumentsScreen() {
                 </Text>
               </View>
             </Card>
+
+            <Pressable onPress={() => nav.navigate('DrivingLicence')} style={styles.doc}>
+              <View style={styles.docIcon}><Icon name="credit-card" size={19} color={colors.orange} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.docTitle}>Driving licence check (DVLA)</Text>
+                <Muted>Add your licence number & share code</Muted>
+              </View>
+              <Icon name="chevron-right" size={18} color={colors.textFaint} />
+            </Pressable>
 
             <Text style={styles.sectionLabel}>YOUR DOCUMENTS</Text>
             {docs.length === 0 ? (

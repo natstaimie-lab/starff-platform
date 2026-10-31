@@ -44,10 +44,7 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT",
-        "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.USE_FINGERPRINT"
       ]
     },
     "plugins": [
@@ -58,6 +55,13 @@
         {
           "photosPermission": "Starff needs access to your photos so you can upload document images and a profile photo.",
           "cameraPermission": "Starff uses the camera so you can photograph and upload compliance documents."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Starff uses the camera to photograph your ID, driving licence and selfie for verification.",
+          "recordAudioAndroid": false
         }
       ],
       [

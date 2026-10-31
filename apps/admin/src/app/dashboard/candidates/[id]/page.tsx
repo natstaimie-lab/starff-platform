@@ -11,7 +11,7 @@ import { Modal, Field, TextInput, Button } from '@/components/Modal';
 import { ReliabilityCard } from '@/components/ReliabilityCard';
 import * as Ic from '@/components/icons';
 
-type Doc = { id: string; type: string; fileName?: string; status: string; expiryDate?: string; createdAt: string; aiCheckVerdict?: string | null; aiCheckSummary?: string | null; aiCheckedAt?: string | null };
+type Doc = { id: string; type: string; fileName?: string; status: string; expiryDate?: string; createdAt: string; aiCheckVerdict?: string | null; aiCheckSummary?: string | null; aiCheckedAt?: string | null; backFileUrl?: string | null; backFileName?: string | null };
 type Job = { id: string; employer: string; jobTitle?: string | null; startDate?: string | null; endDate?: string | null; current: boolean; reasonForLeaving?: string | null };
 type Ref = { id: string; name: string; relationship?: string | null; company?: string | null; email?: string | null; phone?: string | null };
 type WorkerAgreement = {
@@ -28,6 +28,7 @@ type Candidate = {
   healthDeclaration?: boolean; healthNotes?: string | null; consentGdpr?: boolean; consentGdprAt?: string | null;
   agreementAccepted?: boolean; signatureName?: string | null; signedAt?: string | null;
   submittedAt?: string | null; registrationSource?: string | null; createdAt?: string | null; preferredSectors?: string[];
+  drivingLicenceNumber?: string | null; dvlaCheckCode?: string | null; dvlaCheckCodeAt?: string | null;
   userId?: string; loginEmail?: string | null; hasLogin?: boolean;
   documents: Doc[]; skills: { skill: { name: string } }[]; availability: { dayOfWeek: number }[];
   employmentHistory: Job[]; references: Ref[];
@@ -196,6 +197,10 @@ export default function CandidateProfile() {
     try { const { url } = await apiFetch<{ url: string }>(`/candidates/${id}/documents/${docId}/url`); window.open(url, '_blank'); }
     catch (e: any) { alert(e.message); }
   }
+  async function viewBack(docId: string) {
+    try { const { url } = await apiFetch<{ url: string }>(`/candidates/${id}/documents/${docId}/url?side=back`); window.open(url, '_blank'); }
+    catch (e: any) { alert(e.message); }
+  }
   async function recheck(docId: string) {
     setRechecking(docId);
     try { await apiFetch(`/candidates/${id}/documents/${docId}/recheck`, { method: 'POST' }); await load(); }
@@ -276,7 +281,8 @@ export default function CandidateProfile() {
   const DocActions = ({ d }: { d: Doc }) => (!isAdmin ? null : (
     <div style={{ display: 'flex', gap: 6 }}>
       <button onClick={() => recheck(d.id)} disabled={rechecking === d.id} title="Re-run the automated pre-check" style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>{rechecking === d.id ? '…' : 'Re-check'}</button>
-      <button onClick={() => view(d.id)} style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>View</button>
+      <button onClick={() => view(d.id)} style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>{d.backFileUrl ? 'Front' : 'View'}</button>
+      {d.backFileUrl && <button onClick={() => viewBack(d.id)} style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>Back</button>}
       {d.status !== 'VERIFIED' && <button disabled={busy === d.id} onClick={() => setDoc(d.id, 'VERIFIED')} style={{ border: 'none', background: 'var(--success-100)', color: 'var(--success-600)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>Verify</button>}
       {d.status !== 'REJECTED' && <button disabled={busy === d.id} onClick={() => setDoc(d.id, 'REJECTED')} style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--error-600)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>Reject</button>}
     </div>
@@ -288,6 +294,18 @@ export default function CandidateProfile() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Link href="/dashboard/candidates" className="link" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>← Back to candidates</Link>
+
+      {isAdmin && (c.drivingLicenceNumber || c.dvlaCheckCode) && (
+        <Card title="Driving licence (DVLA)" subtitle="Check entitlements & penalty points on gov.uk">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center' }}>
+            <div><div className="sub2">Licence number</div><div style={{ fontWeight: 700, fontFamily: 'var(--font-mono, monospace)' }}>{c.drivingLicenceNumber || '—'}</div></div>
+            <div><div className="sub2">Check code</div><div style={{ fontWeight: 700, fontFamily: 'var(--font-mono, monospace)', letterSpacing: 1 }}>{c.dvlaCheckCode || '—'}</div></div>
+            {c.dvlaCheckCodeAt && <div><div className="sub2">Supplied</div><div style={{ fontWeight: 600 }}>{fmt(c.dvlaCheckCodeAt)}</div></div>}
+            <a href="https://www.gov.uk/check-driving-information" target="_blank" rel="noopener noreferrer" style={{ marginLeft: 'auto', border: 'none', background: 'var(--orange-500)', color: '#fff', fontWeight: 700, fontSize: 13, padding: '8px 14px', borderRadius: 8, textDecoration: 'none' }}>Check on gov.uk →</a>
+          </div>
+          <div className="sub2" style={{ marginTop: 10 }}>Enter the licence number and check code at gov.uk to view categories, endorsements and points. Codes expire 21 days after the driver creates them.</div>
+        </Card>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)', gap: 16 }}>
         <Card title="Compliance checklist" subtitle={`${verifiedCount} of ${REQUIRED.length} checks verified`}>

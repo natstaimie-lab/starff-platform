@@ -32,6 +32,8 @@ import { WorkerDocumentsScreen } from '@/screens/candidate/WorkerDocumentsScreen
 import { PayrollScreen } from '@/screens/candidate/PayrollScreen';
 import { ProfileEditScreen } from '@/screens/candidate/ProfileEditScreen';
 import { PaymentScreen } from '@/screens/candidate/PaymentScreen';
+import { DocumentCaptureScreen } from '@/screens/candidate/DocumentCaptureScreen';
+import { DrivingLicenceScreen } from '@/screens/candidate/DrivingLicenceScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -71,6 +73,8 @@ function ProfileStack() {
       <ProfileStackNav.Screen name="WorkerDocuments" component={WorkerDocumentsScreen} />
       <ProfileStackNav.Screen name="Payroll" component={PayrollScreen} />
       <ProfileStackNav.Screen name="Payment" component={PaymentScreen} />
+      <ProfileStackNav.Screen name="DocumentCapture" component={DocumentCaptureScreen} />
+      <ProfileStackNav.Screen name="DrivingLicence" component={DrivingLicenceScreen} />
     </ProfileStackNav.Navigator>
   );
 }

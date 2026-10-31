@@ -93,9 +93,18 @@ export class MeController {
   @Post('documents')
   addDocument(
     @CurrentUser() user: AuthUser,
-    @Body() dto: { type: string; fileUrl: string; fileName?: string },
+    @Body() dto: { type: string; fileUrl: string; fileName?: string; backFileUrl?: string; backFileName?: string },
   ) {
     return this.me.addDocument(user.id, dto);
+  }
+
+  // ── Driving licence (DVLA check code) ──
+  @Put('driving-licence')
+  setDrivingLicence(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: { licenceNumber?: string; checkCode?: string },
+  ) {
+    return this.me.setDrivingLicence(user.id, dto);
   }
 
   // ── Employment history ──

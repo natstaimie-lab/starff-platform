@@ -295,15 +295,17 @@ export class CandidatesService {
   }
 
   /** Short-lived signed URL so staff can view a private document file. */
-  async documentUrl(candidateId: string, docId: string) {
+  async documentUrl(candidateId: string, docId: string, side?: string) {
     const doc = await this.prisma.candidateDocument.findUnique({ where: { id: docId } });
     if (!doc || doc.candidateId !== candidateId) throw new NotFoundException('Document not found');
+    const path = side === 'back' ? doc.backFileUrl : doc.fileUrl;
+    if (!path) throw new NotFoundException('Document not found');
     const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
       auth: { persistSession: false },
     });
     const { data, error } = await supabase.storage
       .from('candidate-documents')
-      .createSignedUrl(doc.fileUrl, 300);
+      .createSignedUrl(path, 300);
     if (error) throw new NotFoundException('Could not open document');
     return { url: data.signedUrl };
   }

@@ -107,9 +107,14 @@ export const candidateApi = {
       idempotencyKey: idempotencyKey('submit-timesheet', shiftId),
     }),
 
-  /** POST /me/documents — register an uploaded document (see uploads flow). */
-  addDocument: (input: { type: string; fileUrl: string; fileName?: string; expiryDate?: string }) =>
+  /** POST /me/documents — register an uploaded document (see uploads flow).
+   * Two-sided docs (licence, ID card) also pass backFileUrl/backFileName. */
+  addDocument: (input: { type: string; fileUrl: string; fileName?: string; expiryDate?: string; backFileUrl?: string; backFileName?: string }) =>
     apiFetch('/me/documents', { method: 'POST', body: input }),
+
+  /** PUT /me/driving-licence — save DVLA licence number and/or share code. */
+  setDrivingLicence: (input: { licenceNumber?: string; checkCode?: string }) =>
+    apiFetch('/me/driving-licence', { method: 'PUT', body: input }),
 
   /** PUT /me/declarations — GDPR consent, agreement, e-signature. */
   setDeclarations: (input: Record<string, unknown>) =>

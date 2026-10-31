@@ -110,8 +110,8 @@ export class CandidatesController {
   // Open a private document file — ADMIN only (contains ID/RTW/DBS imagery).
   @Get(':id/documents/:docId/url')
   @Roles(Role.ADMIN)
-  docUrl(@Param('id') id: string, @Param('docId') docId: string) {
-    return this.candidates.documentUrl(id, docId);
+  docUrl(@Param('id') id: string, @Param('docId') docId: string, @Query('side') side?: string) {
+    return this.candidates.documentUrl(id, docId, side);
   }
 
   // Re-run the automated pre-check on a document — ADMIN only (reads the file).

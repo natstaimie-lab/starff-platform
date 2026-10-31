@@ -31,4 +31,6 @@ export type ProfileStackParamList = {
   WorkerDocuments: undefined;
   Payroll: undefined;
   Payment: undefined;
+  DocumentCapture: { docType: string; label: string; mode: 'single' | 'card' | 'selfie' };
+  DrivingLicence: undefined;
 };

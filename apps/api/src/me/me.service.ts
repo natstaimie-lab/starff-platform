@@ -430,8 +430,12 @@ export class MeService {
     });
   }
 
-  /** Record a document the candidate uploaded (file already in Supabase Storage). */
-  async addDocument(userId: string, dto: { type: string; fileUrl: string; fileName?: string }) {
+  /** Record a document the candidate uploaded (file already in Supabase Storage).
+   * Two-sided documents (driving licence, ID card) pass backFileUrl/backFileName. */
+  async addDocument(
+    userId: string,
+    dto: { type: string; fileUrl: string; fileName?: string; backFileUrl?: string; backFileName?: string },
+  ) {
     const candidate = await this.candidateFor(userId);
     const doc = await this.prisma.candidateDocument.create({
       data: {
@@ -439,11 +443,35 @@ export class MeService {
         type: dto.type as any,
         fileUrl: dto.fileUrl,
         fileName: dto.fileName,
+        backFileUrl: dto.backFileUrl ?? null,
+        backFileName: dto.backFileName ?? null,
       },
     });
     // Kick off the automated pre-check (assist only — never auto-verifies).
     this.docCheck.runInBackground(doc.id);
     return doc;
+  }
+
+  /** Save the driver's DVLA licence number and/or share code (from
+   * gov.uk/view-driving-licence) so admin can verify entitlements & penalty
+   * points. The code is a short-lived access token, not a credential we act on. */
+  async setDrivingLicence(userId: string, dto: { licenceNumber?: string; checkCode?: string }) {
+    const candidate = await this.candidateFor(userId);
+    const data: {
+      drivingLicenceNumber?: string | null;
+      dvlaCheckCode?: string | null;
+      dvlaCheckCodeAt?: Date | null;
+    } = {};
+    if (dto.licenceNumber !== undefined) {
+      data.drivingLicenceNumber = dto.licenceNumber.trim().toUpperCase().slice(0, 32) || null;
+    }
+    if (dto.checkCode !== undefined) {
+      const code = dto.checkCode.trim().toUpperCase().slice(0, 16) || null;
+      data.dvlaCheckCode = code;
+      data.dvlaCheckCodeAt = code ? new Date() : null;
+    }
+    await this.prisma.candidate.update({ where: { id: candidate.id }, data });
+    return { ok: true };
   }
 
   // ── Employment history ──

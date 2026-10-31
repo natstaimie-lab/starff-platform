@@ -244,6 +244,10 @@ model Candidate {
   shoeSize               String?
   rightToWorkType        String?         // British Citizen | Settled | Visa …
   shareCode              String?         // RTW online share code
+  // ── driving licence (DVLA check) ──
+  drivingLicenceNumber   String?         // the driver's DVLA licence number
+  dvlaCheckCode          String?         // driver-generated "share code" from gov.uk/view-driving-licence (21-day validity)
+  dvlaCheckCodeAt        DateTime?       // when the driver last supplied a check code
   // ── declarations / consents / agreement / e-signature ──
   healthDeclaration      Boolean         @default(false)
   healthNotes            String?
@@ -357,6 +361,10 @@ model CandidateDocument {
   type         DocumentType
   fileUrl      String         // path in Supabase Storage (private bucket)
   fileName     String?
+  // Two-sided documents (driving licence, ID card): the back image. Null for
+  // single-sided docs (passport photo page, selfie, CV, etc.).
+  backFileUrl  String?
+  backFileName String?
   status       DocumentStatus @default(PENDING)
   expiryDate   DateTime?      // for RTW / DBS / certificates
   verifiedById String?        @db.Uuid
