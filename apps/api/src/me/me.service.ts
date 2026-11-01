@@ -436,6 +436,12 @@ export class MeService {
     userId: string,
     dto: { type: string; fileUrl: string; fileName?: string; backFileUrl?: string; backFileName?: string },
   ) {
+    // Identity documents must be a photo, never a PDF (matches the app's guided
+    // camera capture and the portal's image-only rule).
+    const photoOnly = ['SELFIE', 'ID', 'LICENCE'];
+    if (photoOnly.includes(dto.type) && /\.pdf$/i.test(dto.fileName ?? dto.fileUrl)) {
+      throw new BadRequestException('This document must be a photo, not a PDF.');
+    }
     const candidate = await this.candidateFor(userId);
     const doc = await this.prisma.candidateDocument.create({
       data: {

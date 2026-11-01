@@ -45,6 +45,9 @@ const TYPES = [
   { v: 'LICENCE', l: 'Licence' },
   { v: 'CERTIFICATE', l: 'Certificate' },
 ];
+// Identity items must be a photo, never a PDF — matches the mobile app's guided
+// camera capture. Right to Work stays flexible (a share-code printout is a PDF).
+const PHOTO_ONLY = ['SELFIE', 'ID', 'LICENCE'];
 const typeLabel = (t: string) => TYPES.find((x) => x.v === t)?.l ?? t;
 const statusTone: Record<string, string> = { VERIFIED: 'success', PENDING: 'warning', REJECTED: 'error', EXPIRED: 'error' };
 
@@ -67,6 +70,12 @@ export default function DocumentsPage() {
   }, []);
 
   async function upload(file: File) {
+    // Identity documents must be a photo, not a PDF.
+    if (PHOTO_ONLY.includes(type) && !file.type.startsWith('image/')) {
+      setError('Please upload a clear photo of this document, not a PDF.');
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
     setBusy(true); setError('');
     try {
       const { data } = await supabase.auth.getSession();
@@ -94,8 +103,8 @@ export default function DocumentsPage() {
           <input
             ref={fileRef}
             type="file"
-            accept={type === 'SELFIE' ? 'image/*' : 'image/*,application/pdf'}
-            capture={type === 'SELFIE' ? 'user' : undefined}
+            accept={PHOTO_ONLY.includes(type) ? 'image/*' : 'image/*,application/pdf'}
+            capture={type === 'SELFIE' ? 'user' : PHOTO_ONLY.includes(type) ? 'environment' : undefined}
             onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
             disabled={busy}
             style={{ fontSize: 13 }}
@@ -104,6 +113,9 @@ export default function DocumentsPage() {
         </div>
         {type === 'SELFIE' && (
           <p className="mut" style={{ fontSize: 12.5, marginTop: 8 }}>On a phone this opens your front camera — take a clear, well-lit photo of your face so we can match it to your ID.</p>
+        )}
+        {(type === 'ID' || type === 'LICENCE') && (
+          <p className="mut" style={{ fontSize: 12.5, marginTop: 8 }}>Please upload a <b>clear photo</b> (not a PDF). For the best result, use the Starff app, which guides you to line the document up in frame.</p>
         )}
         {error && <p style={{ color: 'var(--error-600)', fontSize: 13, marginTop: 10 }}>{error}</p>}
       </Card>
