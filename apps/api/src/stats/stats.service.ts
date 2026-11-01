@@ -23,6 +23,8 @@ export class StatsService {
       pendingTimesheets,
       newEnquiries,
       complianceAttention,
+      unreadMessages,
+      pendingDeletions,
       revenueAgg,
     ] = await Promise.all([
       this.prisma.candidate.count(),
@@ -38,6 +40,10 @@ export class StatsService {
       this.prisma.candidate.count({
         where: { status: { in: [CandidateStatus.NEW, CandidateStatus.SCREENING, CandidateStatus.INACTIVE, CandidateStatus.REJECTED] } },
       }),
+      // Inbound messages from candidates/clients not yet read by staff.
+      this.prisma.message.count({ where: { senderIsStaff: false, readAt: null } }),
+      // Account-deletion requests still awaiting an admin (drives its badge).
+      this.prisma.user.count({ where: { deletionRequestedAt: { not: null }, deletionHandledAt: null } }),
       this.prisma.invoice.aggregate({
         _sum: { total: true },
         where: { status: InvoiceStatus.PAID },
@@ -53,6 +59,8 @@ export class StatsService {
       pendingTimesheets,
       newEnquiries,
       complianceAttention,
+      unreadMessages,
+      pendingDeletions,
       revenue: Number(revenueAgg._sum.total ?? 0),
     };
   }

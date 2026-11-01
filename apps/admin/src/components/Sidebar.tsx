@@ -69,9 +69,14 @@ export function Sidebar() {
   useEffect(() => { setOpen(false); }, [pathname]);
 
   useEffect(() => {
-    apiFetch<{ pendingTimesheets: number; complianceAttention: number; newEnquiries: number }>('/stats/overview')
-      .then((s) => setBadges({ timesheets: s.pendingTimesheets, compliance: s.complianceAttention, enquiries: s.newEnquiries }))
-      .catch(() => {});
+    const loadBadges = () =>
+      apiFetch<{ pendingTimesheets: number; complianceAttention: number; newEnquiries: number; unreadMessages: number; pendingDeletions: number }>('/stats/overview')
+        .then((s) => setBadges({ timesheets: s.pendingTimesheets, compliance: s.complianceAttention, enquiries: s.newEnquiries, messages: s.unreadMessages, deletions: s.pendingDeletions }))
+        .catch(() => {});
+    loadBadges();
+    // Refresh the counts periodically so new items show up without a reload.
+    const t = setInterval(loadBadges, 30000);
+    return () => clearInterval(t);
   }, [pathname]);
 
   const isActive = (href: string) =>
