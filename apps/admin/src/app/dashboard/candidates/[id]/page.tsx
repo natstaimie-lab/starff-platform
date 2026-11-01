@@ -667,7 +667,7 @@ export default function CandidateProfile() {
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               rows={4}
-              placeholder="e.g. A driving licence isn't accepted as Right to Work — please upload a passport, BRP or share-code printout."
+              placeholder="e.g. A driving licence isn't accepted as Right to Work — please upload a right-to-work share code from gov.uk, or your passport."
               style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', fontSize: 14, fontFamily: 'inherit', resize: 'vertical' }}
             />
           </Field>

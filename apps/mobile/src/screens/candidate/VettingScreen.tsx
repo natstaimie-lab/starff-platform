@@ -28,7 +28,7 @@ const STEPS: VettingStep[] = [
     label: 'Identity',
     icon: 'user',
     docType: 'ID',
-    items: [{ t: 'Photo ID', s: 'Passport, driving licence or BRP' }],
+    items: [{ t: 'Photo ID', s: 'Passport or driving licence' }],
   },
   {
     key: 'rtw',

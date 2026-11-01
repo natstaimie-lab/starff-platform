@@ -30,7 +30,7 @@ export class DocumentCheckService {
 
   private expected(type: string): string {
     const map: Record<string, string> = {
-      RIGHT_TO_WORK: 'a UK right-to-work document (passport, BRP, visa or share-code printout)',
+      RIGHT_TO_WORK: 'a UK right-to-work document — a share-code printout from gov.uk/prove-your-right-to-work, a passport, or other valid proof of immigration status',
       ID: 'a photo ID (passport or driving licence)',
       DBS_CHECK: 'a DBS certificate',
       CV: 'a CV / work history',
