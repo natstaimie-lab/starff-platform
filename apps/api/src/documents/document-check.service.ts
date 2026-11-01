@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { PrismaService } from '../prisma/prisma.service';
+import { toReadableImage } from './document-media';
 
 /**
  * Automated document pre-check — an ASSIST for the admin, never an auto-verify.
@@ -17,9 +18,6 @@ import { PrismaService } from '../prisma/prisma.service';
 @Injectable()
 export class DocumentCheckService {
   private readonly logger = new Logger('DocumentCheck');
-
-  // Claude vision image types we can inline.
-  private static readonly IMG = /\.(jpe?g|png|webp|gif)$/i;
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -61,10 +59,6 @@ export class DocumentCheckService {
       await stamp('WARN', 'Identity selfie — compare it to the photo ID by eye before verifying.');
       return;
     }
-    if (!DocumentCheckService.IMG.test(doc.fileName ?? doc.fileUrl)) {
-      await stamp('WARN', 'Not an image (e.g. PDF) — open and review manually.');
-      return;
-    }
     if (!process.env.ANTHROPIC_API_KEY) {
       this.logger.log('ANTHROPIC_API_KEY not set — skipping document pre-check.');
       return;
@@ -79,11 +73,24 @@ export class DocumentCheckService {
       await stamp('WARN', 'Could not open the file to check it — review manually.');
       return;
     }
-    const buf = Buffer.from(await dl.data.arrayBuffer());
-    const ext = (doc.fileName ?? doc.fileUrl).toLowerCase();
-    const mediaType = ext.endsWith('.png') ? 'image/png'
-      : ext.endsWith('.webp') ? 'image/webp'
-      : ext.endsWith('.gif') ? 'image/gif' : 'image/jpeg';
+    const raw = Buffer.from(await dl.data.arrayBuffer());
+
+    // Identify by content, not file name (phones mislabel photos), and turn an
+    // iPhone HEIC photo into a JPEG Claude can actually read.
+    let readable;
+    try {
+      readable = await toReadableImage(raw);
+    } catch (e) {
+      await stamp('WARN', 'Could not decode the image (possibly a corrupt HEIC) — review manually.');
+      this.logger.warn(`decode failed for ${documentId}: ${(e as Error).message}`);
+      return;
+    }
+    if (!readable) {
+      await stamp('WARN', 'Not a readable image (e.g. a PDF) — open and review manually.');
+      return;
+    }
+    const buf = readable.buffer;
+    const mediaType = readable.mediaType;
 
     const workerName = `${doc.candidate.firstName} ${doc.candidate.lastName}`.trim();
     const today = new Date().toISOString().slice(0, 10);

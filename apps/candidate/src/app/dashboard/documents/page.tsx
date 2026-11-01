@@ -8,6 +8,33 @@ import * as Ic from '@/components/icons';
 
 type Doc = { id: string; type: string; fileName?: string; status: string; createdAt: string };
 
+/**
+ * Re-encode an uploaded image to JPEG in the browser so it displays and can be
+ * read by the document pre-check. Phone photos are often HEIC, which browsers
+ * and the AI can't read. PDFs and anything the browser can't decode pass
+ * through unchanged — the API heals those server-side when a reviewer opens them.
+ */
+async function normalizeToJpeg(file: File): Promise<{ blob: Blob; name: string }> {
+  if (!file.type.startsWith('image/') || file.type === 'image/jpeg') {
+    return { blob: file, name: file.name };
+  }
+  try {
+    const bitmap = await createImageBitmap(file);
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('no canvas');
+    ctx.drawImage(bitmap, 0, 0);
+    const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.9));
+    if (!blob) throw new Error('encode failed');
+    const base = file.name.replace(/\.[^.]+$/, '') || 'document';
+    return { blob, name: `${base}.jpg` };
+  } catch {
+    return { blob: file, name: file.name };
+  }
+}
+
 const TYPES = [
   { v: 'SELFIE', l: 'Identity photo (selfie)' },
   { v: 'RIGHT_TO_WORK', l: 'Right to Work' },
@@ -44,10 +71,13 @@ export default function DocumentsPage() {
     try {
       const { data } = await supabase.auth.getSession();
       const uid = data.session!.user.id;
-      const path = `${uid}/${type}-${Date.now()}-${file.name}`;
-      const { error: upErr } = await supabase.storage.from('candidate-documents').upload(path, file);
+      const { blob, name } = await normalizeToJpeg(file);
+      const path = `${uid}/${type}-${Date.now()}-${name}`;
+      const { error: upErr } = await supabase.storage
+        .from('candidate-documents')
+        .upload(path, blob, { contentType: blob.type || 'application/octet-stream' });
       if (upErr) throw upErr;
-      await apiFetch('/me/documents', { method: 'POST', body: JSON.stringify({ type, fileUrl: path, fileName: file.name }) });
+      await apiFetch('/me/documents', { method: 'POST', body: JSON.stringify({ type, fileUrl: path, fileName: name }) });
       if (fileRef.current) fileRef.current.value = '';
       load();
     } catch (e: any) { setError(e.message ?? 'Upload failed'); } finally { setBusy(false); }

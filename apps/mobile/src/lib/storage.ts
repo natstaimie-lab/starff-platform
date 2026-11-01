@@ -7,6 +7,7 @@
  * so it enters the existing compliance workflow (admin verify, expiry, etc.).
  */
 import { supabase } from '@/lib/supabase';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 const BUCKET = 'candidate-documents';
 
@@ -14,6 +15,30 @@ export interface PickedFile {
   uri: string;
   name: string;
   mimeType?: string;
+}
+
+/**
+ * Normalise a picked/photographed document to a browser- and AI-readable JPEG.
+ * iPhones capture HEIC by default, which neither browsers nor the document
+ * pre-check can read — so every image is re-encoded to JPEG at high quality
+ * (no resize, so document detail is preserved for verification) with a .jpg
+ * name. PDFs pass through untouched.
+ */
+async function ensureJpeg(file: PickedFile): Promise<PickedFile> {
+  const isPdf = file.mimeType === 'application/pdf' || /\.pdf$/i.test(file.name);
+  if (isPdf) return file;
+  try {
+    const out = await ImageManipulator.manipulateAsync(
+      file.uri,
+      [],
+      { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG },
+    );
+    const base = file.name.replace(/\.[^.]+$/, '') || 'document';
+    return { uri: out.uri, name: `${base}.jpg`, mimeType: 'image/jpeg' };
+  } catch {
+    // If re-encoding fails, upload the original rather than blocking the worker.
+    return file;
+  }
 }
 
 export async function uploadCandidateDocument(file: PickedFile): Promise<{
@@ -25,6 +50,9 @@ export async function uploadCandidateDocument(file: PickedFile): Promise<{
   } = await supabase.auth.getSession();
   const uid = session?.user.id;
   if (!uid) throw new Error('You are not signed in.');
+
+  // Always store documents as JPEG (or PDF) so they display and verify everywhere.
+  file = await ensureJpeg(file);
 
   // Read the local file into bytes (works for Expo file:// URIs).
   const resp = await fetch(file.uri);

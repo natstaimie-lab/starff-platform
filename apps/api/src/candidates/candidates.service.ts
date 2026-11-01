@@ -17,6 +17,7 @@ import { RegistrationService } from '../registration/registration.service';
 import { WORKER_DOCUMENTS, getWorkerDoc, workerAgreementSnapshot } from '../me/worker-documents';
 import { cleanSectors } from '../common/sectors';
 import { DocumentCheckService } from '../documents/document-check.service';
+import { toReadableImage } from '../documents/document-media';
 
 @Injectable()
 export class CandidatesService {
@@ -298,11 +299,52 @@ export class CandidatesService {
   async documentUrl(candidateId: string, docId: string, side?: string) {
     const doc = await this.prisma.candidateDocument.findUnique({ where: { id: docId } });
     if (!doc || doc.candidateId !== candidateId) throw new NotFoundException('Document not found');
-    const path = side === 'back' ? doc.backFileUrl : doc.fileUrl;
+    const isBack = side === 'back';
+    let path = isBack ? doc.backFileUrl : doc.fileUrl;
+    const name = isBack ? doc.backFileName : doc.fileName;
     if (!path) throw new NotFoundException('Document not found');
+
     const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
       auth: { persistSession: false },
     });
+
+    // Heal-on-view: browsers can't display HEIC (iPhone's default photo format),
+    // so any such file shows as a broken thumbnail. If the name isn't already a
+    // browser-friendly image, download it, and if it's HEIC convert it to JPEG
+    // once, store the JPEG alongside and point the record at it — so the preview
+    // works now and the AI pre-check can re-read it. Idempotent: once a record
+    // points at a .jpg this is skipped. Lower-stakes types (PDF/unknown) pass
+    // through untouched.
+    const displayable = /\.(jpe?g|png|webp|gif)$/i.test(name ?? '');
+    if (!displayable) {
+      try {
+        const dl = await supabase.storage.from('candidate-documents').download(path);
+        if (!dl.error && dl.data) {
+          const readable = await toReadableImage(Buffer.from(await dl.data.arrayBuffer()));
+          if (readable?.converted) {
+            const newPath = `${path}.jpg`;
+            const up = await supabase.storage
+              .from('candidate-documents')
+              .upload(newPath, readable.buffer, { contentType: 'image/jpeg', upsert: true });
+            if (!up.error) {
+              const newName = `${(name ?? 'document').replace(/\.[^.]+$/, '')}.jpg`;
+              await this.prisma.candidateDocument.update({
+                where: { id: doc.id },
+                data: isBack
+                  ? { backFileUrl: newPath, backFileName: newName }
+                  : { fileUrl: newPath, fileName: newName },
+              });
+              path = newPath;
+              // Re-run the automated pre-check against the now-readable front image.
+              if (!isBack) this.docCheck.runInBackground(doc.id);
+            }
+          }
+        }
+      } catch {
+        // Healing is best-effort; fall back to signing the original file.
+      }
+    }
+
     const { data, error } = await supabase.storage
       .from('candidate-documents')
       .createSignedUrl(path, 300);
