@@ -172,15 +172,25 @@ export function DocumentsScreen() {
             ) : (
               <View style={{ gap: 9 }}>
                 {docs.map((d) => (
-                  <View key={d.id} style={styles.doc}>
-                    <View style={styles.docIcon}>
-                      <Icon name="file-text" size={19} color={colors.orange} />
+                  <View key={d.id} style={styles.docWrap}>
+                    <View style={styles.doc}>
+                      <View style={styles.docIcon}>
+                        <Icon name="file-text" size={19} color={colors.orange} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.docTitle}>{prettyType(d.type)}</Text>
+                        <Muted>{d.fileName ?? 'Document'}</Muted>
+                      </View>
+                      <Pill kind={STATUS_PILL[d.status] ?? 'gray'}>{STATUS_LABEL[d.status] ?? d.status}</Pill>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.docTitle}>{prettyType(d.type)}</Text>
-                      <Muted>{d.fileName ?? 'Document'}</Muted>
-                    </View>
-                    <Pill kind={STATUS_PILL[d.status] ?? 'gray'}>{STATUS_LABEL[d.status] ?? d.status}</Pill>
+                    {d.status === 'REJECTED' && d.rejectionReason ? (
+                      <View style={styles.rejectBox}>
+                        <Text style={styles.rejectText}>
+                          <Text style={{ fontWeight: '800' }}>Why it was rejected: </Text>
+                          {d.rejectionReason} Please upload a corrected version.
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                 ))}
               </View>
@@ -264,4 +274,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   docTitle: { fontSize: 13, fontWeight: '700', color: colors.text },
+  docWrap: { gap: 0 },
+  rejectBox: {
+    marginTop: 6,
+    marginLeft: 49,
+    padding: 10,
+    borderRadius: radius.control,
+    backgroundColor: 'rgba(220,38,38,0.10)',
+  },
+  rejectText: { fontSize: 12.5, lineHeight: 18, color: colors.error },
 });

@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { Card, Badge } from '@/components/ui';
 import * as Ic from '@/components/icons';
 
-type Doc = { id: string; type: string; fileName?: string; status: string; createdAt: string };
+type Doc = { id: string; type: string; fileName?: string; status: string; createdAt: string; rejectionReason?: string | null };
 
 /**
  * Re-encode an uploaded image to JPEG in the browser so it displays and can be
@@ -114,15 +114,22 @@ export default function DocumentsPage() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {docs.map((d) => (
-              <div key={d.id} className="fx ac jb" style={{ padding: '12px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                <div className="fx ac" style={{ gap: 12 }}>
-                  <span style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--surface-sunken)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Ic.FileText width={18} /></span>
-                  <div>
-                    <div className="nm">{typeLabel(d.type)}</div>
-                    <div className="sub2">{d.fileName ?? '—'}</div>
+              <div key={d.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                <div className="fx ac jb">
+                  <div className="fx ac" style={{ gap: 12 }}>
+                    <span style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--surface-sunken)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Ic.FileText width={18} /></span>
+                    <div>
+                      <div className="nm">{typeLabel(d.type)}</div>
+                      <div className="sub2">{d.fileName ?? '—'}</div>
+                    </div>
                   </div>
+                  <Badge tone={(statusTone[d.status] ?? 'neutral') as any}>{d.status}</Badge>
                 </div>
-                <Badge tone={(statusTone[d.status] ?? 'neutral') as any}>{d.status}</Badge>
+                {d.status === 'REJECTED' && d.rejectionReason && (
+                  <div style={{ marginTop: 8, marginLeft: 48, padding: '8px 11px', background: 'var(--error-50, #fdeceb)', borderRadius: 8, fontSize: 12.5, color: 'var(--error-700, #b42318)', lineHeight: 1.45 }}>
+                    <b>Why it was rejected:</b> {d.rejectionReason} Please upload a corrected version above.
+                  </div>
+                )}
               </div>
             ))}
           </div>

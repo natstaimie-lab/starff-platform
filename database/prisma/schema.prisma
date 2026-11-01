@@ -370,10 +370,14 @@ model CandidateDocument {
   verifiedById String?        @db.Uuid
   verifiedAt   DateTime?
   notes        String?
+  // Why a document was rejected — shown to the candidate so they know what to
+  // fix. Prefilled from the AI pre-check summary, editable by the reviewer.
+  rejectionReason String?     @db.Text
 
   // Automated pre-check (assists the admin; never auto-verifies).
   aiCheckVerdict String?      // PASS | WARN | FAIL
-  aiCheckSummary String?      @db.Text
+  aiCheckSummary String?      @db.Text   // full detail for the reviewer (name, expiry, legibility)
+  aiCheckReason  String?      @db.Text   // plain one-sentence reason, candidate-friendly
   aiCheckedAt    DateTime?
 
   createdAt    DateTime       @default(now())

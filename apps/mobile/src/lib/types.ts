@@ -52,6 +52,7 @@ export interface CandidateDocument {
   status: DocumentStatus;
   expiryDate?: string | null;
   createdAt?: string;
+  rejectionReason?: string | null;
 }
 
 export interface Availability {

@@ -102,9 +102,10 @@ export class CandidatesController {
     @Param('id') id: string,
     @Param('docId') docId: string,
     @Body('status') status: DocumentStatus,
+    @Body('reason') reason: string | undefined,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.candidates.setDocumentStatus(id, docId, status, user.id);
+    return this.candidates.setDocumentStatus(id, docId, status, user.id, reason);
   }
 
   // Open a private document file — ADMIN only (contains ID/RTW/DBS imagery).

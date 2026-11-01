@@ -11,7 +11,7 @@ import { Modal, Field, TextInput, Button } from '@/components/Modal';
 import { ReliabilityCard } from '@/components/ReliabilityCard';
 import * as Ic from '@/components/icons';
 
-type Doc = { id: string; type: string; fileName?: string; status: string; expiryDate?: string; createdAt: string; aiCheckVerdict?: string | null; aiCheckSummary?: string | null; aiCheckedAt?: string | null; backFileUrl?: string | null; backFileName?: string | null };
+type Doc = { id: string; type: string; fileName?: string; status: string; expiryDate?: string; createdAt: string; aiCheckVerdict?: string | null; aiCheckSummary?: string | null; aiCheckReason?: string | null; aiCheckedAt?: string | null; backFileUrl?: string | null; backFileName?: string | null; rejectionReason?: string | null };
 type Job = { id: string; employer: string; jobTitle?: string | null; startDate?: string | null; endDate?: string | null; current: boolean; reasonForLeaving?: string | null };
 type Ref = { id: string; name: string; relationship?: string | null; company?: string | null; email?: string | null; phone?: string | null };
 type WorkerAgreement = {
@@ -68,6 +68,8 @@ export default function CandidateProfile() {
   const isAdmin = role === 'ADMIN'; // recruiters don't see bank/NI/health or document files
   const [c, setC] = useState<Candidate | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<Doc | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
   const [reviewing, setReviewing] = useState(false);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(false);
@@ -188,10 +190,16 @@ export default function CandidateProfile() {
     catch (e: any) { alert(e.message); }
   }
 
-  async function setDoc(docId: string, status: 'VERIFIED' | 'REJECTED') {
+  async function setDoc(docId: string, status: 'VERIFIED' | 'REJECTED', reason?: string) {
     setBusy(docId);
-    try { await apiFetch(`/candidates/${id}/documents/${docId}`, { method: 'PATCH', body: JSON.stringify({ status }) }); await load(); }
+    try { await apiFetch(`/candidates/${id}/documents/${docId}`, { method: 'PATCH', body: JSON.stringify({ status, reason }) }); await load(); }
     finally { setBusy(null); }
+  }
+  async function confirmReject() {
+    if (!rejectTarget) return;
+    const target = rejectTarget;
+    setRejectTarget(null);
+    await setDoc(target.id, 'REJECTED', rejectReason.trim() || undefined);
   }
   async function view(docId: string) {
     try { const { url } = await apiFetch<{ url: string }>(`/candidates/${id}/documents/${docId}/url`); window.open(url, '_blank'); }
@@ -264,10 +272,14 @@ export default function CandidateProfile() {
   // The pre-check line under a document (#1 expiry + #2 AI verdict/summary).
   const AiLine = ({ d }: { d: Doc }) => {
     const exp = expiryInfo(d);
-    if (!exp && !d.aiCheckVerdict) return null;
+    const rejected = d.status === 'REJECTED' && d.rejectionReason;
+    if (!exp && !d.aiCheckVerdict && !rejected) return null;
     return (
       <div style={{ marginTop: 5, fontSize: 11.5, lineHeight: 1.45 }}>
         {exp && <div style={{ color: exp.color, fontWeight: 700 }}>⚠ {exp.text}</div>}
+        {rejected && (
+          <div style={{ color: 'var(--error-600)' }}><b>Rejected:</b> <span style={{ color: 'var(--text-secondary)' }}>{d.rejectionReason}</span></div>
+        )}
         {d.aiCheckVerdict && (
           <div style={{ color: verdictColor(d.aiCheckVerdict) }}>
             <b>{verdictLabel(d.aiCheckVerdict)}.</b>{' '}
@@ -284,7 +296,7 @@ export default function CandidateProfile() {
       <button onClick={() => view(d.id)} style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>{d.backFileUrl ? 'Front' : 'View'}</button>
       {d.backFileUrl && <button onClick={() => viewBack(d.id)} style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>Back</button>}
       {d.status !== 'VERIFIED' && <button disabled={busy === d.id} onClick={() => setDoc(d.id, 'VERIFIED')} style={{ border: 'none', background: 'var(--success-100)', color: 'var(--success-600)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>Verify</button>}
-      {d.status !== 'REJECTED' && <button disabled={busy === d.id} onClick={() => setDoc(d.id, 'REJECTED')} style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--error-600)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>Reject</button>}
+      {d.status !== 'REJECTED' && <button disabled={busy === d.id} onClick={() => { setRejectTarget(d); setRejectReason(d.aiCheckReason ?? ''); }} style={{ border: '1px solid var(--border-subtle)', background: 'var(--surface-card)', color: 'var(--error-600)', fontWeight: 700, fontSize: 12, padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>Reject</button>}
     </div>
   ));
   const Row = ({ k, v }: { k: string; v: React.ReactNode }) => (
@@ -645,6 +657,27 @@ export default function CandidateProfile() {
           <p className="dim" style={{ fontSize: 13 }}>We'll email a secure link where they set their own password and open their worker portal. Nothing is shared until they activate.</p>
           <Field label="Email address"><TextInput type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="worker@email.com" /></Field>
           {inviteMsg && <p style={{ fontSize: 13, color: inviteMsg.startsWith('Invite') ? 'var(--success-600)' : 'var(--error-600)' }}>{inviteMsg}</p>}
+        </Modal>
+      )}
+
+      {rejectTarget && (
+        <Modal title="Reject document" subtitle="The candidate is notified with this reason so they know what to fix." onClose={() => setRejectTarget(null)}>
+          <Field label="Reason (shown to the candidate)">
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={4}
+              placeholder="e.g. A driving licence isn't accepted as Right to Work — please upload a passport, BRP or share-code printout."
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', fontSize: 14, fontFamily: 'inherit', resize: 'vertical' }}
+            />
+          </Field>
+          {rejectTarget.aiCheckReason && (
+            <div className="dim" style={{ fontSize: 12 }}>Prefilled from the automated check — edit it to be as helpful as you like.</div>
+          )}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <Button variant="outline" onClick={() => setRejectTarget(null)}>Cancel</Button>
+            <Button onClick={confirmReject} style={{ background: 'var(--error-600)' }}>Reject &amp; notify</Button>
+          </div>
         </Modal>
       )}
 

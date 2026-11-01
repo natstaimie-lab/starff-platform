@@ -18,6 +18,22 @@ import { WORKER_DOCUMENTS, getWorkerDoc, workerAgreementSnapshot } from '../me/w
 import { cleanSectors } from '../common/sectors';
 import { DocumentCheckService } from '../documents/document-check.service';
 import { toReadableImage } from '../documents/document-media';
+import { AuditService } from '../audit/audit.service';
+
+// Friendly names for candidate-facing document notifications.
+const DOC_LABELS: Record<string, string> = {
+  SELFIE: 'identity photo',
+  RIGHT_TO_WORK: 'Right to Work document',
+  ID: 'proof of ID',
+  DBS_CHECK: 'DBS check',
+  CV: 'CV',
+  CERTIFICATE: 'certificate',
+  QUALIFICATION: 'qualification',
+  LICENCE: 'licence',
+  REFERENCE: 'reference',
+  CONTRACT: 'contract',
+  OTHER: 'document',
+};
 
 @Injectable()
 export class CandidatesService {
@@ -26,6 +42,7 @@ export class CandidatesService {
     private readonly notifications: NotificationsService,
     private readonly registration: RegistrationService,
     private readonly docCheck: DocumentCheckService,
+    private readonly audit: AuditService,
   ) {}
 
   /** Staff — re-run the automated pre-check on one document. */
@@ -242,18 +259,81 @@ export class CandidatesService {
     return this.redactForRole(updated, actor.role);
   }
 
-  /** Staff verifies / rejects one of a candidate's compliance documents. */
-  async setDocumentStatus(candidateId: string, docId: string, status: DocumentStatus, verifierId: string) {
-    const doc = await this.prisma.candidateDocument.findUnique({ where: { id: docId } });
+  /**
+   * Staff verifies / rejects one of a candidate's compliance documents.
+   * On rejection the reason (prefilled from the AI pre-check, editable by the
+   * reviewer) is stored and sent to the candidate so they know what to fix; on
+   * verification they get a confirmation. Both decisions are audit-logged.
+   */
+  async setDocumentStatus(
+    candidateId: string,
+    docId: string,
+    status: DocumentStatus,
+    verifierId: string,
+    reason?: string,
+  ) {
+    const doc = await this.prisma.candidateDocument.findUnique({
+      where: { id: docId },
+      include: { candidate: { select: { firstName: true, userId: true, user: { select: { email: true } } } } },
+    });
     if (!doc || doc.candidateId !== candidateId) throw new NotFoundException('Document not found');
-    return this.prisma.candidateDocument.update({
+
+    const isReject = status === DocumentStatus.REJECTED;
+    // Prefer the reviewer's note; fall back to the AI's plain one-sentence reason
+    // (never the detailed admin summary) so the candidate gets a clear, concrete
+    // reason without the technical name/expiry breakdown.
+    const rejectionReason = isReject ? (reason?.trim() || doc.aiCheckReason || null) : null;
+
+    const updated = await this.prisma.candidateDocument.update({
       where: { id: docId },
       data: {
         status,
         verifiedById: status === DocumentStatus.VERIFIED ? verifierId : null,
         verifiedAt: status === DocumentStatus.VERIFIED ? new Date() : null,
+        rejectionReason,
       },
     });
+
+    // Audit the compliance decision (best-effort; never blocks).
+    await this.audit.log({
+      actorId: verifierId,
+      action: isReject ? 'candidate.document.rejected' : `candidate.document.${status.toLowerCase()}`,
+      entity: 'CandidateDocument',
+      entityId: docId,
+      meta: { candidateId, type: doc.type, status, reason: rejectionReason },
+    });
+
+    // Tell the candidate (in-app + push + email). Best-effort.
+    const label = DOC_LABELS[doc.type] ?? 'document';
+    const email = doc.candidate.user?.email;
+    const portal = process.env.CANDIDATE_PORTAL_URL || undefined;
+    if (isReject && email) {
+      await this.notifications
+        .send({
+          to: email,
+          userId: doc.candidate.userId,
+          kind: 'DOCUMENT_REJECTED',
+          subject: `Action needed: your ${label} needs re-uploading`,
+          body: `Hi ${doc.candidate.firstName}, we couldn't approve your ${label}.${rejectionReason ? ` Reason: ${rejectionReason}` : ''} Please upload a clearer or corrected version in your Starff account.`,
+          actionUrl: portal,
+          actionLabel: 'Upload again',
+        })
+        .catch(() => {});
+    } else if (status === DocumentStatus.VERIFIED && email) {
+      await this.notifications
+        .send({
+          to: email,
+          userId: doc.candidate.userId,
+          kind: 'DOCUMENT_VERIFIED',
+          subject: `Your ${label} has been approved`,
+          body: `Hi ${doc.candidate.firstName}, your ${label} has been verified. One less thing to do — thanks!`,
+          actionUrl: portal,
+          actionLabel: 'View your documents',
+        })
+        .catch(() => {});
+    }
+
+    return updated;
   }
 
   /**

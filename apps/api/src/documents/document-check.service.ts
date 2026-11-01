@@ -48,10 +48,10 @@ export class DocumentCheckService {
     });
     if (!doc) return;
 
-    const stamp = (verdict: string, summary: string) =>
+    const stamp = (verdict: string, summary: string, reason?: string) =>
       this.prisma.candidateDocument.update({
         where: { id: documentId },
-        data: { aiCheckVerdict: verdict, aiCheckSummary: summary, aiCheckedAt: new Date() },
+        data: { aiCheckVerdict: verdict, aiCheckSummary: summary, aiCheckReason: reason ?? null, aiCheckedAt: new Date() },
       });
 
     // Selfies are matched visually by a human — no automated facial analysis.
@@ -134,7 +134,9 @@ export class DocumentCheckService {
         r.expiryDate ? `Expiry: ${r.expiryDate}${r.expired ? ' — EXPIRED' : ''}.` : null,
         r.legible === false ? 'Hard to read — may need a clearer copy.' : null,
       ].filter(Boolean).join(' ');
-      await stamp(verdict, bits || 'Checked.');
+      // bits = full detail for the reviewer; r.summary = the plain one-sentence
+      // reason we can safely show a candidate if the document is rejected.
+      await stamp(verdict, bits || 'Checked.', typeof r.summary === 'string' ? r.summary : undefined);
     } catch (e) {
       await stamp('WARN', 'Automated check could not complete — review manually.');
       this.logger.warn(`pre-check error ${documentId}: ${(e as Error).message}`);
