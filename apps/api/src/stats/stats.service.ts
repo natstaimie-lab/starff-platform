@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import {
   CandidateStatus,
+  ClientStatus,
   JobStatus,
+  ShiftStatus,
   TimesheetStatus,
   InvoiceStatus,
   EnquiryStatus,
@@ -25,6 +27,11 @@ export class StatsService {
       complianceAttention,
       unreadMessages,
       pendingDeletions,
+      newCandidates,
+      newClients,
+      jobsAwaitingAdmin,
+      openShifts,
+      overdueInvoices,
       revenueAgg,
     ] = await Promise.all([
       this.prisma.candidate.count(),
@@ -44,6 +51,17 @@ export class StatsService {
       this.prisma.message.count({ where: { senderIsStaff: false, readAt: null } }),
       // Account-deletion requests still awaiting an admin (drives its badge).
       this.prisma.user.count({ where: { deletionRequestedAt: { not: null }, deletionHandledAt: null } }),
+      // ── Remaining sidebar attention badges ──
+      // Brand-new candidate registrations not yet screened.
+      this.prisma.candidate.count({ where: { archivedAt: null, status: CandidateStatus.NEW } }),
+      // New client leads awaiting first contact.
+      this.prisma.client.count({ where: { status: ClientStatus.LEAD } }),
+      // Job requests submitted by clients, awaiting admin review/approval.
+      this.prisma.job.count({ where: { status: { in: [JobStatus.SUBMITTED, JobStatus.UNDER_REVIEW] } } }),
+      // Upcoming shifts that still need a worker.
+      this.prisma.shift.count({ where: { status: ShiftStatus.OPEN, startAt: { gte: new Date() } } }),
+      // Invoices past their due date (need chasing).
+      this.prisma.invoice.count({ where: { status: InvoiceStatus.OVERDUE } }),
       this.prisma.invoice.aggregate({
         _sum: { total: true },
         where: { status: InvoiceStatus.PAID },
@@ -61,6 +79,11 @@ export class StatsService {
       complianceAttention,
       unreadMessages,
       pendingDeletions,
+      newCandidates,
+      newClients,
+      jobsAwaitingAdmin,
+      openShifts,
+      overdueInvoices,
       revenue: Number(revenueAgg._sum.total ?? 0),
     };
   }

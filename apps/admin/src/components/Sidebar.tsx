@@ -70,8 +70,23 @@ export function Sidebar() {
 
   useEffect(() => {
     const loadBadges = () =>
-      apiFetch<{ pendingTimesheets: number; complianceAttention: number; newEnquiries: number; unreadMessages: number; pendingDeletions: number }>('/stats/overview')
-        .then((s) => setBadges({ timesheets: s.pendingTimesheets, compliance: s.complianceAttention, enquiries: s.newEnquiries, messages: s.unreadMessages, deletions: s.pendingDeletions }))
+      apiFetch<{
+        pendingTimesheets: number; complianceAttention: number; newEnquiries: number;
+        unreadMessages: number; pendingDeletions: number; newCandidates: number;
+        newClients: number; jobsAwaitingAdmin: number; openShifts: number; overdueInvoices: number;
+      }>('/stats/overview')
+        .then((s) => setBadges({
+          candidates: s.newCandidates,
+          clients: s.newClients,
+          enquiries: s.newEnquiries,
+          bookings: s.jobsAwaitingAdmin,
+          shifts: s.openShifts,
+          compliance: s.complianceAttention,
+          deletions: s.pendingDeletions,
+          timesheets: s.pendingTimesheets,
+          payroll: s.overdueInvoices,
+          messages: s.unreadMessages,
+        }))
         .catch(() => {});
     loadBadges();
     // Refresh the counts periodically so new items show up without a reload.
