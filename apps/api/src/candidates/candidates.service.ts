@@ -163,7 +163,7 @@ export class CandidatesService {
     const rows = await this.prisma.candidate.findMany({
       where,
       skip: params.skip ?? 0,
-      take: Math.min(params.take ?? 25, 100),
+      take: Math.min(params.take ?? 25, 500),
       orderBy: { createdAt: 'desc' },
       include: {
         documents: true,

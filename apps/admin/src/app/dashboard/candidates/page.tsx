@@ -66,7 +66,7 @@ export default function CandidatesPage() {
   const [notifying, setNotifying] = useState(false);
   const [sectorFilter, setSectorFilter] = useState('');
 
-  const load = () => apiFetch<Candidate[]>('/candidates').then(setRows).catch((e) => setError(e.message)).finally(() => setLoading(false));
+  const load = () => apiFetch<Candidate[]>('/candidates?take=500').then(setRows).catch((e) => setError(e.message)).finally(() => setLoading(false));
   // Auto-refresh the list every 15s so new sign-ups and completed registrations
   // appear without a manual refresh. Silent — doesn't re-flash the skeleton.
   useEffect(() => { load(); const i = setInterval(load, 15000); return () => clearInterval(i); }, []);

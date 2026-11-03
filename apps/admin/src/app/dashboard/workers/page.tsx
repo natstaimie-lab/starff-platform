@@ -28,7 +28,7 @@ export default function WorkersPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch<Worker[]>('/candidates').then(setRows).catch((e) => setError(e.message)).finally(() => setLoading(false));
+    apiFetch<Worker[]>('/candidates?take=500').then(setRows).catch((e) => setError(e.message)).finally(() => setLoading(false));
   }, []);
 
   async function toggle(w: Worker) {
