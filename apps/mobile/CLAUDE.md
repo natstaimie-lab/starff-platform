@@ -4,7 +4,8 @@ Expo + React Native + TypeScript. **Another client of the existing platform** â€
 same Supabase Auth, same NestJS API, same database as the portals. No separate
 backend, no parallel auth. Read the root `CLAUDE.md` first.
 
-Serves both audiences: candidate tabs and employer tabs, chosen by role.
+Serves three audiences, chosen by role: candidate tabs, employer tabs, and a
+staff (ADMIN / RECRUITER) mode.
 
 ## Not a workspace
 
@@ -40,8 +41,8 @@ src/lib/
   types.ts             shapes mirroring Prisma
   useApi.ts            loading / error / refresh hook
 src/auth/AuthContext.tsx   session, role resolution, sign in/up/out, biometric
-src/navigation/        RootNavigator + CandidateTabs + EmployerTabs
-src/screens/           auth/, candidate/, employer/, shared/, Splash
+src/navigation/        RootNavigator + CandidateTabs + EmployerTabs + StaffTabs
+src/screens/           auth/, candidate/, employer/, staff/, shared/, Splash
 src/notifications/     PushRegistrar
 ```
 
@@ -63,6 +64,12 @@ src/notifications/     PushRegistrar
 - Environments come from which `.env` the build uses:
   `EXPO_PUBLIC_APP_ENV` = `development | staging | production`.
 - `PUT /me/availability` expects `{ days }`, not `{ slots }`.
+- **Staff mode.** Staff are identified by `GET /auth/whoami` (the API's `User`
+  role), never by sign-up metadata. `StaffApp` requires Supabase MFA (aal2)
+  before anything loads, like the web dashboard. It's an on-the-go companion:
+  dashboard, timesheet approve/reject, inbox replies, read-only candidates and
+  jobs. Don't show NI, bank, health, address or document files on the phone,
+  and don't add vetting/booking decisions here without being asked.
 - Push needs an EAS projectId for real delivery; it degrades cleanly in Expo Go.
   Don't make features depend on push being live.
 

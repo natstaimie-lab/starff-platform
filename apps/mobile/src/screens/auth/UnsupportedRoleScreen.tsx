@@ -5,8 +5,8 @@ import { colors } from '@/theme/tokens';
 import { useAuth } from '@/auth/AuthContext';
 
 /**
- * Shown when a signed-in user is neither a candidate nor an employer (e.g. an
- * admin/recruiter). Admin functions stay in the web dashboard by design.
+ * Shown when a signed-in user's role can't be resolved — no candidate profile,
+ * no client company and not staff (or the API couldn't be reached).
  */
 export function UnsupportedRoleScreen() {
   const { signOut } = useAuth();
@@ -15,8 +15,8 @@ export function UnsupportedRoleScreen() {
       <View style={{ flex: 1 }}>
         <EmptyState
           icon="shield-check"
-          title="This app is for workers & employers"
-          subtitle="Your account is a Starff staff account. Please use the admin dashboard on the web. You can sign out and log in with a worker or employer account here."
+          title="We couldn't find your account"
+          subtitle="This login isn't linked to a worker, employer or Starff staff profile yet — or we couldn't reach Starff just now. Sign out and try again, or contact the Starff team."
         />
       </View>
       <View style={{ padding: 24 }}>

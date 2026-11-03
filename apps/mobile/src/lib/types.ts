@@ -222,3 +222,125 @@ export interface ClientSubmission {
     rating: number | null;
   };
 }
+
+// ── Staff (ADMIN / RECRUITER) ──────────────────────────────────────────────
+export type StaffRole = 'ADMIN' | 'RECRUITER';
+
+export interface WhoAmI {
+  id: string;
+  email: string | null;
+  role: Role | null;
+}
+
+/** GET /stats/overview — the admin dashboard's headline counts. */
+export interface StaffOverview {
+  candidates: number;
+  workers: number;
+  clients: number;
+  bookings: number;
+  timesheets: number;
+  pendingTimesheets: number;
+  newEnquiries: number;
+  complianceAttention: number;
+  unreadMessages: number;
+  pendingDeletions: number;
+  newCandidates: number;
+  newClients: number;
+  jobsAwaitingAdmin: number;
+  openShifts: number;
+  overdueInvoices: number;
+  revenue: number;
+}
+
+/** GET /stats/alerts — operational alerts (late, no check-in, expiring docs…). */
+export interface OperationalAlert {
+  type: string;
+  severity: 'high' | 'medium' | 'low';
+  message: string;
+  occurredAt?: string;
+  candidateId?: string | null;
+  candidateName?: string | null;
+  shiftId?: string | null;
+  jobId?: string | null;
+  jobTitle?: string | null;
+}
+
+/** GET /timesheets — staff view (all companies). */
+export interface StaffTimesheet {
+  id: string;
+  status: TimesheetStatus;
+  hoursWorked?: string | number | null;
+  breakMinutes?: number | null;
+  clockIn?: string | null;
+  clockOut?: string | null;
+  createdAt?: string;
+  candidate?: { firstName: string; lastName: string } | null;
+  shift?: {
+    startAt: string;
+    endAt: string;
+    payRate?: string | number;
+    chargeRate?: string | number;
+    job?: { title: string; client?: { id: string; name: string } | null } | null;
+  } | null;
+}
+
+/** GET /messages/conversations — staff inbox rows. */
+export interface StaffConversation {
+  id: string;
+  kind: string;
+  name: string;
+  lastMessage: string;
+  lastAt: string;
+  unread: number;
+}
+
+export interface StaffMessage {
+  id: string;
+  body: string;
+  senderIsStaff: boolean;
+  createdAt: string;
+}
+
+/** GET /messages/conversations/:id — one thread (marks inbound as read). */
+export interface StaffThread {
+  conversationId: string;
+  kind: string;
+  name: string;
+  messages: StaffMessage[];
+}
+
+/** GET /candidates and GET /candidates/:id — staff (unredacted for ADMIN). */
+export interface StaffCandidate {
+  id: string;
+  userId?: string | null;
+  firstName: string;
+  lastName: string;
+  email?: string | null;
+  phone?: string | null;
+  city?: string | null;
+  postcode?: string | null;
+  status: CandidateStatus;
+  headline?: string | null;
+  rightToWorkType?: string | null;
+  rating?: number | null;
+  createdAt?: string;
+  loginEmail?: string | null;
+  hasLogin?: boolean;
+  documents?: CandidateDocument[];
+  availability?: Availability[];
+  skills?: { skill?: { name: string } | null }[];
+}
+
+/** GET /jobs — staff view of every booking. */
+export interface StaffJob {
+  id: string;
+  title: string;
+  status: string;
+  openings?: number;
+  startDate?: string | null;
+  payRate?: string | number;
+  createdAt?: string;
+  client?: { id: string; name: string; city?: string | null } | null;
+  site?: { id: string; name: string } | null;
+  _count?: { shifts?: number; applications?: number };
+}

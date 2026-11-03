@@ -76,6 +76,28 @@ Mutations send an `Idempotency-Key`.
 | Locations | `GET/POST/DELETE /client/locations` | CLIENT | ClientSite | 🔜 helper ready |
 | Alerts | — | — | Notification | ⛔ needs member-list endpoint + push |
 
+### Staff (ADMIN / RECRUITER)
+
+Resolved via `GET /auth/whoami` (role from the API's `User` row, never from
+sign-up metadata). Staff mode sits behind Supabase TOTP MFA (aal2), the same
+gate as the web dashboard; enrolment works on the phone (QR / setup key).
+No new backend routes — these are the admin dashboard's own endpoints.
+
+| Screen / action | Method + endpoint | Role | Entity | Status |
+|---|---|---|---|---|
+| Role resolution | `GET /auth/whoami` (`@MfaExempt`) | any | User | ✅ wired |
+| Two-step verification | Supabase `auth.mfa.*` | ADMIN/RECRUITER | — | ✅ wired |
+| Operations dashboard | `GET /stats/overview`, `GET /stats/alerts` | ADMIN/RECRUITER | — | ✅ wired |
+| Timesheet review | `GET /timesheets?status=`, `PATCH /timesheets/:id/approve\|reject` | ADMIN/RECRUITER | Timesheet | ✅ wired |
+| Inbox + reply | `GET /messages/conversations`, `GET/POST /messages/conversations/:id` | ADMIN/RECRUITER | Conversation/Message | ✅ wired |
+| Candidates (list + record) | `GET /candidates?status=`, `GET /candidates/:id` | ADMIN/RECRUITER | Candidate | ✅ read-only |
+| Job bookings | `GET /jobs` | ADMIN/RECRUITER | Job | ✅ read-only |
+| Notifications / push | `GET /notifications`, push-tokens | any | Notification | ✅ wired (after MFA) |
+
+The candidate record on the phone never shows NI, bank, health notes, address
+lines or document files, even to ADMIN. Vetting, status changes, matching,
+invites, submit-to-client and booking stay on the web dashboard.
+
 Legend: ✅ built & wired this stage · 🔜 endpoint exists, screen is next stage ·
 ⚠️ small backend addition required · ⛔ design-only or new endpoint required.
 

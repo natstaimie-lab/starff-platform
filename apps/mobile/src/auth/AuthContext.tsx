@@ -5,7 +5,7 @@
  *
  * Responsibilities:
  *  - restore / observe the Supabase session (persisted in encrypted storage),
- *  - resolve the app role (candidate | employer) so navigation can branch,
+ *  - resolve the app role (candidate | employer | staff) so navigation can branch,
  *  - idempotently ensure a candidate's backend profile exists on first login,
  *  - sign in / register / sign out,
  *  - optional biometric unlock as a convenience after the first login.
@@ -27,14 +27,17 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { apiFetch } from '@/lib/api';
-import { candidateApi, clientApi } from '@/lib/endpoints';
+import { authApi, candidateApi, clientApi } from '@/lib/endpoints';
+import type { StaffRole } from '@/lib/types';
 
-export type AppRole = 'candidate' | 'employer';
+export type AppRole = 'candidate' | 'employer' | 'staff';
 
 interface AuthContextValue {
   loading: boolean;
   session: Session | null;
   role: AppRole | null;
+  /** ADMIN | RECRUITER when role === 'staff' (drives what staff mode shows). */
+  staffRole: StaffRole | null;
   /** True once a session exists but before role resolution finishes. */
   resolvingRole: boolean;
   signIn: (email: string, password: string) => Promise<void>;
@@ -94,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
+  const [staffRole, setStaffRole] = useState<StaffRole | null>(null);
   const [resolvingRole, setResolvingRole] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
@@ -127,6 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!session?.user) {
       setRole(null);
+      setStaffRole(null);
       bootstrappedFor.current = null;
       return;
     }
@@ -138,6 +143,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function resolveAndBootstrap(s: Session) {
     setResolvingRole(true);
     try {
+      // Staff first: the API's User row is the source of truth for ADMIN /
+      // RECRUITER (promoted server-side, never self-assigned via metadata).
+      // whoami is @MfaExempt so it answers before the staff MFA step-up.
+      try {
+        const who = await authApi.whoami();
+        if (who?.role === 'ADMIN' || who?.role === 'RECRUITER') {
+          setStaffRole(who.role);
+          setRole('staff');
+          return;
+        }
+      } catch {
+        /* offline / API down — fall through to the member probes below */
+      }
+      setStaffRole(null);
+
       const meta = s.user.user_metadata ?? {};
       const intended = meta.role as AppRole | undefined;
 
@@ -170,8 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {
         /* not a client */
       }
-      // Unknown role (likely an admin/recruiter) — the app is worker/employer
-      // only, so keep them out with a clear message elsewhere.
+      // Unknown role — keep them out with a clear message elsewhere.
       setRole(null);
     } finally {
       setResolvingRole(false);
@@ -244,6 +263,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       session,
       role,
+      staffRole,
       resolvingRole,
       biometricAvailable,
       biometricEnabled,
@@ -303,6 +323,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async signOut() {
         await supabase.auth.signOut();
         setRole(null);
+        setStaffRole(null);
       },
       async setBiometricEnabled(on) {
         await SecureStore.setItemAsync(BIOMETRIC_FLAG, on ? 'true' : 'false');
@@ -320,6 +341,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       session,
       role,
+      staffRole,
       resolvingRole,
       biometricAvailable,
       biometricEnabled,

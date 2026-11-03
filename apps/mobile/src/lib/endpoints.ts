@@ -15,8 +15,16 @@ import type {
   Journey,
   Notification,
   OpenJob,
+  OperationalAlert,
   Shift,
+  StaffCandidate,
+  StaffConversation,
+  StaffJob,
+  StaffOverview,
+  StaffThread,
+  StaffTimesheet,
   Timesheet,
+  WhoAmI,
 } from '@/lib/types';
 
 // ── Candidate (role CANDIDATE) ────────────────────────────────────────────
@@ -276,4 +284,71 @@ export const notificationsApi = {
   /** DELETE /notifications/push-tokens — unregister on sign-out. */
   removePushToken: (token: string) =>
     apiFetch('/notifications/push-tokens', { method: 'DELETE', body: { token } }),
+};
+
+// ── Identity (any authenticated user) ───────────────────────────────────────
+export const authApi = {
+  /** GET /auth/whoami — role of the signed-in user. @MfaExempt, so it works at aal1. */
+  whoami: () => apiFetch<WhoAmI>('/auth/whoami'),
+};
+
+// ── Staff (roles ADMIN + RECRUITER) ─────────────────────────────────────────
+// The same routes the admin dashboard uses. The API enforces role + MFA (aal2)
+// on every one of them; the app only decides what to show.
+export const staffApi = {
+  /** GET /staff/me — the staff member's own record. */
+  me: () => apiFetch<{ id: string; email?: string; role: string; firstName?: string | null; lastName?: string | null }>('/staff/me'),
+
+  /** GET /stats/overview — headline counts / attention badges. */
+  overview: () => apiFetch<StaffOverview>('/stats/overview'),
+
+  /** GET /stats/alerts — operational alerts. */
+  alerts: () => apiFetch<{ alerts: OperationalAlert[]; counts: Record<string, number> }>('/stats/alerts'),
+
+  /** GET /timesheets?status= — every company's timesheets. */
+  timesheets: (status?: string) =>
+    apiFetch<StaffTimesheet[]>(`/timesheets${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+
+  /** PATCH /timesheets/:id/approve — explicit staff approval. */
+  approveTimesheet: (id: string) =>
+    apiFetch(`/timesheets/${id}/approve`, {
+      method: 'PATCH',
+      idempotencyKey: idempotencyKey('staff-approve-timesheet', id),
+    }),
+
+  /** PATCH /timesheets/:id/reject — reject with an optional reason. */
+  rejectTimesheet: (id: string, reason?: string) =>
+    apiFetch(`/timesheets/${id}/reject`, {
+      method: 'PATCH',
+      body: { reason },
+      idempotencyKey: idempotencyKey('staff-reject-timesheet', id),
+    }),
+
+  /** GET /messages/conversations — the staff inbox. */
+  conversations: () => apiFetch<StaffConversation[]>('/messages/conversations'),
+
+  /** GET /messages/conversations/:id — one thread (marks inbound messages read). */
+  conversation: (id: string) => apiFetch<StaffThread>(`/messages/conversations/${id}`),
+
+  /** POST /messages/conversations/:id — reply as Starff. */
+  reply: (id: string, body: string) =>
+    apiFetch(`/messages/conversations/${id}`, {
+      method: 'POST',
+      body: { body },
+      idempotencyKey: idempotencyKey('staff-reply', id, Date.now()),
+    }),
+
+  /** GET /candidates?status=&take= — newest first, archived hidden. */
+  candidates: (params: { status?: string; take?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.status) q.set('status', params.status);
+    q.set('take', String(params.take ?? 100));
+    return apiFetch<StaffCandidate[]>(`/candidates?${q.toString()}`);
+  },
+
+  /** GET /candidates/:id — full staff record. */
+  candidate: (id: string) => apiFetch<StaffCandidate>(`/candidates/${id}`),
+
+  /** GET /jobs — every booking, newest first. */
+  jobs: () => apiFetch<StaffJob[]>('/jobs'),
 };

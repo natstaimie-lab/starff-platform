@@ -5,6 +5,7 @@
  *   no session or unknown role → Auth stack (login / register)
  *   role = candidate           → Candidate tab app
  *   role = employer            → Employer tab app
+ *   role = staff               → MFA gate → Staff (admin/recruiter) tab app
  *
  * This is where "the app identifies the user's role after login and loads the
  * correct navigation, dashboard, permissions and features" is enforced.
@@ -19,6 +20,7 @@ import { RegisterScreen } from '@/screens/auth/RegisterScreen';
 import { UnsupportedRoleScreen } from '@/screens/auth/UnsupportedRoleScreen';
 import { CandidateTabs } from '@/navigation/CandidateTabs';
 import { EmployerTabs } from '@/navigation/EmployerTabs';
+import { StaffApp } from '@/navigation/StaffTabs';
 import { PushRegistrar } from '@/notifications/PushRegistrar';
 
 export type AuthStackParams = {
@@ -49,15 +51,18 @@ export function RootNavigator() {
     content = <CandidateTabs />;
   } else if (role === 'employer') {
     content = <EmployerTabs />;
+  } else if (role === 'staff') {
+    content = <StaffApp />;
   } else {
-    // Signed in but not a worker/employer (e.g. admin) — app is not for them.
+    // Signed in but the role couldn't be resolved (no profile / API down).
     content = <UnsupportedRoleScreen />;
   }
 
   return (
     <>
       <NavigationContainer>{content}</NavigationContainer>
-      {session && role ? <PushRegistrar /> : null}
+      {/* Staff register push inside StaffApp, once MFA is complete. */}
+      {session && role && role !== 'staff' ? <PushRegistrar /> : null}
     </>
   );
 }
