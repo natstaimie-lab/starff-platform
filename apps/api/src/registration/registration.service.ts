@@ -939,6 +939,10 @@ export class RegistrationService {
         archivedAt: null,
         status: { in: [CandidateStatus.NEW, CandidateStatus.SCREENING] },
         createdAt: { lte: cutoff },
+        // Only truly abandoned sign-ups — never park someone who has shown real
+        // engagement by uploading a document (they may just be awaiting a DBS or
+        // share code, which can take weeks).
+        documents: { none: {} },
       },
       select: { id: true, firstName: true, lastName: true, createdAt: true },
       take: 500,
