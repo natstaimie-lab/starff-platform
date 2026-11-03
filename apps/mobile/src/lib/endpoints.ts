@@ -16,6 +16,12 @@ import type {
   Notification,
   OpenJob,
   Shift,
+  StaffCandidate,
+  StaffConversation,
+  StaffOverview,
+  StaffThread,
+  StaffTimesheet,
+  StaffWorkflow,
   Timesheet,
 } from '@/lib/types';
 
@@ -246,6 +252,50 @@ export const messagesApi = {
   /** POST /messages/thread — send a message to the Starff team. */
   send: (body: string) =>
     apiFetch('/messages/thread', { method: 'POST', body: { body } }),
+};
+
+// ── Staff (roles ADMIN + RECRUITER, unless noted) ─────────────────────────
+export const staffApi = {
+  /** GET /stats/overview + /stats/workflow — the dashboard counts and queues. */
+  overview: () => apiFetch<StaffOverview>('/stats/overview'),
+  workflow: () => apiFetch<StaffWorkflow>('/stats/workflow'),
+
+  /** GET /timesheets?status= — every worker's timesheets. */
+  timesheets: (status?: string) =>
+    apiFetch<StaffTimesheet[]>(`/timesheets${status ? `?status=${status}` : ''}`),
+  approveTimesheet: (id: string) =>
+    apiFetch(`/timesheets/${id}/approve`, {
+      method: 'PATCH',
+      idempotencyKey: idempotencyKey('staff-approve-timesheet', id),
+    }),
+  rejectTimesheet: (id: string, reason: string) =>
+    apiFetch(`/timesheets/${id}/reject`, {
+      method: 'PATCH',
+      body: { reason },
+      idempotencyKey: idempotencyKey('staff-reject-timesheet', id),
+    }),
+
+  /** GET /candidates — newest first; recruiters get a redacted copy from the API. */
+  candidates: () => apiFetch<StaffCandidate[]>('/candidates?take=500'),
+  candidate: (id: string) => apiFetch<StaffCandidate>(`/candidates/${id}`),
+  /** PATCH /candidates/:id/documents/:docId — ADMIN only. */
+  setDocumentStatus: (id: string, docId: string, status: 'VERIFIED' | 'REJECTED', reason?: string) =>
+    apiFetch(`/candidates/${id}/documents/${docId}`, {
+      method: 'PATCH',
+      body: { status, reason },
+      idempotencyKey: idempotencyKey('staff-document', docId, status),
+    }),
+  /** GET /candidates/:id/documents/:docId/url — 5-minute signed link, ADMIN only. */
+  documentUrl: (id: string, docId: string, side?: 'back') =>
+    apiFetch<{ url: string }>(
+      `/candidates/${id}/documents/${docId}/url${side ? `?side=${side}` : ''}`,
+    ),
+
+  /** Staff inbox: GET /messages/conversations, GET + POST /messages/conversations/:id. */
+  conversations: () => apiFetch<StaffConversation[]>('/messages/conversations'),
+  thread: (id: string) => apiFetch<StaffThread>(`/messages/conversations/${id}`),
+  reply: (id: string, body: string) =>
+    apiFetch(`/messages/conversations/${id}`, { method: 'POST', body: { body } }),
 };
 
 // ── Shared: account (roles CANDIDATE + CLIENT) ─────────────────────────────

@@ -5,7 +5,7 @@
  *
  * Responsibilities:
  *  - restore / observe the Supabase session (persisted in encrypted storage),
- *  - resolve the app role (candidate | employer) so navigation can branch,
+ *  - resolve the app role (candidate | employer | staff) so navigation can branch,
  *  - idempotently ensure a candidate's backend profile exists on first login,
  *  - sign in / register / sign out,
  *  - optional biometric unlock as a convenience after the first login.
@@ -29,12 +29,15 @@ import { supabase } from '@/lib/supabase';
 import { apiFetch } from '@/lib/api';
 import { candidateApi, clientApi } from '@/lib/endpoints';
 
-export type AppRole = 'candidate' | 'employer';
+export type AppRole = 'candidate' | 'employer' | 'staff';
+export type StaffRole = 'ADMIN' | 'RECRUITER';
 
 interface AuthContextValue {
   loading: boolean;
   session: Session | null;
   role: AppRole | null;
+  /** Set when role = staff. The API enforces what each one can do; this only drives the UI. */
+  staffRole: StaffRole | null;
   /** True once a session exists but before role resolution finishes. */
   resolvingRole: boolean;
   signIn: (email: string, password: string) => Promise<void>;
@@ -94,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
+  const [staffRole, setStaffRole] = useState<StaffRole | null>(null);
   const [resolvingRole, setResolvingRole] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
@@ -127,6 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!session?.user) {
       setRole(null);
+      setStaffRole(null);
       bootstrappedFor.current = null;
       return;
     }
@@ -138,6 +143,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function resolveAndBootstrap(s: Session) {
     setResolvingRole(true);
     try {
+      // Staff first, from the server's record rather than sign-up metadata: a
+      // promoted account can still carry an old role hint, and must never be
+      // provisioned a worker or company profile. whoami is callable before MFA.
+      try {
+        const me = await apiFetch<{ role: string | null }>('/auth/whoami');
+        if (me?.role === 'ADMIN' || me?.role === 'RECRUITER') {
+          setStaffRole(me.role);
+          setRole('staff');
+          return;
+        }
+      } catch {
+        /* fall through to the worker / employer checks */
+      }
+
       const meta = s.user.user_metadata ?? {};
       const intended = meta.role as AppRole | undefined;
 
@@ -170,8 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {
         /* not a client */
       }
-      // Unknown role (likely an admin/recruiter) — the app is worker/employer
-      // only, so keep them out with a clear message elsewhere.
+      // Unknown role — keep them out with a clear message elsewhere.
       setRole(null);
     } finally {
       setResolvingRole(false);
@@ -244,6 +262,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       session,
       role,
+      staffRole,
       resolvingRole,
       biometricAvailable,
       biometricEnabled,
@@ -303,6 +322,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async signOut() {
         await supabase.auth.signOut();
         setRole(null);
+        setStaffRole(null);
       },
       async setBiometricEnabled(on) {
         await SecureStore.setItemAsync(BIOMETRIC_FLAG, on ? 'true' : 'false');
@@ -320,6 +340,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       session,
       role,
+      staffRole,
       resolvingRole,
       biometricAvailable,
       biometricEnabled,

@@ -22,13 +22,16 @@ export function useApi<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
   });
 
   const load = useCallback(
-    async (mode: 'initial' | 'refresh' = 'initial') => {
-      setState((s) => ({
-        ...s,
-        loading: mode === 'initial',
-        refreshing: mode === 'refresh',
-        error: null,
-      }));
+    async (mode: 'initial' | 'refresh' | 'silent' = 'initial') => {
+      // Silent keeps what's on screen untouched, with no spinner shifting the layout.
+      if (mode !== 'silent') {
+        setState((s) => ({
+          ...s,
+          loading: mode === 'initial',
+          refreshing: mode === 'refresh',
+          error: null,
+        }));
+      }
       try {
         const data = await fetcher();
         setState({ data, loading: false, refreshing: false, error: null });
@@ -58,5 +61,6 @@ export function useApi<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
     ...state,
     reload: () => load('initial'),
     refresh: () => load('refresh'),
+    silentRefresh: () => load('silent'),
   };
 }

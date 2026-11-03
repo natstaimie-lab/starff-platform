@@ -4,7 +4,9 @@ Expo + React Native + TypeScript. **Another client of the existing platform** â€
 same Supabase Auth, same NestJS API, same database as the portals. No separate
 backend, no parallel auth. Read the root `CLAUDE.md` first.
 
-Serves both audiences: candidate tabs and employer tabs, chosen by role.
+Serves three audiences, chosen by role: candidate tabs, employer tabs, and staff
+tabs (ADMIN/RECRUITER, behind the same TOTP MFA as the admin dashboard). Staff get
+day-to-day actions only; job approval, matching and booking stay on the web.
 
 ## Not a workspace
 
@@ -40,8 +42,8 @@ src/lib/
   types.ts             shapes mirroring Prisma
   useApi.ts            loading / error / refresh hook
 src/auth/AuthContext.tsx   session, role resolution, sign in/up/out, biometric
-src/navigation/        RootNavigator + CandidateTabs + EmployerTabs
-src/screens/           auth/, candidate/, employer/, shared/, Splash
+src/navigation/        RootNavigator + CandidateTabs + EmployerTabs + StaffTabs
+src/screens/           auth/, candidate/, employer/, staff/, shared/, Splash
 src/notifications/     PushRegistrar
 ```
 

@@ -7,7 +7,6 @@
     "orientation": "portrait",
     "scheme": "starff",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "runtimeVersion": {
       "policy": "fingerprint"
     },
@@ -18,11 +17,6 @@
       "fallbackToCacheTimeout": 0
     },
     "icon": "./assets/icon.png",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0B1F3A"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -72,7 +66,16 @@
         }
       ],
       "expo-font",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0B1F3A",
+          "imageWidth": 200
+        }
+      ]
     ],
     "extra": {
       "eas": {

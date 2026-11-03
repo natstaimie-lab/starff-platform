@@ -222,3 +222,85 @@ export interface ClientSubmission {
     rating: number | null;
   };
 }
+
+// ── Staff (roles ADMIN + RECRUITER) ────────────────────────────────────────
+export interface StaffOverview {
+  candidates: number;
+  pendingTimesheets: number;
+  newEnquiries: number;
+  complianceAttention: number;
+  unreadMessages: number;
+  jobsAwaitingAdmin: number;
+  openShifts: number;
+  overdueInvoices: number;
+}
+
+export interface StaffWorkflow {
+  counts: { clientAccepted: number; responsesToReview: number; upcomingShifts: number; reliabilityConcerns: number };
+  awaitingApprovalJobs: { id: string; title: string; openings: number; client: { name: string } }[];
+  readyToBook: {
+    id: string;
+    candidate: { firstName: string; lastName: string };
+    job: { id: string; title: string; client: { name: string } };
+  }[];
+  upcomingShifts: {
+    id: string;
+    startAt: string;
+    candidate: { firstName: string; lastName: string } | null;
+    job: { id: string; title: string; client: { name: string } };
+  }[];
+  reliabilityConcerns: { candidateId: string; name: string; level: string }[];
+}
+
+export interface StaffTimesheet {
+  id: string;
+  status: string;
+  hoursWorked?: number | string | null;
+  candidate?: { firstName: string; lastName: string } | null;
+  shift?: {
+    startAt: string;
+    job?: { title: string; client?: { name: string } | null } | null;
+  } | null;
+}
+
+export interface StaffDocument {
+  id: string;
+  type: string;
+  status: string;
+  expiryDate?: string | null;
+  createdAt: string;
+  fileUrl?: string | null;
+  backFileUrl?: string | null;
+  aiCheckVerdict?: string | null;
+  aiCheckSummary?: string | null;
+  rejectionReason?: string | null;
+}
+
+export interface StaffCandidate {
+  id: string;
+  firstName: string;
+  lastName: string;
+  status: string;
+  phone?: string | null;
+  city?: string | null;
+  postcode?: string | null;
+  available?: boolean;
+  loginEmail?: string | null;
+  documents: StaffDocument[];
+}
+
+export interface StaffConversation {
+  id: string;
+  kind: string;
+  name: string;
+  lastMessage: string;
+  lastAt: string;
+  unread: number;
+}
+
+export interface StaffThread {
+  conversationId: string;
+  name: string;
+  kind: string;
+  messages: { id: string; body: string; senderIsStaff: boolean; senderName?: string; createdAt: string }[];
+}
