@@ -16,6 +16,7 @@ import { EnquiriesService } from './enquiries.service';
 import { CreateEnquiryDto } from './dto/create-enquiry.dto';
 import { Public } from '../auth/public.decorator';
 import { Roles } from '../auth/roles.decorator';
+import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
 
 @ApiTags('enquiries')
 @Controller('enquiries')
@@ -55,6 +56,17 @@ export class EnquiriesController {
   @Roles(Role.ADMIN, Role.RECRUITER)
   setSpam(@Param('id') id: string, @Body('spam') spam: boolean) {
     return this.enquiries.setSpam(id, spam);
+  }
+
+  // Staff only — send a branded email reply to the enquirer.
+  @Post(':id/reply')
+  @Roles(Role.ADMIN, Role.RECRUITER)
+  reply(
+    @Param('id') id: string,
+    @Body() dto: { subject?: string; body: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.enquiries.reply(id, user.id, dto);
   }
 
   // Staff only — promote an enquiry into a Candidate or Client.

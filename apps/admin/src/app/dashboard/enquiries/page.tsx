@@ -28,6 +28,10 @@ export default function EnquiriesPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [view, setView] = useState<Enquiry | null>(null);
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replySubject, setReplySubject] = useState('Re: Your enquiry to Starff');
+  const [replyBody, setReplyBody] = useState('');
+  const [sending, setSending] = useState(false);
 
   const load = (t: 'inbox' | 'spam' = tab) => {
     setLoading(true);
@@ -74,6 +78,35 @@ export default function EnquiriesPage() {
       await load();
     } catch (e: any) { alert(e?.message || 'Could not delete this enquiry.'); }
     finally { setBusy(null); }
+  }
+
+  // Collapse the reply composer whenever a different enquiry is opened/closed.
+  useEffect(() => { setReplyOpen(false); }, [view?.id]);
+
+  function openReply(e: Enquiry) {
+    setReplySubject('Re: Your enquiry to Starff');
+    setReplyBody(`Hi ${(e.name || 'there').split(' ')[0]},\n\n`);
+    setReplyOpen(true);
+  }
+
+  async function sendReply() {
+    if (!view || !replyBody.trim()) return;
+    setSending(true);
+    try {
+      const res = await apiFetch<{ emailed: boolean; error?: string }>(`/enquiries/${view.id}/reply`, {
+        method: 'POST',
+        body: JSON.stringify({ subject: replySubject, body: replyBody }),
+      });
+      if (res.emailed) {
+        setReplyOpen(false); setReplyBody(''); setView(null); await load();
+        alert('Reply sent.');
+      } else {
+        alert('The branded email could not be sent — email sending isn’t configured yet (RESEND_API_KEY). The enquiry was marked as contacted.');
+        await load();
+      }
+    } catch (e: any) {
+      alert(e?.message || 'Could not send the reply.');
+    } finally { setSending(false); }
   }
 
   const btn = (bg: string): React.CSSProperties => ({ border: 'none', background: bg, color: '#fff', fontWeight: 700, fontSize: 12, padding: '6px 12px', borderRadius: 8, cursor: 'pointer' });
@@ -178,12 +211,26 @@ export default function EnquiriesPage() {
             <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.6, color: 'var(--navy-900)', background: 'var(--grey-50)', border: '1px solid var(--grey-200)', borderRadius: 10, padding: 14 }}>
               {view.message || '(no message provided)'}
             </div>
+            {view.email && replyOpen && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--grey-500)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Your reply</div>
+                <input value={replySubject} onChange={(e) => setReplySubject(e.target.value)} placeholder="Subject" style={{ width: '100%', padding: '9px 11px', border: '1px solid var(--grey-200)', borderRadius: 8, fontSize: 13.5, marginBottom: 8 }} />
+                <textarea value={replyBody} onChange={(e) => setReplyBody(e.target.value)} rows={8} placeholder="Write your reply…" style={{ width: '100%', padding: '11px 12px', border: '1px solid var(--grey-200)', borderRadius: 8, fontSize: 14, lineHeight: 1.5, fontFamily: 'inherit', resize: 'vertical' }} />
+                <div className="dim" style={{ fontSize: 12, marginTop: 6 }}>Sent as a branded Starff email (navy & orange, with your logo and footer). Line breaks are kept.</div>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
               <button disabled={busy === view.id} onClick={() => remove(view.id, view.name)} style={{ ...danger, marginRight: 'auto' }} title="Delete permanently">{busy === view.id ? '…' : 'Delete'}</button>
-              {view.email && (
-                <a href={`mailto:${view.email}?subject=${encodeURIComponent('Re: Your enquiry to Starff')}`} style={{ ...btn('var(--orange-500)'), textDecoration: 'none', display: 'inline-block' }}>Reply by email</a>
+              {view.email && !replyOpen && (
+                <button onClick={() => openReply(view)} style={btn('var(--orange-500)')}>Write reply</button>
               )}
-              <button onClick={() => setView(null)} style={ghost}>Close</button>
+              {view.email && replyOpen && (
+                <>
+                  <a href={`mailto:${view.email}?subject=${encodeURIComponent(replySubject)}`} style={{ ...ghost, textDecoration: 'none', display: 'inline-block' }} title="Reply from your own email app instead">Use my email app</a>
+                  <button disabled={sending || !replyBody.trim()} onClick={sendReply} style={{ ...btn('var(--orange-500)'), opacity: sending || !replyBody.trim() ? 0.6 : 1 }}>{sending ? 'Sending…' : 'Send styled reply'}</button>
+                </>
+              )}
+              <button onClick={() => { setReplyOpen(false); setView(null); }} style={ghost}>Close</button>
             </div>
           </div>
         </div>

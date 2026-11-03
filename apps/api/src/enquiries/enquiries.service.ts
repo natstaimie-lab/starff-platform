@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateEnquiryDto } from './dto/create-enquiry.dto';
 import { RegistrationService } from '../registration/registration.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AuditService } from '../audit/audit.service';
 
 // Conservative spam signals — tuned to avoid false positives on genuine enquiries.
 const SPAM_KEYWORDS = [
@@ -28,7 +29,46 @@ export class EnquiriesService {
     private readonly prisma: PrismaService,
     private readonly registration: RegistrationService,
     private readonly notifications: NotificationsService,
+    private readonly audit: AuditService,
   ) {}
+
+  /**
+   * Send a branded reply to an enquiry via Resend (the same styled template as
+   * our other emails), mark it contacted, and audit it. Returns whether the
+   * email actually went out — it only sends when RESEND_API_KEY is configured.
+   */
+  async reply(id: string, actorId: string, dto: { subject?: string; body: string }) {
+    const enquiry = await this.prisma.enquiry.findUnique({ where: { id } });
+    if (!enquiry) throw new NotFoundException('Enquiry not found');
+    if (!enquiry.email) throw new BadRequestException('This enquiry has no email address to reply to.');
+    const text = (dto.body ?? '').trim();
+    if (!text) throw new BadRequestException('The reply message is empty.');
+
+    const subject = dto.subject?.trim() || 'Re: Your enquiry to Starff';
+    // Preserve the admin's line breaks inside the branded HTML template.
+    const bodyHtml = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+
+    const res = await this.notifications.send({
+      to: enquiry.email,
+      kind: 'ENQUIRY_REPLY',
+      subject,
+      body: bodyHtml,
+    });
+
+    // Move it out of "new" so it stops showing in the badge/queue. Best-effort.
+    await this.prisma.enquiry
+      .update({ where: { id }, data: { status: EnquiryStatus.CONTACTED } })
+      .catch(() => {});
+    await this.audit.log({
+      actorId,
+      action: 'enquiry.replied',
+      entity: 'Enquiry',
+      entityId: id,
+      meta: { to: enquiry.email, subject, emailed: res.emailed },
+    });
+
+    return { emailed: res.emailed, error: res.error };
+  }
 
   /** Cheap heuristics — returns why it looks like spam, or {spam:false}. */
   private detectSpam(dto: CreateEnquiryDto): { spam: boolean; reason?: string } {

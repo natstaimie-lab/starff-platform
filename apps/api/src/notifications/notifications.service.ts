@@ -41,7 +41,8 @@ export type NotifyKind =
   | 'NEW_SIGNUP'
   | 'SELFIE_REQUIRED'
   | 'NEW_MESSAGE'
-  | 'ACCOUNT_DELETION_REQUEST';
+  | 'ACCOUNT_DELETION_REQUEST'
+  | 'ENQUIRY_REPLY';
 
 interface NotifyInput {
   to: string;
