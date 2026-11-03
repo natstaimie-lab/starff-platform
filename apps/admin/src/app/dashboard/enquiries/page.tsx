@@ -199,7 +199,7 @@ export default function EnquiriesPage() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ background: '#fff', borderRadius: 14, maxWidth: 520, width: '100%', padding: 24, boxShadow: '0 20px 60px rgba(11,31,58,0.25)' }}
+            style={{ background: '#fff', borderRadius: 14, maxWidth: 520, width: '100%', padding: 24, boxShadow: '0 20px 60px rgba(11,31,58,0.25)', maxHeight: '90vh', overflowY: 'auto' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <Badge tone="info">{typeLabel[view.type] ?? view.type}</Badge>
@@ -219,7 +219,7 @@ export default function EnquiriesPage() {
                 <div className="dim" style={{ fontSize: 12, marginTop: 6 }}>Sent as a branded Starff email (navy & orange, with your logo and footer). Line breaks are kept.</div>
               </div>
             )}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginTop: 20, position: 'sticky', bottom: -24, background: '#fff', paddingTop: 14, paddingBottom: 4, borderTop: '1px solid var(--grey-100, #eef1f5)' }}>
               <button disabled={busy === view.id} onClick={() => remove(view.id, view.name)} style={{ ...danger, marginRight: 'auto' }} title="Delete permanently">{busy === view.id ? '…' : 'Delete'}</button>
               {view.email && !replyOpen && (
                 <button onClick={() => openReply(view)} style={btn('var(--orange-500)')}>Write reply</button>
