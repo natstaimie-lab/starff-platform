@@ -26,7 +26,7 @@ export default function CompliancePage() {
     // first=true shows the skeleton + surfaces errors; the 15s background polls
     // refresh silently so compliance statuses update without a manual refresh.
     const load = (first = false) =>
-      apiFetch<Cand[]>('/candidates')
+      apiFetch<Cand[]>('/candidates?take=500')
         .then(setRows)
         .catch((e) => { if (first) setError(e.message); })
         .finally(() => { if (first) setLoading(false); });
