@@ -812,7 +812,10 @@ export class RegistrationService {
    * Best-effort: a single failure never stops the rest. Returns the count sent.
    */
   async sendRegistrationReminders(): Promise<{ reminded: number }> {
-    const MAX_REMINDERS = 3;
+    // Ghosts (no documents) get 3 nudges; candidates who've engaged (uploaded at
+    // least one document) get a 4th "you're nearly there" nudge before parking.
+    const MAX_GHOST = 3;
+    const MAX_ENGAGED = 4;
     const now = new Date();
     const staleAfter = new Date(now.getTime() - 24 * 60 * 60 * 1000); // registered > 24h ago
     const cooloff = new Date(now.getTime() - 48 * 60 * 60 * 1000); // last nudge > 48h ago
@@ -823,10 +826,10 @@ export class RegistrationService {
         archivedAt: null,
         status: { in: [CandidateStatus.NEW, CandidateStatus.SCREENING] },
         createdAt: { lte: staleAfter },
-        reminderCount: { lt: MAX_REMINDERS },
+        reminderCount: { lt: MAX_ENGAGED }, // widest cap; per-person cap applied below
         OR: [{ lastReminderAt: null }, { lastReminderAt: { lte: cooloff } }],
       },
-      include: { user: { select: { email: true } } },
+      include: { user: { select: { email: true } }, _count: { select: { documents: true } } },
       take: 200,
     });
 
@@ -835,13 +838,20 @@ export class RegistrationService {
       const email = c.user?.email;
       // Skip placeholder logins (walk-ins added without a real address).
       if (!email || email.endsWith('@candidate.local') || email.endsWith('@placeholder.starff')) continue;
+      const engaged = c._count.documents > 0;
+      const cap = engaged ? MAX_ENGAGED : MAX_GHOST;
+      if ((c.reminderCount ?? 0) >= cap) continue; // ghost already had its 3
+      // The extra (4th) nudge for someone who's started but not finished.
+      const finalEngaged = engaged && (c.reminderCount ?? 0) === MAX_GHOST;
       await this.notifications
         .send({
           to: email,
           userId: c.userId,
           kind: 'REGISTRATION_REMINDER',
-          subject: 'Finish your Starff registration',
-          body: `Hi ${c.firstName}, you're nearly there. A few quick steps — your right to work, ID, a quick selfie and availability — and we can start matching you to shifts. It only takes a few minutes.`,
+          subject: finalEngaged ? 'Just one step left on your Starff registration' : 'Finish your Starff registration',
+          body: finalEngaged
+            ? `Hi ${c.firstName}, you've already uploaded your documents — you're almost there. Finish the last few steps and submit your registration so we can verify you and start matching you to shifts.`
+            : `Hi ${c.firstName}, you're nearly there. A few quick steps — your right to work, ID, a quick selfie and availability — and we can start matching you to shifts. It only takes a few minutes.`,
           actionUrl: this.candidatePortalUrl(),
           actionLabel: 'Finish my registration',
         })
@@ -946,24 +956,29 @@ export class RegistrationService {
    * Auto-park abandoned sign-ups: candidates who registered long ago, were
    * reminded, and still never submitted get archived so they stop cluttering the
    * active lists. Reversible — it only sets archivedAt (the login stays active,
-   * and finishing their registration un-parks them via submitCandidate). Default
-   * window 14 days; override with STALE_PARK_DAYS.
+   * and finishing their registration un-parks them via submitCandidate). Two
+   * tiers: ghosts with no documents park after STALE_PARK_DAYS (default 14);
+   * candidates who've engaged (uploaded a document) get a longer runway,
+   * STALE_PARK_DAYS_ENGAGED (default 45), since a DBS or share code can take weeks.
    */
   async parkStaleIncompleteRegistrations(): Promise<{ parked: number }> {
-    const days = Number(process.env.STALE_PARK_DAYS) || 14;
-    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const ghostDays = Number(process.env.STALE_PARK_DAYS) || 14;
+    const engagedDays = Number(process.env.STALE_PARK_DAYS_ENGAGED) || 45;
+    const ghostCutoff = new Date(Date.now() - ghostDays * 24 * 60 * 60 * 1000);
+    const engagedCutoff = new Date(Date.now() - engagedDays * 24 * 60 * 60 * 1000);
     const stale = await this.prisma.candidate.findMany({
       where: {
         submittedAt: null,
         archivedAt: null,
         status: { in: [CandidateStatus.NEW, CandidateStatus.SCREENING] },
-        createdAt: { lte: cutoff },
-        // Only truly abandoned sign-ups — never park someone who has shown real
-        // engagement by uploading a document (they may just be awaiting a DBS or
-        // share code, which can take weeks).
-        documents: { none: {} },
+        OR: [
+          // True ghosts — no documents — cleared quickly.
+          { documents: { none: {} }, createdAt: { lte: ghostCutoff } },
+          // Engaged but stalled — gets the longer runway before parking.
+          { documents: { some: {} }, createdAt: { lte: engagedCutoff } },
+        ],
       },
-      select: { id: true, firstName: true, lastName: true, createdAt: true },
+      select: { id: true, firstName: true, lastName: true, createdAt: true, _count: { select: { documents: true } } },
       take: 500,
     });
     let parked = 0;
@@ -973,11 +988,11 @@ export class RegistrationService {
         action: 'candidate.auto_parked',
         entity: 'Candidate',
         entityId: c.id,
-        meta: { reason: 'incomplete registration', afterDays: days, registeredAt: c.createdAt },
+        meta: { reason: 'incomplete registration', engaged: c._count.documents > 0, afterDays: c._count.documents > 0 ? engagedDays : ghostDays, registeredAt: c.createdAt },
       });
       parked++;
     }
-    if (parked) this.logger.log(`auto-parked ${parked} stale incomplete registration(s) (> ${days} days).`);
+    if (parked) this.logger.log(`auto-parked ${parked} stale incomplete registration(s) (ghost > ${ghostDays}d, engaged > ${engagedDays}d).`);
     return { parked };
   }
 
