@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsDateString,
   IsEmail,
   IsEnum,
   IsOptional,
@@ -43,6 +44,16 @@ export class RegisterCandidateDto {
   @IsOptional()
   @IsString()
   postcode?: string;
+
+  /** ISO date (YYYY-MM-DD). Collected by the website register form; 18+ enforced. */
+  @IsOptional()
+  @IsDateString()
+  dateOfBirth?: string;
+
+  /** Right-to-work declaration (British/Irish, Settled, Visa…). */
+  @IsOptional()
+  @IsString()
+  rightToWorkType?: string;
 
   /** Free-text sector/role, stored on the candidate headline. */
   @IsOptional()

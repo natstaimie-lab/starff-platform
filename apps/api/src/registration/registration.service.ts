@@ -36,6 +36,20 @@ export interface ProgressResult {
   nextSection: string | null;
 }
 
+/** Parse a website sign-up date of birth, enforcing an 18+ minimum when given. */
+function parseDob18(v?: string): Date | undefined {
+  if (!v) return undefined;
+  const d = new Date(v);
+  if (isNaN(d.getTime())) throw new BadRequestException('Enter a valid date of birth.');
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  if (age < 18) throw new BadRequestException('You must be at least 18 years old to register.');
+  if (age > 100) throw new BadRequestException('Enter a valid date of birth.');
+  return d;
+}
+
 @Injectable()
 export class RegistrationService {
   private readonly logger = new Logger('Registration');
@@ -122,6 +136,7 @@ export class RegistrationService {
     const firstName = dto.firstName.trim();
     const lastName = dto.lastName.trim();
     const source = dto.source ?? RegistrationSource.WEBSITE;
+    const dob = parseDob18(dto.dateOfBirth); // validates 18+ when provided
 
     // 1. Match an existing platform user by email (idempotent front door).
     let user = await this.prisma.user.findUnique({ where: { email } });
@@ -162,6 +177,8 @@ export class RegistrationService {
             phone: existing.phone ?? dto.phone,
             city: existing.city ?? dto.city,
             postcode: existing.postcode ?? dto.postcode,
+            dateOfBirth: existing.dateOfBirth ?? dob,
+            rightToWorkType: existing.rightToWorkType ?? dto.rightToWorkType,
             headline: existing.headline ?? dto.sector,
           },
         })
@@ -173,6 +190,8 @@ export class RegistrationService {
             phone: dto.phone,
             city: dto.city,
             postcode: dto.postcode,
+            dateOfBirth: dob,
+            rightToWorkType: dto.rightToWorkType,
             headline: dto.sector,
             preferredSectors: cleanSectors(dto.preferredSectors),
             status: CandidateStatus.NEW,
