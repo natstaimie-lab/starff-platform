@@ -1,6 +1,7 @@
 import {
   IsArray,
   IsBoolean,
+  IsDateString,
   IsEmail,
   IsIn,
   IsOptional,
@@ -40,6 +41,18 @@ export class CreateCandidateDto {
   @IsOptional()
   @IsString()
   postcode?: string;
+
+  // ISO date string (YYYY-MM-DD). Required by the public sign-up forms; optional
+  // here so admin walk-in adds (no DOB to hand) still work.
+  @IsOptional()
+  @IsDateString()
+  dateOfBirth?: string;
+
+  // Right-to-work declaration picked at sign-up (British/Irish, Settled, Visa…).
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  rightToWorkType?: string;
 
   @IsOptional()
   @IsString()

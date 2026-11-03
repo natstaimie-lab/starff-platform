@@ -17,6 +17,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AuditService } from '../audit/audit.service';
 import { RegisterCandidateDto } from './dto/register-candidate.dto';
 import { RegisterClientDto } from './dto/register-client.dto';
 
@@ -42,6 +43,7 @@ export class RegistrationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly audit: AuditService,
   ) {}
 
   private admin(): SupabaseClient {
@@ -663,6 +665,8 @@ export class RegistrationService {
       data: {
         submittedAt: c.submittedAt ?? new Date(),
         status: c.status === CandidateStatus.NEW ? CandidateStatus.SCREENING : c.status,
+        // If they'd been auto-parked for inactivity, finishing un-parks them.
+        archivedAt: null,
       },
     });
     await this.notifications.send({
@@ -916,6 +920,51 @@ export class RegistrationService {
       await this.sendRegistrationReminders();
     } catch (e) {
       this.logger.warn(`registration reminder cron failed: ${(e as Error).message}`);
+    }
+  }
+
+  /**
+   * Auto-park abandoned sign-ups: candidates who registered long ago, were
+   * reminded, and still never submitted get archived so they stop cluttering the
+   * active lists. Reversible — it only sets archivedAt (the login stays active,
+   * and finishing their registration un-parks them via submitCandidate). Default
+   * window 30 days; override with STALE_PARK_DAYS.
+   */
+  async parkStaleIncompleteRegistrations(): Promise<{ parked: number }> {
+    const days = Number(process.env.STALE_PARK_DAYS) || 30;
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const stale = await this.prisma.candidate.findMany({
+      where: {
+        submittedAt: null,
+        archivedAt: null,
+        status: { in: [CandidateStatus.NEW, CandidateStatus.SCREENING] },
+        createdAt: { lte: cutoff },
+      },
+      select: { id: true, firstName: true, lastName: true, createdAt: true },
+      take: 500,
+    });
+    let parked = 0;
+    for (const c of stale) {
+      await this.prisma.candidate.update({ where: { id: c.id }, data: { archivedAt: new Date() } }).catch(() => {});
+      await this.audit.log({
+        action: 'candidate.auto_parked',
+        entity: 'Candidate',
+        entityId: c.id,
+        meta: { reason: 'incomplete registration', afterDays: days, registeredAt: c.createdAt },
+      });
+      parked++;
+    }
+    if (parked) this.logger.log(`auto-parked ${parked} stale incomplete registration(s) (> ${days} days).`);
+    return { parked };
+  }
+
+  /** Daily at 03:30 London time — archive long-abandoned incomplete sign-ups. */
+  @Cron('30 3 * * *', { name: 'park-stale-registrations', timeZone: 'Europe/London' })
+  async runParkStaleCron(): Promise<void> {
+    try {
+      await this.parkStaleIncompleteRegistrations();
+    } catch (e) {
+      this.logger.warn(`auto-park cron failed: ${(e as Error).message}`);
     }
   }
 }

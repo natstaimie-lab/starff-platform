@@ -25,6 +25,10 @@ async function ensureProfile(): Promise<string> {
         firstName: (u.user_metadata?.firstName as string) ?? 'New',
         lastName: (u.user_metadata?.lastName as string) ?? 'Candidate',
         preferredSectors: (u.user_metadata?.preferredSectors as string[]) ?? undefined,
+        phone: (u.user_metadata?.phone as string) ?? undefined,
+        postcode: (u.user_metadata?.postcode as string) ?? undefined,
+        dateOfBirth: (u.user_metadata?.dateOfBirth as string) ?? undefined,
+        rightToWorkType: (u.user_metadata?.rightToWorkType as string) ?? undefined,
         source: 'PORTAL',
       }),
     });

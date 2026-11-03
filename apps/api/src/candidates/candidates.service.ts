@@ -20,6 +20,20 @@ import { DocumentCheckService } from '../documents/document-check.service';
 import { toReadableImage } from '../documents/document-media';
 import { AuditService } from '../audit/audit.service';
 
+/** Parse a sign-up date of birth, enforcing a sensible 18+ minimum age. */
+function parseDob(v?: string): Date | undefined {
+  if (!v) return undefined;
+  const d = new Date(v);
+  if (isNaN(d.getTime())) throw new BadRequestException('Enter a valid date of birth.');
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  if (age < 18) throw new BadRequestException('You must be at least 18 years old to register.');
+  if (age > 100) throw new BadRequestException('Enter a valid date of birth.');
+  return d;
+}
+
 // Friendly names for candidate-facing document notifications.
 const DOC_LABELS: Record<string, string> = {
   SELFIE: 'identity photo',
@@ -78,8 +92,9 @@ export class CandidatesService {
       const existing = await this.prisma.candidate.findUnique({ where: { userId: dto.userId } });
       if (existing) return existing;
       const source = (dto.source as RegistrationSource) ?? RegistrationSource.PORTAL;
+      const dob = parseDob(dto.dateOfBirth);
       const candidate = await this.prisma.candidate.create({
-        data: { userId: dto.userId, firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone, city: dto.city, postcode: dto.postcode, headline: dto.headline, preferredSectors: cleanSectors(dto.preferredSectors), registrationSource: source },
+        data: { userId: dto.userId, firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone, city: dto.city, postcode: dto.postcode, dateOfBirth: dob, rightToWorkType: dto.rightToWorkType, headline: dto.headline, preferredSectors: cleanSectors(dto.preferredSectors), registrationSource: source },
       });
       // Alert staff a new worker just signed up (best-effort; never blocks).
       await this.notifications.notifyStaffSignup({

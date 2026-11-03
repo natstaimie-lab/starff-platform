@@ -46,7 +46,7 @@ const isDob = (v: string) => {
   const dt = new Date(yr, mon - 1, day);
   if (dt.getFullYear() !== yr || dt.getMonth() !== mon - 1 || dt.getDate() !== day) return false;
   const age = (Date.now() - dt.getTime()) / (365.25 * 864e5);
-  return age >= 16 && age <= 100;
+  return age >= 18 && age <= 100;
 };
 const dobToISO = (v: string) => {
   const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);
@@ -240,7 +240,7 @@ export function RegisterScreen({ navigation, route }: Props) {
               </View>
             </View>
             <Field label="Date of birth" hint="(DD/MM/YYYY)"><Input onDark value={dob} onChangeText={(v) => setDob(formatDob(v))} placeholder="21/04/1996" keyboardType="number-pad" maxLength={10} /></Field>
-            {dob.length > 0 && !dobOk ? <Text style={styles.err}>Enter a valid date (DD/MM/YYYY), age 16+.</Text> : null}
+            {dob.length > 0 && !dobOk ? <Text style={styles.err}>Enter a valid date (DD/MM/YYYY), age 18+.</Text> : null}
           </>
         ) : null}
 
