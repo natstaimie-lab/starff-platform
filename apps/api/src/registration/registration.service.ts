@@ -928,10 +928,10 @@ export class RegistrationService {
    * reminded, and still never submitted get archived so they stop cluttering the
    * active lists. Reversible — it only sets archivedAt (the login stays active,
    * and finishing their registration un-parks them via submitCandidate). Default
-   * window 30 days; override with STALE_PARK_DAYS.
+   * window 14 days; override with STALE_PARK_DAYS.
    */
   async parkStaleIncompleteRegistrations(): Promise<{ parked: number }> {
-    const days = Number(process.env.STALE_PARK_DAYS) || 30;
+    const days = Number(process.env.STALE_PARK_DAYS) || 14;
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     const stale = await this.prisma.candidate.findMany({
       where: {
