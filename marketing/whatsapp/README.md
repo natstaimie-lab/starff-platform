@@ -102,8 +102,9 @@ _Starff Ltd · temporary staffing · we never charge workers a fee._
 
 ### C. Shift alert — `03-shift-alert-EXAMPLE.png` (the one you'll post most)
 
-**Easiest: use the Canva template** — *Starff WhatsApp — Shift alert template*
-(https://canva.link/t5vda4rav71f6iq). Duplicate the page, type over the
+**Easiest: use the Canva template** — *Starff WhatsApp — Post templates*
+(https://canva.link/t5vda4rav71f6iq). Page 1 shift alert (C), page 2 urgent
+(F), page 3 weekly roundup (D), page 4 shift filled (E). Duplicate the page, type over the
 details, Share → Download → PNG. Swap or delete the warehouse illustration for
 non-warehouse roles.
 
