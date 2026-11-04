@@ -32,7 +32,8 @@ const AuthStack = createNativeStackNavigator<AuthStackParams>();
 
 function AuthNavigator() {
   return (
-    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+    // In builds, iOS takes the status bar colour from the native stack, not expo-status-bar.
+    <AuthStack.Navigator screenOptions={{ headerShown: false, statusBarStyle: 'light' }}>
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Register" component={RegisterScreen} />
     </AuthStack.Navigator>

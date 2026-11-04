@@ -109,7 +109,7 @@ export function LoginScreen({ navigation }: Props) {
         <View style={styles.trust}>
           <Icon name="shield-lock" size={14} color={colors.orange} />
           <Text style={styles.trustText}>
-            FCA-grade identity checks · GDPR compliant
+            Your data is encrypted in transit
           </Text>
         </View>
       </View>

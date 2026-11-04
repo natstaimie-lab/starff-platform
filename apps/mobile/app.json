@@ -3,7 +3,11 @@
     "name": "Starff",
     "slug": "starff-mobile",
     "owner": "starffltd",
-    "version": "0.1.0",
+    "version": "1.0.0",
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "orientation": "portrait",
     "scheme": "starff",
     "userInterfaceStyle": "light",
@@ -39,6 +43,9 @@
         "android.permission.CAMERA",
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -48,7 +55,8 @@
         "expo-image-picker",
         {
           "photosPermission": "Starff needs access to your photos so you can upload document images and a profile photo.",
-          "cameraPermission": "Starff uses the camera so you can photograph and upload compliance documents."
+          "cameraPermission": "Starff uses the camera so you can photograph and upload compliance documents.",
+          "microphonePermission": false
         }
       ],
       [
