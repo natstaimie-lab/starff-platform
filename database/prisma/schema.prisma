@@ -361,6 +361,9 @@ model CandidateDocument {
   type         DocumentType
   fileUrl      String         // path in Supabase Storage (private bucket)
   fileName     String?
+  // SHA-256 of the uploaded file bytes. Lets the duplicate guard flag when the
+  // same file is used for two required checks (e.g. Right to Work and ID).
+  fileHash     String?
   // Two-sided documents (driving licence, ID card): the back image. Null for
   // single-sided docs (passport photo page, selfie, CV, etc.).
   backFileUrl  String?
@@ -378,6 +381,10 @@ model CandidateDocument {
   aiCheckVerdict String?      // PASS | WARN | FAIL
   aiCheckSummary String?      @db.Text   // full detail for the reviewer (name, expiry, legibility)
   aiCheckReason  String?      @db.Text   // plain one-sentence reason, candidate-friendly
+  // Hash of the AI-read document identity (type + number) — NOT the number
+  // itself. Lets the duplicate guard spot the same physical document uploaded as
+  // two different photos, without storing the sensitive number in plaintext.
+  aiDocFingerprint String?
   aiCheckedAt    DateTime?
 
   createdAt    DateTime       @default(now())

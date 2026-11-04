@@ -11,7 +11,7 @@ import { Modal, Field, TextInput, Button } from '@/components/Modal';
 import { ReliabilityCard } from '@/components/ReliabilityCard';
 import * as Ic from '@/components/icons';
 
-type Doc = { id: string; type: string; fileName?: string; status: string; expiryDate?: string; createdAt: string; aiCheckVerdict?: string | null; aiCheckSummary?: string | null; aiCheckReason?: string | null; aiCheckedAt?: string | null; backFileUrl?: string | null; backFileName?: string | null; rejectionReason?: string | null };
+type Doc = { id: string; type: string; fileName?: string; status: string; expiryDate?: string; createdAt: string; aiCheckVerdict?: string | null; aiCheckSummary?: string | null; aiCheckReason?: string | null; aiCheckedAt?: string | null; backFileUrl?: string | null; backFileName?: string | null; rejectionReason?: string | null; fileHash?: string | null; aiDocFingerprint?: string | null };
 type Job = { id: string; employer: string; jobTitle?: string | null; startDate?: string | null; endDate?: string | null; current: boolean; reasonForLeaving?: string | null };
 type Ref = { id: string; name: string; relationship?: string | null; company?: string | null; email?: string | null; phone?: string | null };
 type WorkerAgreement = {
@@ -240,7 +240,26 @@ export default function CandidateProfile() {
   if (error) return <p style={{ color: 'var(--error-600)', fontSize: 13 }}>{error}</p>;
   if (!c) return <p className="dim">Loading…</p>;
 
-  const verifiedCount = REQUIRED.filter((r) => docStatus(c.documents.find((d) => d.type === r.type)) === 'compliant').length;
+  // Duplicate guard: one document can't satisfy two required checks. Two
+  // documents are "the same" when they share the exact file (fileHash) OR the
+  // same AI-read document identity (aiDocFingerprint — same passport/licence
+  // photographed twice).
+  const sameDoc = (a?: Doc, b?: Doc) =>
+    !!a && !!b && a.id !== b.id && (
+      (!!a.fileHash && a.fileHash === b.fileHash) ||
+      (!!a.aiDocFingerprint && a.aiDocFingerprint === b.aiDocFingerprint)
+    );
+  // A required slot counts only if its verified document isn't the same physical
+  // document as one already counted by an earlier slot — forcing a different doc.
+  const counted: Doc[] = [];
+  const rowCounts = (type: string) => {
+    const d = c.documents.find((x) => x.type === type);
+    if (docStatus(d) !== 'compliant') return false;
+    if (d && counted.some((p) => sameDoc(d, p))) return false;
+    if (d) counted.push(d);
+    return true;
+  };
+  const verifiedCount = REQUIRED.filter((r) => rowCounts(r.type)).length;
   const pct = Math.round((verifiedCount / REQUIRED.length) * 100);
   const extras = c.documents.filter((d) => !REQUIRED.some((r) => r.type === d.type));
 
@@ -326,11 +345,14 @@ export default function CandidateProfile() {
           </div>
           {REQUIRED.map((r) => {
             const doc = c.documents.find((d) => d.type === r.type);
+            const dupeType = doc
+              ? REQUIRED.find((x) => x.type !== r.type && sameDoc(doc, c.documents.find((d) => d.type === x.type)))?.label
+              : undefined;
             return (
               <div key={r.type} className="fx ac jb" style={{ padding: '11px 0', borderBottom: '1px solid var(--border-subtle)', gap: 10 }}>
                 <div className="fx ac" style={{ gap: 11, minWidth: 0 }}>
                   {doc && <DocThumb d={doc} />}
-                  <div style={{ minWidth: 0 }}><div className="nm">{r.label}</div><div className="sub2" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc ? (doc.fileName ?? 'uploaded') : 'Not uploaded'}</div>{doc && <AiLine d={doc} />}</div>
+                  <div style={{ minWidth: 0 }}><div className="nm">{r.label}</div><div className="sub2" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc ? (doc.fileName ?? 'uploaded') : 'Not uploaded'}</div>{doc && <AiLine d={doc} />}{dupeType && <div style={{ color: 'var(--error-600)', fontSize: 11.5, fontWeight: 700, marginTop: 4 }}>⚠ Same file as {dupeType} — a different document is needed for this check.</div>}</div>
                 </div>
                 <div className="fx ac" style={{ gap: 10, flexShrink: 0 }}><ComplianceBadge status={docStatus(doc)} />{doc && <DocActions d={doc} />}</div>
               </div>

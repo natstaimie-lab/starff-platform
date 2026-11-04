@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { PrismaService } from '../prisma/prisma.service';
@@ -48,11 +49,36 @@ export class DocumentCheckService {
     });
     if (!doc) return;
 
-    const stamp = (verdict: string, summary: string, reason?: string) =>
+    const stamp = (verdict: string, summary: string, reason?: string, docFingerprint?: string) =>
       this.prisma.candidateDocument.update({
         where: { id: documentId },
-        data: { aiCheckVerdict: verdict, aiCheckSummary: summary, aiCheckReason: reason ?? null, aiCheckedAt: new Date() },
+        data: {
+          aiCheckVerdict: verdict,
+          aiCheckSummary: summary,
+          aiCheckReason: reason ?? null,
+          aiCheckedAt: new Date(),
+          ...(docFingerprint ? { aiDocFingerprint: docFingerprint } : {}),
+        },
       });
+
+    // Download the file once: fingerprint it for the duplicate guard (always —
+    // even for selfies or when the AI is off), then reuse the bytes for the check.
+    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: { persistSession: false },
+    });
+    let raw: Buffer | null = null;
+    try {
+      const dl = await supabase.storage.from('candidate-documents').download(doc.fileUrl);
+      if (!dl.error && dl.data) {
+        raw = Buffer.from(await dl.data.arrayBuffer());
+        const hash = createHash('sha256').update(raw).digest('hex');
+        if (hash !== doc.fileHash) {
+          await this.prisma.candidateDocument.update({ where: { id: documentId }, data: { fileHash: hash } });
+        }
+      }
+    } catch (e) {
+      this.logger.warn(`fingerprint failed for ${documentId}: ${(e as Error).message}`);
+    }
 
     // Selfies are matched visually by a human — no automated facial analysis.
     if (doc.type === 'SELFIE') {
@@ -63,17 +89,10 @@ export class DocumentCheckService {
       this.logger.log('ANTHROPIC_API_KEY not set — skipping document pre-check.');
       return;
     }
-
-    // Pull the file from the private bucket.
-    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-      auth: { persistSession: false },
-    });
-    const dl = await supabase.storage.from('candidate-documents').download(doc.fileUrl);
-    if (dl.error || !dl.data) {
+    if (!raw) {
       await stamp('WARN', 'Could not open the file to check it — review manually.');
       return;
     }
-    const raw = Buffer.from(await dl.data.arrayBuffer());
 
     // Identify by content, not file name (phones mislabel photos), and turn an
     // iPhone HEIC photo into a JPEG Claude can actually read.
@@ -98,7 +117,8 @@ export class DocumentCheckService {
       `This image was uploaded by a temporary worker as ${this.expected(doc.type)}.`,
       `The worker's name on file is "${workerName}". Today's date is ${today}.`,
       'Read the document and reply with ONLY a JSON object, no prose, with these keys:',
-      '{ "documentType": string (what the document actually is),',
+      '{ "documentType": string (what the document actually is, e.g. "passport", "driving licence", "BRP"),',
+      '  "documentNumber": string or null (the document/reference number — passport no., licence no., BRP no. — digits/letters only, no spaces),',
       '  "nameOnDocument": string or null,',
       '  "nameMatches": boolean (does it match the name on file, allowing for middle names/initials),',
       '  "expiryDate": string YYYY-MM-DD or null,',
@@ -134,9 +154,15 @@ export class DocumentCheckService {
         r.expiryDate ? `Expiry: ${r.expiryDate}${r.expired ? ' — EXPIRED' : ''}.` : null,
         r.legible === false ? 'Hard to read — may need a clearer copy.' : null,
       ].filter(Boolean).join(' ');
+      // Identity fingerprint: hash of document type + number so the duplicate
+      // guard can match the same physical document across two different photos,
+      // without ever storing the sensitive number itself.
+      const normNum = String(r.documentNumber ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const normType = String(r.documentType ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const docFingerprint = normNum.length >= 5 ? createHash('sha256').update(`${normType}|${normNum}`).digest('hex') : undefined;
       // bits = full detail for the reviewer; r.summary = the plain one-sentence
       // reason we can safely show a candidate if the document is rejected.
-      await stamp(verdict, bits || 'Checked.', typeof r.summary === 'string' ? r.summary : undefined);
+      await stamp(verdict, bits || 'Checked.', typeof r.summary === 'string' ? r.summary : undefined, docFingerprint);
     } catch (e) {
       await stamp('WARN', 'Automated check could not complete — review manually.');
       this.logger.warn(`pre-check error ${documentId}: ${(e as Error).message}`);

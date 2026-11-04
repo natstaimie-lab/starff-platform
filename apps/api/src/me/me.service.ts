@@ -4,6 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { createHash } from 'node:crypto';
+import { createClient } from '@supabase/supabase-js';
 import { ApplicationStatus, Role, ShiftStatus, TimesheetStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -443,6 +445,35 @@ export class MeService {
       throw new BadRequestException('This document must be a photo, not a PDF.');
     }
     const candidate = await this.candidateFor(userId);
+
+    // Fingerprint the uploaded file and hard-block an exact duplicate of another
+    // of this candidate's documents — the same file can't satisfy two checks
+    // (e.g. using one passport image for both Right to Work and Proof of ID).
+    let fileHash: string | null = null;
+    try {
+      const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+        auth: { persistSession: false },
+      });
+      const dl = await supabase.storage.from('candidate-documents').download(dto.fileUrl);
+      if (!dl.error && dl.data) {
+        fileHash = createHash('sha256').update(Buffer.from(await dl.data.arrayBuffer())).digest('hex');
+      }
+    } catch {
+      // Best-effort — if we can't fingerprint now, the pre-check does it async.
+    }
+    if (fileHash) {
+      const labels: Record<string, string> = {
+        SELFIE: 'selfie', RIGHT_TO_WORK: 'Right to Work', ID: 'proof of ID',
+        DBS_CHECK: 'DBS check', CV: 'CV', LICENCE: 'licence',
+      };
+      const clash = await this.prisma.candidateDocument.findFirst({ where: { candidateId: candidate.id, fileHash } });
+      if (clash) {
+        throw new BadRequestException(
+          `You've already uploaded this exact document${clash.type !== dto.type ? ` as your ${labels[clash.type] ?? 'other document'}` : ''}. Please upload a different document for this check.`,
+        );
+      }
+    }
+
     const doc = await this.prisma.candidateDocument.create({
       data: {
         candidateId: candidate.id,
@@ -451,6 +482,7 @@ export class MeService {
         fileName: dto.fileName,
         backFileUrl: dto.backFileUrl ?? null,
         backFileName: dto.backFileName ?? null,
+        fileHash,
       },
     });
     // Kick off the automated pre-check (assist only — never auto-verifies).
