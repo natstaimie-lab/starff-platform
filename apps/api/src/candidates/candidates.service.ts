@@ -280,6 +280,45 @@ export class CandidatesService {
    * reviewer) is stored and sent to the candidate so they know what to fix; on
    * verification they get a confirmation. Both decisions are audit-logged.
    */
+  /**
+   * Send a candidate a branded email via Resend (the same template as our other
+   * emails) and audit it. Returns whether it actually went out. The audit keeps
+   * who, to whom and the subject, not the message itself.
+   */
+  async sendEmail(id: string, actorId: string, dto: { subject?: string; body: string }) {
+    const candidate = await this.prisma.candidate.findUnique({
+      where: { id },
+      select: { user: { select: { email: true } } },
+    });
+    if (!candidate) throw new NotFoundException('Candidate not found');
+    const to = candidate.user?.email;
+    if (!to || to.endsWith('@candidate.local')) {
+      throw new BadRequestException('This candidate has no email address.');
+    }
+
+    const text = (dto.body ?? '').trim();
+    if (!text) throw new BadRequestException('The message is empty.');
+    if (text.length > 5000) throw new BadRequestException('The message is too long (5,000 characters at most).');
+
+    // The template inserts the subject and body as HTML, so neither may carry markup.
+    const subject =
+      (dto.subject ?? '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 150) ||
+      'A message from Starff';
+    const bodyHtml = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+
+    const res = await this.notifications.send({ to, kind: 'CANDIDATE_EMAIL', subject, body: bodyHtml });
+
+    await this.audit.log({
+      actorId,
+      action: 'candidate.emailed',
+      entity: 'Candidate',
+      entityId: id,
+      meta: { to, subject, emailed: res.emailed },
+    });
+
+    return { emailed: res.emailed };
+  }
+
   async setDocumentStatus(
     candidateId: string,
     docId: string,

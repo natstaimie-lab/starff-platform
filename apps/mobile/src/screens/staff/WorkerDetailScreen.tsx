@@ -141,7 +141,7 @@ export function StaffWorkerDetailScreen() {
                 <ListRow icon="user" title={c.phone} subtitle="Tap to call" onPress={() => void Linking.openURL(`tel:${c.phone}`)} />
               ) : null}
               {c.loginEmail ? (
-                <ListRow icon="message" title={c.loginEmail} subtitle="Tap to email" onPress={() => void Linking.openURL(`mailto:${c.loginEmail}`)} />
+                <ListRow icon="message" title={c.loginEmail} subtitle="Send a Starff email" onPress={() => nav.navigate('WorkerEmail', { id, firstName: c.firstName, email: c.loginEmail })} />
               ) : null}
               <ListRow
                 icon="map-pin"

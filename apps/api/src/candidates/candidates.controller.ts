@@ -95,6 +95,17 @@ export class CandidatesController {
     return this.candidates.attachLogin(id, dto);
   }
 
+  // Staff — send a candidate a branded email from the Starff address.
+  @Post(':id/email')
+  @Roles(Role.ADMIN, Role.RECRUITER)
+  email(
+    @Param('id') id: string,
+    @Body() dto: { subject?: string; body: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.candidates.sendEmail(id, user.id, dto);
+  }
+
   // Verify / reject a compliance document — ADMIN only (compliance decision).
   @Patch(':id/documents/:docId')
   @Roles(Role.ADMIN)

@@ -15,6 +15,7 @@ import { StaffAccountScreen } from '@/screens/staff/AccountScreen';
 import { StaffTimesheetsScreen } from '@/screens/staff/TimesheetsScreen';
 import { StaffWorkersScreen } from '@/screens/staff/WorkersScreen';
 import { StaffWorkerDetailScreen } from '@/screens/staff/WorkerDetailScreen';
+import { StaffWorkerEmailScreen } from '@/screens/staff/WorkerEmailScreen';
 import { StaffInboxScreen } from '@/screens/staff/InboxScreen';
 import { StaffThreadScreen } from '@/screens/staff/ThreadScreen';
 
@@ -36,6 +37,7 @@ function WorkersStack() {
     <WorkersStackNav.Navigator screenOptions={{ headerShown: false }}>
       <WorkersStackNav.Screen name="WorkersMain" component={StaffWorkersScreen} />
       <WorkersStackNav.Screen name="WorkerDetail" component={StaffWorkerDetailScreen} />
+      <WorkersStackNav.Screen name="WorkerEmail" component={StaffWorkerEmailScreen} />
     </WorkersStackNav.Navigator>
   );
 }

@@ -291,6 +291,13 @@ export const staffApi = {
       `/candidates/${id}/documents/${docId}/url${side ? `?side=${side}` : ''}`,
     ),
 
+  /** POST /candidates/:id/email — a branded email from the Starff address. */
+  emailCandidate: (id: string, subject: string, body: string) =>
+    apiFetch<{ emailed: boolean }>(`/candidates/${id}/email`, {
+      method: 'POST',
+      body: { subject, body },
+    }),
+
   /** Staff inbox: GET /messages/conversations, GET + POST /messages/conversations/:id. */
   conversations: () => apiFetch<StaffConversation[]>('/messages/conversations'),
   thread: (id: string) => apiFetch<StaffThread>(`/messages/conversations/${id}`),
