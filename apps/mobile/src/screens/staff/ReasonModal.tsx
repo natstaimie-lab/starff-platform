@@ -3,7 +3,7 @@ import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, View } from 'r
 import { Button, Field, Input, Muted } from '@/components/ui';
 import { colors, radius } from '@/theme/tokens';
 
-/** Asks for the reason behind a rejection; the API passes it on to the worker. */
+/** Asks for the reason behind a rejection. Each caller's hint says who sees it. */
 export function ReasonModal({
   visible,
   title,

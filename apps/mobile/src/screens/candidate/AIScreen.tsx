@@ -27,7 +27,7 @@ export function CandidateAIScreen() {
   ]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
 
   const send = async (text?: string) => {
     const message = (text ?? draft).trim();

@@ -111,7 +111,7 @@ export function StaffTimesheetsScreen() {
       <ReasonModal
         visible={!!rejecting}
         title="Reject timesheet"
-        hint="Say what's wrong so it can be corrected."
+        hint="This is saved for your team. The worker only sees that it was rejected, so contact them if they need to fix it."
         busy={!!rejecting && acting === rejecting.id}
         onCancel={() => setRejecting(null)}
         onSubmit={(reason) => {

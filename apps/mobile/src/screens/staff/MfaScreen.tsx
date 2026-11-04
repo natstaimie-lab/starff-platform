@@ -88,7 +88,12 @@ export function StaffMfaScreen({ onVerified }: { onVerified: () => void }) {
         code: c,
       });
       if (vErr) {
-        setError("That code didn't match. Enter the current 6-digit code and try again.");
+        const wrongCode = vErr.code === 'mfa_verification_failed';
+        setError(
+          wrongCode
+            ? "That code didn't match. Use the entry you set up for the Starff admin dashboard and try again."
+            : `Could not verify: ${vErr.message}`,
+        );
         return;
       }
       onVerified();
@@ -135,16 +140,14 @@ export function StaffMfaScreen({ onVerified }: { onVerified: () => void }) {
                 </Text>
               </>
             ) : (
-              <Muted style={styles.gap}>Open your authenticator app and enter the current code for Starff.</Muted>
+              <Muted style={styles.gap}>Open your authenticator app and enter the current code from the entry you set up for the Starff admin dashboard.</Muted>
             )}
             <View style={{ height: 12 }} />
             <Field label="6-digit code">
               <Input
                 value={code}
-                onChangeText={setCode}
+                onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 6))}
                 keyboardType="number-pad"
-                textContentType="oneTimeCode"
-                maxLength={6}
                 placeholder="123456"
               />
             </Field>

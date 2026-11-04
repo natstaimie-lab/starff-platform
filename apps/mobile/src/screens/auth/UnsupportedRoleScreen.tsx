@@ -1,5 +1,6 @@
 import React from 'react';
-import { SafeAreaView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, EmptyState } from '@/components/ui';
 import { colors } from '@/theme/tokens';
 import { useAuth } from '@/auth/AuthContext';

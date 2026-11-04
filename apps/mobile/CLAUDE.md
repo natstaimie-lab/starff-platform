@@ -11,7 +11,7 @@ day-to-day actions only; job approval, matching and booking stay on the web.
 ## Not a workspace
 
 `apps/mobile` is intentionally excluded from the root `workspaces` array — it
-runs React 19 / RN 0.86 and can't share the portals' React 18. Install and run
+runs React 19.3 / RN 0.88 (Expo SDK 58) and can't share the portals' React 18. Install and run
 from inside this folder; it has its own `node_modules` and `package-lock.json`.
 
 ```bash
