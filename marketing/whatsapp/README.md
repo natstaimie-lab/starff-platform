@@ -102,7 +102,13 @@ _Starff Ltd · temporary staffing · we never charge workers a fee._
 
 ### C. Shift alert — `03-shift-alert-EXAMPLE.png` (the one you'll post most)
 
-Edit the `03-…` entry in `src/posts.json`, run `node render.mjs 03` from `src/`, and attach the new image.
+**Easiest: use the Canva template** — *Starff WhatsApp — Shift alert template*
+(https://canva.link/t5vda4rav71f6iq). Duplicate the page, type over the
+details, Share → Download → PNG. Swap or delete the warehouse illustration for
+non-warehouse roles.
+
+(Developer alternative: edit the `03-…` entry in `src/posts.json`, run
+`node render.mjs 03` from `src/`.)
 
 ```
 🟠 *TEMPORARY SHIFT — {{ROLE}}*
