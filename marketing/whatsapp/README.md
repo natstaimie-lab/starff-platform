@@ -5,8 +5,10 @@ a **one-way broadcast to candidates** (temp workers): followers see posts but
 can't reply in the channel, and they can't see each other's numbers. Applications
 come in through a direct message to the Starff WhatsApp Business number.
 
-> **Before going live:** the three blockers in `marketing/README.md` apply here
-> too — the real phone number, the final sector list, and whether "Get Starffed"
+> **WhatsApp number:** 07742 545 967 (used in every post and the Canva templates).
+>
+> **Before going live:** the remaining blockers in `marketing/README.md` apply here
+> too — the final sector list and whether "Get Starffed"
 > is used. This kit uses the **website's four sectors** (Logistics & Warehousing,
 > Events & Entertainment, Construction, Delivery Services) and leaves out the
 > "Get Starffed" pun until that's decided. Every `{{PLACEHOLDER}}` must be
@@ -44,7 +46,7 @@ Paid temporary shifts across London from Starff — logistics & warehousing, eve
 
 Every post shows the rate, location, hours and what you need.
 
-To apply: message us on WhatsApp {{PHONE}} with the shift name.
+To apply: message us on WhatsApp 07742 545 967 with the shift name.
 New? Register at starff.co.uk first.
 
 We never charge workers a fee.
@@ -78,7 +80,7 @@ Every shift shows:
 🕐 Date and hours
 ✅ What you need to bring
 
-*How to apply:* message us on WhatsApp {{PHONE}} with the shift name.
+*How to apply:* message us on WhatsApp 07742 545 967 with the shift name.
 *New to Starff?* Register at starff.co.uk — it takes 5 minutes.
 
 Turn on notifications 🔔 so you don't miss shifts.
@@ -95,7 +97,7 @@ _Starff Ltd. We never charge workers a fee._
 2️⃣ Upload your right-to-work ID (passport, share code or BRP)
 3️⃣ We message you when a shift matches your skills and area
 
-Already registered? Just reply to the shift on WhatsApp {{PHONE}}.
+Already registered? Just reply to the shift on WhatsApp 07742 545 967.
 
 _Starff Ltd · temporary staffing · we never charge workers a fee._
 ```
@@ -122,7 +124,7 @@ non-warehouse roles.
 
 *You'll need:* {{REQUIREMENTS — e.g. safety boots, hi-vis, CSCS card}}
 
-To apply, message *{{ROLE}} {{DATE}}* to {{PHONE}}.
+To apply, message *{{ROLE}} {{DATE}}* to 07742 545 967.
 First come, first served — admin confirms every booking.
 
 _Starff Ltd · we never charge workers a fee._
@@ -138,7 +140,7 @@ _Starff Ltd · we never charge workers a fee._
 • *{{ROLE}}* — {{AREA}}, {{DAYS}} — £{{RATE}}/hr
 • *{{ROLE}}* — {{AREA}}, {{DAYS}} — £{{RATE}}/hr
 
-All *temporary*. Message {{PHONE}} with the role and day to apply.
+All *temporary*. Message 07742 545 967 with the role and day to apply.
 
 _Starff Ltd · we never charge workers a fee._
 ```
@@ -159,7 +161,7 @@ Thanks to everyone who applied. More shifts coming — keep notifications on �
 🕐 Start {{TIME}} · 💷 £{{RATE}}/hr · *temporary*
 Need: {{REQUIREMENTS}}
 
-Message *URGENT* to {{PHONE}} now.
+Message *URGENT* to 07742 545 967 now.
 _Starff Ltd · we never charge workers a fee._
 ```
 
@@ -171,7 +173,7 @@ _Starff Ltd · we never charge workers a fee._
 Starff supplies vetted *temporary* workers for logistics, events, construction and delivery across London.
 
 Tell us the shift — we'll do the rest.
-📞 {{PHONE}} · starff.co.uk
+📞 07742 545 967 · starff.co.uk
 ```
 
 ## 5. Posting rhythm
