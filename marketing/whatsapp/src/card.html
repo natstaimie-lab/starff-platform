@@ -1,0 +1,63 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@500;700;800;900&family=Space+Mono:wght@700&display=block" rel="stylesheet">
+<style>
+  :root{--navy:#0F172A;--blue:#2563EB;--orange:#F97316;--white:#fff;--muted:#94A3B8;--line:#1E293B}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:1080px;height:1080px;overflow:hidden;background:var(--navy);font-family:"Avenir Next","Mulish",system-ui,sans-serif;color:var(--white)}
+  .card{position:relative;width:1080px;height:1080px;padding:84px;display:flex;flex-direction:column}
+  .dots{position:absolute;border-radius:50%;background:var(--orange)}
+  .top{display:flex;justify-content:space-between;align-items:center}
+  .logo{height:84px}
+  .tag{font-weight:800;font-size:22px;letter-spacing:.14em;border:2px solid var(--orange);color:var(--orange);padding:12px 20px;border-radius:999px}
+  h1{font-weight:900;font-size:92px;line-height:1.02;letter-spacing:-.02em;margin-top:auto}
+  h1 .o{color:var(--orange);display:block}
+  .sub{font-size:36px;font-weight:600;color:#CBD5E1;margin-top:28px;line-height:1.35;max-width:860px}
+  .foot{margin-top:56px;padding-top:28px;border-top:2px solid var(--line);display:flex;justify-content:space-between;font-size:24px;color:var(--muted);font-weight:700}
+  .foot b{color:var(--white)}
+  /* shift card */
+  .role{font-weight:900;font-size:84px;line-height:1.04;letter-spacing:-.02em;margin-top:64px}
+  .where{font-size:38px;font-weight:700;color:#CBD5E1;margin-top:18px}
+  .rate{margin-top:44px;display:flex;align-items:baseline;gap:18px}
+  .rate .n{font-family:"Space Mono",monospace;font-size:120px;color:var(--orange);line-height:1}
+  .rate .u{font-size:34px;font-weight:700;color:#CBD5E1}
+  .grid{margin-top:48px;display:grid;grid-template-columns:1fr 1fr;gap:22px 40px}
+  .grid div{font-size:30px;font-weight:700}
+  .grid span{display:block;font-size:20px;letter-spacing:.14em;color:var(--orange);font-weight:800;margin-bottom:6px}
+  .cta{margin-top:auto;background:var(--orange);color:var(--navy);font-weight:900;font-size:34px;padding:24px 32px;border-radius:16px;text-align:center}
+  ol.steps{list-style:none;margin-top:56px;display:flex;flex-direction:column;gap:30px}
+  ol.steps li{display:flex;gap:28px;align-items:center;font-size:40px;font-weight:700}
+  ol.steps li i{font-style:normal;flex:none;width:76px;height:76px;border-radius:50%;background:var(--orange);color:var(--navy);display:grid;place-items:center;font-weight:900;font-size:38px}
+  ul.list{list-style:none;margin-top:44px;display:flex;flex-direction:column;gap:0}
+  ul.list li{display:flex;justify-content:space-between;align-items:baseline;font-size:34px;font-weight:700;padding:22px 0;border-bottom:2px solid var(--line)}
+  ul.list li em{font-style:normal;font-family:"Space Mono",monospace;color:var(--orange);font-size:32px}
+  ul.list li small{display:block;font-size:24px;color:var(--muted);font-weight:600;margin-top:4px}
+  /* profile */
+  .profile{width:640px;height:640px;display:grid;place-items:center}
+  .profile img{height:330px;transform:translateX(-4px)}
+</style></head>
+<body><div id="root"></div>
+<script>
+const P = JSON.parse(decodeURIComponent(location.hash.slice(1)));
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const foot = `<div class="foot"><span><b>Starff Ltd</b> · temporary staffing · Co. 17166246</span><span>We never charge workers a fee</span></div>`;
+const header = tag => `<div class="top"><img class="logo" src="starff-white.png">${tag ? `<span class="tag">${esc(tag)}</span>` : ""}</div>`;
+const decor = `<div class="dots" style="width:420px;height:420px;right:-140px;top:-140px;opacity:.08"></div><div class="dots" style="width:90px;height:90px;right:150px;top:270px;opacity:.9"></div>`;
+const T = {
+  profile: p => { document.documentElement.style.cssText = `width:640px;height:640px;background:${p.bg}`; document.body.style.cssText=`width:640px;height:640px;background:${p.bg}`;
+    return `<div class="profile"><img src="mark-orange.png"></div>`; },
+  hero: p => `<div class="card">${decor}${header(p.tag)}<h1>${esc(p.l1)}<span class="o">${esc(p.l2)}</span></h1><p class="sub">${esc(p.sub)}</p>${foot}</div>`,
+  shift: p => `<div class="card">${header(p.tag || "TEMPORARY SHIFT")}
+    <div class="role">${esc(p.role)}</div><div class="where">${esc(p.location)}</div>
+    <div class="rate"><span class="n">${esc(p.rate)}</span><span class="u">${esc(p.rateUnit || "per hour")}</span></div>
+    <div class="grid"><div><span>WHEN</span>${esc(p.when)}</div><div><span>HOURS</span>${esc(p.hours)}</div>
+      <div><span>YOU'LL NEED</span>${esc(p.needs)}</div><div><span>SPACES</span>${esc(p.spaces)}</div></div>
+    <div class="cta" style="margin-top:56px">${esc(p.cta || "Message us to apply")}</div>${foot}</div>`,
+  steps: p => `<div class="card">${header(p.tag)}<h1 style="margin-top:72px;font-size:88px">${esc(p.l1)}<span class="o">${esc(p.l2)}</span></h1>
+    <ol class="steps">${p.steps.map((s,i)=>`<li><i>${i+1}</i>${esc(s)}</li>`).join("")}</ol><div style="margin-top:auto"></div>${foot}</div>`,
+  roundup: p => `<div class="card">${header(p.tag || "THIS WEEK")}<h1 style="margin-top:64px;font-size:84px">${esc(p.l1)}<span class="o">${esc(p.l2)}</span></h1>
+    <ul class="list">${p.items.map(it=>`<li><span>${esc(it.role)}<small>${esc(it.where)}</small></span><em>${esc(it.rate)}</em></li>`).join("")}</ul>
+    <div style="margin-top:auto"></div>${foot}</div>`,
+};
+document.getElementById("root").innerHTML = T[P.t](P);
+</script></body></html>
