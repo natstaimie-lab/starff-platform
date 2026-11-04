@@ -9,6 +9,7 @@ import { clientApi } from '@/lib/endpoints';
 interface Worker {
   id: string;
   name: string;
+  reference: string;
   status: string;
   city?: string | null;
   role: string;
@@ -57,7 +58,7 @@ export function EmployerTalentScreen() {
                   <Text style={styles.avatarText}>{initials(w.name)}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.name}>{w.name}</Text>
+                  <Text style={styles.name}>{w.name} · {w.reference}</Text>
                   <Muted>
                     {w.role}
                     {w.city ? ` · ${w.city}` : ''} · {w.shifts} shift{w.shifts > 1 ? 's' : ''}

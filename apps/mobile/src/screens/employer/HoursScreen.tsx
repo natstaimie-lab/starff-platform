@@ -83,11 +83,12 @@ export function EmployerHoursScreen() {
             </TwoCol>
             {timesheets.map((t) => {
               const c = (t as any).candidate;
-              const name = `${c?.firstName ?? ''} ${c?.lastName ?? ''}`.trim() || 'Worker';
+              const firstName = c?.firstName || 'Worker';
+              const name = c?.reference ? `${firstName} · ${c.reference}` : firstName;
               return (
                 <Card key={t.id} tight>
                   <View style={styles.row}>
-                    <Avatar initials={initials(name)} tone="orange" size={38} />
+                    <Avatar initials={initials(firstName)} tone="orange" size={38} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.role}>{name}</Text>
                       <Muted>

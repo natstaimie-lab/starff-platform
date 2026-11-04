@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InvoiceStatus, TimesheetStatus } from '@prisma/client';
+import { candidateReference } from '../common/candidate-reference';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AuditService } from '../audit/audit.service';
@@ -86,7 +87,7 @@ export class InvoicesService {
     const timesheets = await this.prisma.timesheet.findMany({
       where: { status: TimesheetStatus.APPROVED, hoursWorked: { not: null } },
       include: {
-        candidate: { select: { firstName: true, lastName: true } },
+        candidate: { select: { id: true, firstName: true } },
         shift: {
           select: {
             startAt: true, endAt: true, chargeRate: true,
@@ -133,7 +134,8 @@ export class InvoicesService {
         const day = new Date(t.shift.startAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
         return {
           timesheetId: t.id,
-          description: `${t.candidate.firstName} ${t.candidate.lastName} — ${t.shift.job.title} (${day})`,
+          // Clients read this line, so first name + reference only — no surname.
+          description: `${t.candidate.firstName} (${candidateReference(t.candidate.id)}) — ${t.shift.job.title} (${day})`,
           hours, rate, amount: round2(hours * rate),
         };
       });

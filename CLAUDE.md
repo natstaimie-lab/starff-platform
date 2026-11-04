@@ -42,7 +42,7 @@ docs/             build plans and setup guides (background, not instructions)
 ```
 
 `apps/mobile` is deliberately **outside** the root `workspaces` array — it runs
-React 19 / RN 0.86 and cannot share the portals' React 18. Install inside
+React 19.3 / RN 0.88 (Expo SDK 58) and cannot share the portals' React 18. Install inside
 `apps/mobile` itself.
 
 ## Commands

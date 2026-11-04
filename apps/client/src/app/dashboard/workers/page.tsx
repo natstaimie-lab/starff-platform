@@ -5,7 +5,7 @@ import { apiFetch } from '@/lib/api';
 import { Card, Avatar, ComplianceBadge, Badge, DataTable, type Column } from '@/components/ui';
 import { Modal } from '@/components/Modal';
 
-type Worker = { id: string; name: string; role: string; city?: string; status: string; shifts: number };
+type Worker = { id: string; name: string; reference: string; role: string; city?: string; status: string; shifts: number };
 type WorkerDetail = {
   firstName: string;
   reference: string;
@@ -49,7 +49,7 @@ export default function WorkersPage() {
   useEffect(() => { apiFetch<Worker[]>('/client/workers').then(setRows).catch(() => {}).finally(() => setLoading(false)); }, []);
 
   function view(w: Worker) {
-    setOpenId(w.id); setOpenName(w.name); setDetail(null); setDError(''); setDLoading(true);
+    setOpenId(w.id); setOpenName(`${w.name} · ${w.reference}`); setDetail(null); setDError(''); setDLoading(true);
     apiFetch<WorkerDetail>(`/client/workers/${w.id}`)
       .then(setDetail)
       .catch((e) => setDError(e.message))
@@ -62,7 +62,7 @@ export default function WorkersPage() {
   }
 
   const cols: Column<Worker>[] = [
-    { key: 'name', header: 'Worker', render: (r) => <div className="namecell"><Avatar name={r.name} size={30} /><div><div className="nm">{r.name}</div><div className="sub2">{r.role}</div></div></div> },
+    { key: 'name', header: 'Worker', render: (r) => <div className="namecell"><Avatar name={r.name} size={30} /><div><div className="nm">{r.name} · {r.reference}</div><div className="sub2">{r.role}</div></div></div> },
     { key: 'city', header: 'Location', render: (r) => <span className="dim">{r.city ?? '—'}</span> },
     { key: 'shifts', header: 'Shifts', align: 'right', render: (r) => <span className="mono">{r.shifts}</span> },
     { key: 'status', header: 'Compliance', render: (r) => <ComplianceBadge status={r.status.toLowerCase()} /> },

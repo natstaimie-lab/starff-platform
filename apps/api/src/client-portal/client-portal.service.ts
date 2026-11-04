@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { JobStatus, Role, ShiftStatus, TimesheetStatus } from '@prisma/client';
+import { candidateReference } from '../common/candidate-reference';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AuditService } from '../audit/audit.service';
@@ -352,14 +353,19 @@ export class ClientPortalService {
 
   async timesheets(userId: string) {
     const { client } = await this.clientFor(userId);
-    return this.prisma.timesheet.findMany({
+    const timesheets = await this.prisma.timesheet.findMany({
       where: { status: TimesheetStatus.SUBMITTED, shift: { job: { clientId: client.id } } },
       orderBy: { createdAt: 'desc' },
       include: {
-        candidate: { select: { firstName: true, lastName: true } },
+        candidate: { select: { id: true, firstName: true } },
         shift: { select: { startAt: true, job: { select: { title: true } } } },
       },
     });
+    // First name + reference only — clients never see a worker's surname.
+    return timesheets.map((t) => ({
+      ...t,
+      candidate: { firstName: t.candidate.firstName, reference: candidateReference(t.candidate.id) },
+    }));
   }
 
   async approveTimesheet(userId: string, timesheetId: string) {
@@ -389,7 +395,7 @@ export class ClientPortalService {
             timesheet: {
               select: {
                 hoursWorked: true,
-                candidate: { select: { firstName: true, lastName: true } },
+                candidate: { select: { id: true, firstName: true, lastName: true } },
                 shift: { select: { startAt: true, job: { select: { title: true } } } },
               },
             },
@@ -400,7 +406,21 @@ export class ClientPortalService {
     if (!invoice || invoice.clientId !== client.id) {
       throw new NotFoundException('Invoice not found');
     }
-    return invoice;
+    // First name + reference only. Older lines have the full name saved in their
+    // description, so it's swapped out here as well as in the candidate itself.
+    return {
+      ...invoice,
+      lines: invoice.lines.map((line) => {
+        const c = line.timesheet?.candidate;
+        if (!line.timesheet || !c) return line;
+        const reference = candidateReference(c.id);
+        return {
+          ...line,
+          description: line.description.replace(`${c.firstName} ${c.lastName}`, `${c.firstName} (${reference})`),
+          timesheet: { ...line.timesheet, candidate: { firstName: c.firstName, reference } },
+        };
+      }),
+    };
   }
 
   async locations(userId: string) {
@@ -472,7 +492,7 @@ export class ClientPortalService {
 
     return {
       firstName: c.firstName, // first name only — no surname
-      reference: `C-${c.id.slice(-6).toUpperCase()}`,
+      reference: candidateReference(c.id),
       role: c.headline ?? shifts[0].job.title,
       experience: c.headline ?? null,
       skills: c.skills.map((s) => s.skill.name),
@@ -498,7 +518,7 @@ export class ClientPortalService {
       where: { job: { clientId: client.id }, candidateId: { not: null } },
       orderBy: { startAt: 'desc' },
       include: {
-        candidate: { select: { id: true, firstName: true, lastName: true, status: true, city: true } },
+        candidate: { select: { id: true, firstName: true, status: true, city: true } },
         job: { select: { title: true } },
       },
     });
@@ -508,7 +528,8 @@ export class ClientPortalService {
       if (!byCandidate.has(s.candidate.id)) {
         byCandidate.set(s.candidate.id, {
           id: s.candidate.id,
-          name: `${s.candidate.firstName} ${s.candidate.lastName}`,
+          name: s.candidate.firstName, // first name only — no surname
+          reference: candidateReference(s.candidate.id),
           status: s.candidate.status,
           city: s.candidate.city,
           role: s.job.title,
@@ -665,7 +686,7 @@ export class ClientPortalService {
         job: { id: a.job.id, title: a.job.title, startDate: a.job.startDate, endDate: a.job.endDate, openings: a.job.openings },
         candidate: {
           firstName: c.firstName, // first name only — no surname
-          reference: `C-${c.id.slice(-6).toUpperCase()}`, // candidate reference, not the raw id
+          reference: candidateReference(c.id), // candidate reference, not the raw id
           role: c.headline ?? a.job.title,
           experience: c.headline ?? null,
           skills: c.skills.map((s) => s.skill.name),
@@ -770,7 +791,7 @@ export class ClientPortalService {
     const { client } = await this.clientFor(userId);
     const shift = await this.prisma.shift.findUnique({
       where: { id: shiftId },
-      include: { job: { select: { clientId: true, title: true } }, candidate: { select: { id: true, firstName: true, lastName: true } } },
+      include: { job: { select: { clientId: true, title: true } }, candidate: { select: { id: true, firstName: true } } },
     });
     if (!shift || shift.job.clientId !== client.id) throw new NotFoundException('Shift not found');
     if (!shift.candidateId) throw new BadRequestException('No worker booked on this shift');

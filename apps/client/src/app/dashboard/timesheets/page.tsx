@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { Card, Avatar } from '@/components/ui';
 
-type TS = { id: string; hoursWorked?: string; candidate: { firstName: string; lastName: string }; shift: { startAt: string; job: { title: string } } };
+type TS = { id: string; hoursWorked?: string; candidate: { firstName: string; reference: string }; shift: { startAt: string; job: { title: string } } };
 const fmt = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
 export default function TimesheetsPage() {
@@ -24,9 +24,9 @@ export default function TimesheetsPage() {
     <Card title="Timesheets to Approve" subtitle={`${rows.length} awaiting your approval`}>
       {loading ? <p className="mut">Loading…</p> : rows.length === 0 ? <p className="mut">Nothing to approve right now. 🎉</p> : rows.map((t) => (
         <div key={t.id} className="tsrow">
-          <Avatar name={`${t.candidate.firstName} ${t.candidate.lastName}`} size={36} />
+          <Avatar name={t.candidate.firstName} size={36} />
           <div className="f1">
-            <div className="tsnm">{t.candidate.firstName} {t.candidate.lastName}</div>
+            <div className="tsnm">{t.candidate.firstName} · {t.candidate.reference}</div>
             <div className="tsdt">{t.shift.job.title} · {fmt(t.shift.startAt)}</div>
           </div>
           <span className="tshr">{t.hoursWorked ?? '—'} hrs</span>

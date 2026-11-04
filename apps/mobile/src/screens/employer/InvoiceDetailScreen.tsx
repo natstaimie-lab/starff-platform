@@ -14,7 +14,7 @@ interface Line {
   rate: string | number;
   amount: string | number;
   timesheet?: {
-    candidate?: { firstName: string; lastName: string };
+    candidate?: { firstName: string; reference: string };
     shift?: { startAt?: string; job?: { title?: string } };
   } | null;
 }
@@ -70,7 +70,7 @@ export function EmployerInvoiceDetailScreen() {
             ) : (
               <Card tight>
                 {(data.lines ?? []).map((l) => {
-                  const worker = l.timesheet?.candidate ? `${l.timesheet.candidate.firstName} ${l.timesheet.candidate.lastName}` : null;
+                  const worker = l.timesheet?.candidate ? `${l.timesheet.candidate.firstName} · ${l.timesheet.candidate.reference}` : null;
                   return (
                     <View key={l.id} style={styles.lineRow}>
                       <View style={{ flex: 1 }}>

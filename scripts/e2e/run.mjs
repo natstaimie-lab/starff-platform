@@ -145,6 +145,9 @@ async function timesheets(created) {
   const ts1 = await p.timesheet.findUnique({ where: { shiftId: s1.id }, select: { id: true, status: true, hoursWorked: true } });
   const ts2 = await p.timesheet.findUnique({ where: { shiftId: s2.id }, select: { id: true } });
   check('submit → SUBMITTED, 7.5h', sub.status === 201 && ts1.status === 'SUBMITTED' && Number(ts1.hoursWorked) === 7.5);
+  const pendingForClient = await req('/client/timesheets', clientUser.bearer, 'GET').then((r) => r.json());
+  const clientTs = pendingForClient.find((t) => t.id === ts1.id);
+  check('client timesheet has first name + reference, no surname', !!clientTs?.candidate?.reference && !('lastName' in clientTs.candidate) && !JSON.stringify(clientTs).includes(cand.lastName));
   const appr = await req(`/client/timesheets/${ts1.id}/approve`, clientUser.bearer, 'PATCH');
   check('client approve → APPROVED', appr.status === 200 && (await p.timesheet.findUnique({ where: { id: ts1.id }, select: { status: true } })).status === 'APPROVED');
   const rej = await req(`/timesheets/${ts2.id}/reject`, admin.bearer, 'PATCH', { reason: 'Hours off' });

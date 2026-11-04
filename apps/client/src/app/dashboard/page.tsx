@@ -9,7 +9,7 @@ import * as Ic from '@/components/icons';
 type Overview = { activeBookings: number; workersOnSiteToday: number; timesheetsPending: number; spendMtd: number };
 type Job = { id: string; title: string; status: string; site?: string; filled: number; total: number };
 type Sub = { id: string; status: string; adminSummary?: string | null; job: { title: string }; candidate: { firstName: string; reference: string; role: string; skills: string[]; rating?: number | null; complianceConfirmed: boolean; travelArea?: string | null } };
-type TS = { id: string; hoursWorked?: string; candidate: { firstName: string; lastName: string }; shift: { startAt: string; job: { title: string } } };
+type TS = { id: string; hoursWorked?: string; candidate: { firstName: string; reference: string }; shift: { startAt: string; job: { title: string } } };
 type Inv = { id: string; number: string; total: string; status: string; periodEnd: string };
 type Worker = { id: string; name: string; role: string; city?: string; status: string; shifts: number };
 
@@ -186,9 +186,9 @@ export default function ClientDashboard() {
           <Head title="Timesheets Awaiting Approval" href="/dashboard/timesheets" />
           {pendingTs.length === 0 ? <p className="dim" style={{ fontSize: 13.5 }}>Nothing to approve right now.</p> : pendingTs.map((t) => (
             <div key={t.id} className="fx ac" style={{ gap: 10, padding: '9px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-              <Avatar name={`${t.candidate.firstName} ${t.candidate.lastName}`} size={32} />
+              <Avatar name={t.candidate.firstName} size={32} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>{t.candidate.firstName} {t.candidate.lastName}</div>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>{t.candidate.firstName} · {t.candidate.reference}</div>
                 <div className="dim" style={{ fontSize: 12 }}>{t.shift.job.title} · {fmt(t.shift.startAt)}</div>
               </div>
               <span className="mono" style={{ fontSize: 12.5, fontWeight: 700 }}>{t.hoursWorked ?? '—'}h</span>
