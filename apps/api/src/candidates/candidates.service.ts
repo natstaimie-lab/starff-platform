@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -16,6 +17,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { RegistrationService } from '../registration/registration.service';
 import { WORKER_DOCUMENTS, getWorkerDoc, workerAgreementSnapshot } from '../me/worker-documents';
 import { cleanSectors } from '../common/sectors';
+import { checkEmail, emailTypoMessage } from '../common/email-check';
+import { findPossibleDuplicate } from '../common/duplicate-candidate';
 import { DocumentCheckService } from '../documents/document-check.service';
 import { toReadableImage } from '../documents/document-media';
 import { AuditService } from '../audit/audit.service';
@@ -93,6 +96,20 @@ export class CandidatesService {
       if (existing) return existing;
       const source = (dto.source as RegistrationSource) ?? RegistrationSource.PORTAL;
       const dob = parseDob(dto.dateOfBirth);
+      // The login already exists by now, so blocking would strand the person.
+      // The portal/app pre-check stops most of these; anything that slips
+      // through is flagged to staff instead.
+      const staffFlags: string[] = [];
+      const typo = realEmail ? checkEmail(realEmail) : { ok: true as const, suggestion: undefined };
+      if (!typo.ok) {
+        staffFlags.push(`Email looks mistyped${typo.suggestion ? ` (did they mean ${typo.suggestion}?)` : ''} — fix it with "Invite to portal".`);
+      }
+      const dup = await findPossibleDuplicate(this.prisma, {
+        firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone, dateOfBirth: dob ?? null, excludeUserId: dto.userId,
+      });
+      if (dup) {
+        staffFlags.push(`Possible duplicate of ${dup.name} (same ${dup.reason === 'phone' ? 'phone number' : 'name and date of birth'}) — check and archive one.`);
+      }
       const candidate = await this.prisma.candidate.create({
         data: { userId: dto.userId, firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone, city: dto.city, postcode: dto.postcode, dateOfBirth: dob, rightToWorkType: dto.rightToWorkType, headline: dto.headline, preferredSectors: cleanSectors(dto.preferredSectors), registrationSource: source },
       });
@@ -103,7 +120,16 @@ export class CandidatesService {
         source,
         lookingFor: candidate.preferredSectors,
         link: `/dashboard/candidates/${candidate.id}`,
+        flags: staffFlags,
       });
+      if (staffFlags.length) {
+        await this.audit.log({
+          action: 'candidate.signup.flagged',
+          entity: 'Candidate',
+          entityId: candidate.id,
+          meta: { flags: staffFlags, source, possibleDuplicateOf: dup?.candidateId },
+        });
+      }
       if (realEmail) {
         await this.notifications
           .send({
@@ -123,6 +149,23 @@ export class CandidatesService {
     // ── Admin front desk: no auth user yet. Create the profile against a
     // placeholder login first; if a real email was given, upgrade it to a proper
     // Supabase login (and optionally email the set-password invite). ──
+    if (realEmail && !checkEmail(realEmail).ok) {
+      throw new BadRequestException(emailTypoMessage(realEmail));
+    }
+    if (!dto.allowDuplicate) {
+      const dup = await findPossibleDuplicate(this.prisma, {
+        firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone, dateOfBirth: parseDob(dto.dateOfBirth) ?? null,
+      });
+      if (dup) {
+        throw new ConflictException({
+          code: 'POSSIBLE_DUPLICATE',
+          message: `${dup.name} is already on file with the same ${dup.reason === 'phone' ? 'phone number' : 'name and date of birth'}. Open their profile instead, or add anyway if this is a different person.`,
+          candidateId: dup.candidateId,
+          name: dup.name,
+        });
+      }
+    }
+
     const placeholderId = randomUUID();
     // Always seed with a local placeholder address — attachCandidateLogin owns the
     // real email (and its uniqueness / clash checks) when one is supplied.

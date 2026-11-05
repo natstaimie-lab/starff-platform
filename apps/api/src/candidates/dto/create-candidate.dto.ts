@@ -64,6 +64,12 @@ export class CreateCandidateDto {
   @IsBoolean()
   sendInvite?: boolean;
 
+  // Admin front desk: the API warns (409 POSSIBLE_DUPLICATE) when this looks like
+  // someone already on file. Resend with allowDuplicate: true to add them anyway.
+  @IsOptional()
+  @IsBoolean()
+  allowDuplicate?: boolean;
+
   // Where the sign-up came from, for the staff "new sign-up" alert.
   // PORTAL (candidate web portal), MOBILE (app), or WEBSITE (from starff.co.uk).
   @IsOptional()

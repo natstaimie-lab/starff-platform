@@ -101,15 +101,37 @@ export default function CandidatesPage() {
     } finally { setNotifying(false); }
   }
 
-  async function save() {
+  // apiFetch errors look like "API 409: {json}" — pull out the API's body.
+  function apiError(e: any): { status?: number; code?: string; message: string } {
+    const m = /^API (\d+): ([\s\S]*)$/.exec(e?.message ?? '');
+    if (!m) return { message: e?.message || 'Something went wrong.' };
+    try {
+      const b = JSON.parse(m[2]);
+      const msg = Array.isArray(b.message) ? b.message.join(' ') : b.message;
+      return { status: Number(m[1]), code: b.code, message: msg || m[2] };
+    } catch { return { status: Number(m[1]), message: m[2] }; }
+  }
+
+  async function save(allowDuplicate = false) {
     if (!form.firstName.trim() || !form.lastName.trim()) return;
     setSaving(true);
     try {
       const body: any = { firstName: form.firstName, lastName: form.lastName, headline: form.headline, city: form.city, postcode: form.postcode, phone: form.phone };
       if (form.email.trim()) { body.email = form.email.trim(); body.sendInvite = form.sendInvite; }
+      if (allowDuplicate) body.allowDuplicate = true;
       await apiFetch('/candidates', { method: 'POST', body: JSON.stringify(body) });
       setOpen(false); setForm(empty); await load();
-    } catch (e: any) { setError(e.message); } finally { setSaving(false); }
+    } catch (e: any) {
+      const err = apiError(e);
+      // Looks like someone already on file — you decide.
+      if (err.code === 'POSSIBLE_DUPLICATE' && !allowDuplicate) {
+        setSaving(false);
+        if (confirm(`${err.message}\n\nOK = add as a new person anyway. Cancel = go back.`)) return save(true);
+        setError(err.message);
+        return;
+      }
+      setError(err.message);
+    } finally { setSaving(false); }
   }
 
   const cols: Column<Candidate>[] = [
@@ -177,7 +199,7 @@ export default function CandidatesPage() {
           onClose={() => setOpen(false)}
           footer={<>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={save} disabled={saving || !form.firstName.trim() || !form.lastName.trim()}>{saving ? 'Saving…' : 'Add candidate'}</Button>
+            <Button onClick={() => save()} disabled={saving || !form.firstName.trim() || !form.lastName.trim()}>{saving ? 'Saving…' : 'Add candidate'}</Button>
           </>}
         >
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

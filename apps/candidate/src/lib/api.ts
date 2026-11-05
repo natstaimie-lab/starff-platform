@@ -57,3 +57,29 @@ export async function apiFetch<T = any>(
   }
   return res.json();
 }
+
+export type SignupPrecheck =
+  | { ok: true }
+  | { ok: false; reason: 'EMAIL_TYPO' | 'EMAIL_IN_USE' | 'POSSIBLE_DUPLICATE'; message: string; suggestion?: string };
+
+/**
+ * Public sign-up pre-check (no login yet, so no token). Run BEFORE creating the
+ * Supabase account so a mistyped email or a second account is caught on the form.
+ * Fails open: if the API can't be reached, sign-up carries on (staff are still
+ * alerted server-side to anything that slips through).
+ */
+export async function precheckSignup(input: {
+  email: string; firstName?: string; lastName?: string; phone?: string; dateOfBirth?: string;
+}): Promise<SignupPrecheck> {
+  try {
+    const res = await fetch(API_URL + '/registration/candidate/precheck', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) return { ok: true };
+    return (await res.json()) as SignupPrecheck;
+  } catch {
+    return { ok: true };
+  }
+}

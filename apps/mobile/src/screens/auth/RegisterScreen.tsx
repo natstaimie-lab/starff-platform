@@ -16,6 +16,8 @@ import { SignaturePad } from '@/components/SignaturePad';
 import { Icon } from '@/components/Icon';
 import { colors, radius } from '@/theme/tokens';
 import { useAuth } from '@/auth/AuthContext';
+import { checkEmail } from '@/lib/email-check';
+import { signupApi } from '@/lib/endpoints';
 import type { AuthStackParams } from '@/navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<AuthStackParams, 'Register'>;
@@ -113,7 +115,8 @@ export function RegisterScreen({ navigation, route }: Props) {
   const [alerts, setAlerts] = useState(false);
   const [signed, setSigned] = useState(false);
 
-  const emailOk = isEmail(email);
+  const emailTypo = isEmail(email) ? checkEmail(email) : { ok: true as const, suggestion: undefined };
+  const emailOk = isEmail(email) && emailTypo.ok;
   const phoneOk = isUKPhone(phone);
   const postcodeOk = isUKPostcode(postcode);
   const dobOk = isDob(dob);
@@ -133,6 +136,20 @@ export function RegisterScreen({ navigation, route }: Props) {
   const advance = async () => {
     if (!ready) return;
     if (isReg && step < LAST) {
+      if (step === 0) {
+        // Catch a second account before they fill in the rest.
+        setBusy(true);
+        const [firstName, ...rest] = name.trim().split(' ');
+        const pre = await signupApi.precheckCandidate({
+          email: email.trim(), firstName, lastName: rest.join(' '), phone: phone.trim(), dateOfBirth: dobToISO(dob),
+        });
+        setBusy(false);
+        if (!pre.ok) {
+          Alert.alert(pre.reason === 'EMAIL_TYPO' ? 'Check your email' : 'Already registered?', pre.message,
+            pre.reason === 'EMAIL_TYPO' ? [{ text: 'OK' }] : [{ text: 'Go to log in', onPress: () => navigation.navigate('Login') }, { text: 'Back' }]);
+          return;
+        }
+      }
       setStep(step + 1);
       return;
     }
@@ -142,7 +159,7 @@ export function RegisterScreen({ navigation, route }: Props) {
       if (role === 'candidate') {
         const [firstName, ...rest] = name.trim().split(' ');
         res = await signUpCandidate({
-          email,
+          email: email.trim(),
           password,
           firstName,
           lastName: rest.join(' '),
@@ -210,7 +227,11 @@ export function RegisterScreen({ navigation, route }: Props) {
           <>
             <Field label="Company name"><Input onDark value={company} onChangeText={setCompany} placeholder="Tesco Distribution" /></Field>
             <Field label="Work email"><Input onDark value={email} onChangeText={setEmail} placeholder="you@company.com" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" /></Field>
-            {email.length > 0 && !emailOk ? <Text style={styles.err}>Enter a valid work email address.</Text> : null}
+            {email.length > 0 && !emailTypo.ok ? (
+              <Text style={styles.err} onPress={() => emailTypo.suggestion && setEmail(emailTypo.suggestion)}>
+                {emailTypo.suggestion ? `Looks mistyped. Did you mean ${emailTypo.suggestion}? Tap to fix.` : 'That email looks mistyped. Please check it.'}
+              </Text>
+            ) : email.length > 0 && !emailOk ? <Text style={styles.err}>Enter a valid work email address.</Text> : null}
             <View style={styles.row2}>
               <View style={{ flex: 1 }}>
                 <Field label="Contact number"><Input onDark value={phone} onChangeText={setPhone} placeholder="07700 900000" keyboardType="phone-pad" maxLength={16} /></Field>
@@ -230,7 +251,11 @@ export function RegisterScreen({ navigation, route }: Props) {
           <>
             <Field label="Full name"><Input onDark value={name} onChangeText={setName} placeholder="Jamie Smith" /></Field>
             <Field label="Email"><Input onDark value={email} onChangeText={setEmail} placeholder="you@email.com" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" /></Field>
-            {email.length > 0 && !emailOk ? <Text style={styles.err}>Enter a valid email address.</Text> : null}
+            {email.length > 0 && !emailTypo.ok ? (
+              <Text style={styles.err} onPress={() => emailTypo.suggestion && setEmail(emailTypo.suggestion)}>
+                {emailTypo.suggestion ? `Looks mistyped. Did you mean ${emailTypo.suggestion}? Tap to fix.` : 'That email looks mistyped. Please check it.'}
+              </Text>
+            ) : email.length > 0 && !emailOk ? <Text style={styles.err}>Enter a valid email address.</Text> : null}
             <View style={styles.row2}>
               <View style={{ flex: 1 }}>
                 <Field label="Mobile"><Input onDark value={phone} onChangeText={setPhone} placeholder="07700 900000" keyboardType="phone-pad" maxLength={16} /></Field>

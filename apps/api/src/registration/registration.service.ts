@@ -8,6 +8,8 @@ import {
 import { Cron } from '@nestjs/schedule';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { cleanSectors } from '../common/sectors';
+import { checkEmail, emailTypoMessage } from '../common/email-check';
+import { findPossibleDuplicate, DUPLICATE_SIGNUP_MESSAGE } from '../common/duplicate-candidate';
 import {
   CandidateStatus,
   ClientStatus,
@@ -131,6 +133,34 @@ export class RegistrationService {
   // ────────────────────────────────────────────────────────────
   // CANDIDATE ENROLMENT  (called by the website / app front door)
   // ────────────────────────────────────────────────────────────
+  /**
+   * Pre-flight check the candidate portal and mobile app call BEFORE creating the
+   * Supabase login, so a mistyped email or a second account is stopped while the
+   * person is still on the form. Never reveals whose account a duplicate is.
+   */
+  async precheckCandidate(input: { email: string; firstName?: string; lastName?: string; phone?: string; dateOfBirth?: string }) {
+    const email = (input.email ?? '').trim().toLowerCase();
+    const typo = checkEmail(email);
+    if (!typo.ok) {
+      return { ok: false, reason: 'EMAIL_TYPO' as const, message: emailTypoMessage(email), suggestion: typo.suggestion };
+    }
+    const existingUser = await this.prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return { ok: false, reason: 'EMAIL_IN_USE' as const, message: DUPLICATE_SIGNUP_MESSAGE };
+    }
+    const dob = input.dateOfBirth ? new Date(input.dateOfBirth) : null;
+    const dup = await findPossibleDuplicate(this.prisma, {
+      firstName: input.firstName,
+      lastName: input.lastName,
+      phone: input.phone,
+      dateOfBirth: dob && !isNaN(dob.getTime()) ? dob : null,
+    });
+    if (dup) {
+      return { ok: false, reason: 'POSSIBLE_DUPLICATE' as const, message: DUPLICATE_SIGNUP_MESSAGE };
+    }
+    return { ok: true as const };
+  }
+
   async registerCandidate(dto: RegisterCandidateDto) {
     const email = dto.email.trim().toLowerCase();
     const firstName = dto.firstName.trim();
@@ -142,6 +172,20 @@ export class RegistrationService {
     let user = await this.prisma.user.findUnique({ where: { email } });
     let isNewAccount = false;
     let activationUrl: string | undefined;
+
+    // The website form posts via webhook and can't show the person an error, so
+    // here we accept the sign-up (never lose a lead) and flag it to staff instead.
+    const staffFlags: string[] = [];
+    if (!user) {
+      const typo = checkEmail(email);
+      if (!typo.ok) {
+        staffFlags.push(`Email looks mistyped${typo.suggestion ? ` (did they mean ${typo.suggestion}?)` : ''} — they won't get their activation email. Fix it with "Invite to portal".`);
+      }
+      const dup = await findPossibleDuplicate(this.prisma, { firstName, lastName, phone: dto.phone, dateOfBirth: dob ?? null });
+      if (dup) {
+        staffFlags.push(`Possible duplicate of ${dup.name} (same ${dup.reason === 'phone' ? 'phone number' : 'name and date of birth'}) — check and archive one.`);
+      }
+    }
 
     if (!user) {
       const auth = await this.ensureAuthUser(
@@ -207,7 +251,16 @@ export class RegistrationService {
         source,
         lookingFor: candidate.preferredSectors,
         link: `/dashboard/candidates/${candidate.id}`,
+        flags: staffFlags,
       });
+      if (staffFlags.length) {
+        await this.audit.log({
+          action: 'candidate.signup.flagged',
+          entity: 'Candidate',
+          entityId: candidate.id,
+          meta: { flags: staffFlags, source },
+        });
+      }
     }
 
     // 3. Attach any documents already uploaded — skip duplicates by type+path.
@@ -544,6 +597,9 @@ export class RegistrationService {
     const email = (opts.email?.trim().toLowerCase() || (currentIsPlaceholder ? '' : currentEmail));
     if (!email || email.endsWith('@candidate.local')) {
       throw new BadRequestException('A real email address is required to send a portal invite.');
+    }
+    if (!checkEmail(email).ok) {
+      throw new BadRequestException(emailTypoMessage(email));
     }
     // The email must not already belong to a different account.
     const clash = await this.prisma.user.findUnique({ where: { email } });

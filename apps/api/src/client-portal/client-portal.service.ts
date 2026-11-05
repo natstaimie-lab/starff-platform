@@ -1,3 +1,4 @@
+import { checkEmail, emailTypoMessage } from '../common/email-check';
 import {
   BadRequestException,
   ForbiddenException,
@@ -896,6 +897,7 @@ export class ClientPortalService {
   async addContact(userId: string, dto: { firstName: string; lastName: string; email: string; phone?: string; jobTitle?: string }) {
     const { client } = await this.clientFor(userId);
     if (!dto.firstName?.trim() || !dto.email?.trim()) throw new ForbiddenException('Name and email are required');
+    if (!checkEmail(dto.email).ok) throw new BadRequestException(emailTypoMessage(dto.email));
     return this.prisma.clientContact.create({
       data: {
         clientId: client.id,
