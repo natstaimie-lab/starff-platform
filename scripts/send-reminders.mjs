@@ -11,7 +11,7 @@
  * none within 48h of the last, real email addresses only.
  *
  * Env: DATABASE_URL (required), RESEND_API_KEY (required to email),
- *      MAIL_FROM (optional), CANDIDATE_PORTAL_URL (optional), DRY_RUN=1 (optional).
+ *      MAIL_FROM (optional), MAIL_REPLY_TO (optional), CANDIDATE_PORTAL_URL (optional), DRY_RUN=1 (optional).
  *
  * Run locally:  node --env-file=.env scripts/send-reminders.mjs
  */
@@ -20,6 +20,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 const RESEND_KEY = process.env.RESEND_API_KEY;
 const MAIL_FROM = process.env.MAIL_FROM || 'Starff <noreply@starff.co.uk>';
+const MAIL_REPLY_TO = process.env.MAIL_REPLY_TO || 'hello@starff.co.uk';
 const PORTAL = process.env.CANDIDATE_PORTAL_URL || 'https://my.starff.co.uk';
 const DRY_RUN = process.env.DRY_RUN === '1';
 const MAX_REMINDERS = 3;
@@ -47,7 +48,7 @@ async function sendEmail(to, firstName) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: MAIL_FROM, to, subject: 'Finish your Starff registration', html: emailHtml(firstName) }),
+    body: JSON.stringify({ from: MAIL_FROM, reply_to: MAIL_REPLY_TO, to, subject: 'Finish your Starff registration', html: emailHtml(firstName) }),
   });
   if (!res.ok) throw new Error(`Resend ${res.status} ${await res.text().catch(() => '')}`.trim());
   return true;

@@ -21,6 +21,8 @@ services:
         value: production
       - key: MAIL_FROM
         value: "Starff <noreply@starff.co.uk>"
+      - key: MAIL_REPLY_TO
+        value: "hello@starff.co.uk"
       - key: SUPABASE_URL
         value: "https://vtmafvssthoypwgcjtkm.supabase.co"
       - key: CORS_ORIGINS

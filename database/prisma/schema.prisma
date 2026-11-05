@@ -253,6 +253,8 @@ model Candidate {
   healthNotes            String?
   consentGdpr            Boolean         @default(false)
   consentGdprAt          DateTime?
+  marketingConsent       Boolean         @default(false) // opted in to job alerts / news emails (UK PECR)
+  marketingConsentAt     DateTime?
   agreementAccepted      Boolean         @default(false)
   agreementAcceptedAt    DateTime?
   signatureName          String?         // typed e-signature

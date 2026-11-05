@@ -109,7 +109,8 @@ export function RegisterScreen({ navigation, route }: Props) {
   const [terms, setTerms] = useState(false);
   const [privacy, setPrivacy] = useState(false);
   const [gdpr, setGdpr] = useState(false);
-  const [alerts, setAlerts] = useState(true);
+  // Marketing opt-in must start unticked — a pre-ticked box isn't valid consent (UK GDPR/PECR).
+  const [alerts, setAlerts] = useState(false);
   const [signed, setSigned] = useState(false);
 
   const emailOk = isEmail(email);
@@ -153,6 +154,7 @@ export function RegisterScreen({ navigation, route }: Props) {
           headline: prefRole || sectors.join(', ') || undefined,
           availabilityPattern: avail,
           consentGdpr: gdpr,
+          marketingConsent: alerts,
           agreementAccepted: terms,
           signatureName: name.trim(),
         });
@@ -290,7 +292,7 @@ export function RegisterScreen({ navigation, route }: Props) {
               <AgreeRow on={terms} set={setTerms} onRead={() => setViewDoc('terms')}>I accept Starff’s <Text style={styles.b}>Terms &amp; Conditions</Text> of engagement.</AgreeRow>
               <AgreeRow on={privacy} set={setPrivacy} onRead={() => setViewDoc('privacy')}>I have read the <Text style={styles.b}>Privacy Policy</Text>.</AgreeRow>
               <AgreeRow on={gdpr} set={setGdpr} onRead={() => setViewDoc('gdpr')}>I give explicit <Text style={styles.b}>GDPR consent</Text> for identity, right-to-work &amp; DBS checks.</AgreeRow>
-              <AgreeRow on={alerts} set={setAlerts}>Send me matching shift alerts <Text style={{ color: '#8FA1BC' }}>(optional)</Text>.</AgreeRow>
+              <AgreeRow on={alerts} set={setAlerts}>Email me shift alerts and news from Starff <Text style={{ color: '#8FA1BC' }}>(optional — unsubscribe any time)</Text>.</AgreeRow>
             </View>
             <Text style={styles.fieldLabel}>E-SIGNATURE</Text>
             <View style={{ marginTop: 6 }}>

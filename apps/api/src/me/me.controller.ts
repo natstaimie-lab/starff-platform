@@ -169,7 +169,7 @@ export class MeController {
   @Put('declarations')
   setDeclarations(
     @CurrentUser() user: AuthUser,
-    @Body() dto: { healthDeclaration?: boolean; healthNotes?: string; consentGdpr?: boolean; agreementAccepted?: boolean; signatureName?: string },
+    @Body() dto: { healthDeclaration?: boolean; healthNotes?: string; consentGdpr?: boolean; marketingConsent?: boolean; agreementAccepted?: boolean; signatureName?: string },
   ) {
     return this.me.setDeclarations(user.id, dto);
   }

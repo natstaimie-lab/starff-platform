@@ -9,6 +9,7 @@ type Me = {
   firstName: string; lastName: string;
   healthDeclaration?: boolean; healthNotes?: string | null;
   consentGdpr?: boolean; consentGdprAt?: string | null;
+  marketingConsent?: boolean; marketingConsentAt?: string | null;
   agreementAccepted?: boolean; agreementAcceptedAt?: string | null;
   signatureName?: string | null; signedAt?: string | null;
 };
@@ -56,6 +57,7 @@ export default function DeclarationsPage() {
   const [health, setHealth] = useState(false);
   const [healthNotes, setHealthNotes] = useState('');
   const [consent, setConsent] = useState(false);
+  const [marketing, setMarketing] = useState(false);
   const [agree, setAgree] = useState(false);
   const [signature, setSignature] = useState('');
   const [saving, setSaving] = useState(false);
@@ -75,6 +77,7 @@ export default function DeclarationsPage() {
       setHealth(!!m.healthDeclaration);
       setHealthNotes(m.healthNotes ?? '');
       setConsent(!!m.consentGdpr);
+      setMarketing(!!m.marketingConsent);
       setAgree(!!m.agreementAccepted);
       setSignature(m.signatureName ?? '');
     }).catch((e) => setError(e.message));
@@ -103,7 +106,7 @@ export default function DeclarationsPage() {
     try {
       const updated = await apiFetch<Me>('/me/declarations', {
         method: 'PUT',
-        body: JSON.stringify({ healthDeclaration: health, healthNotes, consentGdpr: consent, agreementAccepted: agree, signatureName: signature }),
+        body: JSON.stringify({ healthDeclaration: health, healthNotes, consentGdpr: consent, marketingConsent: marketing, agreementAccepted: agree, signatureName: signature }),
       });
       setMe(updated);
       setSaved(true);
@@ -180,6 +183,14 @@ export default function DeclarationsPage() {
           <span>I consent to Starff storing and processing my personal data to find me work, run compliance checks and pay me, as described in the privacy policy.</span>
         </label>
         {me.consentGdpr && me.consentGdprAt && <p className="dim" style={{ fontSize: 12.5, marginTop: 10 }}>Consented on {fmt(me.consentGdprAt)}.</p>}
+      </Card>
+
+      <Card title="Job alerts & news (optional)" subtitle="You don’t need this to work with us — untick any time.">
+        <label style={box}>
+          <input type="checkbox" checked={marketing} onChange={(e) => { setMarketing(e.target.checked); setSaved(false); }} style={{ marginTop: 3 }} />
+          <span>Yes, email me about new shifts, job alerts and news from Starff. I can unsubscribe at any time.</span>
+        </label>
+        {me.marketingConsent && me.marketingConsentAt && <p className="dim" style={{ fontSize: 12.5, marginTop: 10 }}>Opted in on {fmt(me.marketingConsentAt)}.</p>}
       </Card>
 
       <Card title="Candidate agreement" subtitle="Please read, then sign below.">

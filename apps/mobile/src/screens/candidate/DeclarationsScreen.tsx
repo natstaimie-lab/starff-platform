@@ -18,6 +18,7 @@ export function DeclarationsScreen() {
   const [health, setHealth] = useState(false);
   const [healthNotes, setHealthNotes] = useState('');
   const [gdpr, setGdpr] = useState(false);
+  const [marketing, setMarketing] = useState(false);
   const [agreement, setAgreement] = useState(false);
   const [signature, setSignature] = useState('');
   const [saving, setSaving] = useState(false);
@@ -27,6 +28,7 @@ export function DeclarationsScreen() {
       setHealth(!!me.healthDeclaration);
       setHealthNotes(me.healthNotes ?? '');
       setGdpr(!!me.consentGdpr);
+      setMarketing(!!me.marketingConsent);
       setAgreement(!!me.agreementAccepted);
       setSignature(me.signatureName ?? '');
     }
@@ -41,6 +43,7 @@ export function DeclarationsScreen() {
         healthDeclaration: health,
         healthNotes: healthNotes.trim() || undefined,
         consentGdpr: gdpr,
+        marketingConsent: marketing,
         agreementAccepted: agreement,
         signatureName: signature.trim(),
       });
@@ -82,6 +85,12 @@ export function DeclarationsScreen() {
                   style={{ height: 72, paddingTop: 12, textAlignVertical: 'top' }}
                 />
               </Field>
+            </Card>
+
+            <Card>
+              <ConsentRow on={marketing} set={setMarketing}>
+                <Text style={styles.b}>Optional:</Text> email me about new shifts, job alerts and news from Starff. I can unsubscribe at any time.
+              </ConsentRow>
             </Card>
 
             <Card>
