@@ -60,7 +60,7 @@ const LEGAL: Record<string, { title: string; updated: string; body: [string, str
     title: 'Terms & Conditions',
     updated: 'Last updated 1 June 2026',
     body: [
-      ['Your agreement with Starff', 'By registering you enter an agreement with Starff Recruitment Ltd to be supplied as a temporary worker to Starff’s hirers. We are an employment business under the Conduct of Employment Agencies and Employment Businesses Regulations 2003.'],
+      ['Your agreement with Starff', 'By registering you enter an agreement with Starff Ltd (company no. 17166246) to be supplied as a temporary worker to Starff’s hirers. We are an employment business under the Conduct of Employment Agencies and Employment Businesses Regulations 2003.'],
       ['Assignments & pay', 'Each shift you accept is a separate assignment. You are paid weekly for verified, approved hours at the agreed rate, including 12.07% rolled-up holiday pay, less PAYE tax, National Insurance and any pension contributions.'],
       ['Your responsibilities', 'You agree to provide accurate information, hold valid right-to-work and any required licences (DBS, CSCS, CPC, SIA), attend confirmed shifts, and follow each hirer’s site and safety rules.'],
       ['Ending the relationship', 'Either party may end the relationship at any time. Completed approved hours remain payable. Misconduct or false information may result in removal from the platform.'],
