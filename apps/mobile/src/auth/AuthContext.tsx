@@ -78,6 +78,7 @@ interface CandidateSignUp {
   /** Full-time | Part-time | Weekends — seeds the weekly availability days. */
   availabilityPattern?: string;
   consentGdpr?: boolean;
+  marketingConsent?: boolean;
   agreementAccepted?: boolean;
   signatureName?: string;
 }
@@ -219,10 +220,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (Object.keys(patch).length) {
           try { await candidateApi.updateProfile(candidate.id, patch); } catch { /* best-effort */ }
         }
-        if (meta.consentGdpr || meta.agreementAccepted || meta.signatureName) {
+        if (meta.consentGdpr || meta.marketingConsent || meta.agreementAccepted || meta.signatureName) {
           try {
             await candidateApi.setDeclarations({
               consentGdpr: !!meta.consentGdpr,
+              marketingConsent: !!meta.marketingConsent,
               agreementAccepted: !!meta.agreementAccepted,
               signatureName: meta.signatureName,
             });
@@ -300,6 +302,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               shiftPreference: input.shiftPreference,
               availabilityPattern: input.availabilityPattern,
               consentGdpr: input.consentGdpr,
+              marketingConsent: input.marketingConsent,
               agreementAccepted: input.agreementAccepted,
               signatureName: input.signatureName,
             },

@@ -588,7 +588,7 @@ export class MeService {
   // so we keep a genuine record of when the candidate consented/signed.
   async setDeclarations(
     userId: string,
-    dto: { healthDeclaration?: boolean; healthNotes?: string; consentGdpr?: boolean; agreementAccepted?: boolean; signatureName?: string },
+    dto: { healthDeclaration?: boolean; healthNotes?: string; consentGdpr?: boolean; marketingConsent?: boolean; agreementAccepted?: boolean; signatureName?: string },
   ) {
     const candidate = await this.candidateFor(userId);
     const now = new Date();
@@ -600,6 +600,11 @@ export class MeService {
     if (dto.consentGdpr !== undefined) {
       data.consentGdpr = !!dto.consentGdpr;
       data.consentGdprAt = dto.consentGdpr ? (candidate.consentGdprAt ?? now) : null;
+    }
+    // Optional marketing opt-in — never required to register, can be withdrawn any time.
+    if (dto.marketingConsent !== undefined) {
+      data.marketingConsent = !!dto.marketingConsent;
+      data.marketingConsentAt = dto.marketingConsent ? (candidate.marketingConsentAt ?? now) : null;
     }
     if (dto.agreementAccepted !== undefined) {
       data.agreementAccepted = !!dto.agreementAccepted;

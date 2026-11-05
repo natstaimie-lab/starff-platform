@@ -25,7 +25,7 @@ type Candidate = {
   dateOfBirth?: string | null; nationalInsurance?: string | null; addressLine1?: string | null; addressLine2?: string | null;
   emergencyName?: string | null; emergencyPhone?: string | null; emergencyRelationship?: string | null;
   bankAccountName?: string | null; bankSortCode?: string | null; bankAccountNumber?: string | null;
-  healthDeclaration?: boolean; healthNotes?: string | null; consentGdpr?: boolean; consentGdprAt?: string | null;
+  healthDeclaration?: boolean; healthNotes?: string | null; consentGdpr?: boolean; consentGdprAt?: string | null; marketingConsent?: boolean; marketingConsentAt?: string | null;
   agreementAccepted?: boolean; signatureName?: string | null; signedAt?: string | null;
   submittedAt?: string | null; registrationSource?: string | null; createdAt?: string | null; preferredSectors?: string[];
   drivingLicenceNumber?: string | null; dvlaCheckCode?: string | null; dvlaCheckCodeAt?: string | null;
@@ -618,6 +618,7 @@ export default function CandidateProfile() {
         <Row k="Health & safety declaration" v={c.healthDeclaration ? <Badge tone="success">Confirmed</Badge> : <span className="dim">Not confirmed</span>} />
         {c.healthNotes && <Row k="Health notes" v={c.healthNotes} />}
         <Row k="GDPR consent" v={c.consentGdpr ? <Badge tone="success">Consented {fmt(c.consentGdprAt)}</Badge> : <span className="dim">No</span>} />
+        <Row k="Marketing emails" v={c.marketingConsent ? <Badge tone="success">Opted in {fmt(c.marketingConsentAt)}</Badge> : <span className="dim">Not opted in</span>} />
         <Row k="Candidate agreement" v={c.agreementAccepted ? <Badge tone="success">Accepted</Badge> : <span className="dim">Not accepted</span>} />
         <Row k="Signature" v={c.signatureName ? `${c.signatureName} · ${fmt(c.signedAt)}` : '—'} />
       </Card>

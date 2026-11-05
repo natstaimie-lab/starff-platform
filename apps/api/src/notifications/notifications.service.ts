@@ -123,6 +123,8 @@ export class NotificationsService {
         },
         body: JSON.stringify({
           from: process.env.MAIL_FROM ?? 'Starff <noreply@starff.co.uk>',
+          // noreply@ has no mailbox — route replies to a real, monitored inbox.
+          reply_to: process.env.MAIL_REPLY_TO || 'hello@starff.co.uk',
           to: input.to,
           subject: input.subject,
           html: this.render(input),
