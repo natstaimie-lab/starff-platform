@@ -7,23 +7,7 @@ import { Card } from '@/components/ui';
 
 const WEIGHT_ORDER = ['skills', 'compliance', 'rightToWork', 'availability', 'rating', 'reliability', 'proximity'];
 
-const TOGGLES = [
-  { key: 'email', label: 'Email notifications', desc: 'New enquiries, timesheets and compliance alerts' },
-  { key: 'sms', label: 'SMS alerts', desc: 'Urgent shift changes and no-show warnings' },
-  { key: 'compliance', label: 'Compliance reminders', desc: 'Right-to-work and document expiry reminders' },
-  { key: 'weekly', label: 'Weekly summary', desc: 'A Monday digest of the week ahead' },
-];
-
-function Switch({ on, onClick }: { on: boolean; onClick: () => void }) {
-  return (
-    <button onClick={onClick} aria-label="toggle" style={{ width: 46, height: 26, borderRadius: 999, border: 'none', cursor: 'pointer', background: on ? 'var(--success-500)' : 'var(--grey-300)', position: 'relative' }}>
-      <span style={{ position: 'absolute', top: 2, left: on ? 22 : 2, width: 22, height: 22, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
-    </button>
-  );
-}
-
 export default function SettingsPage() {
-  const [state, setState] = useState<Record<string, boolean>>({ email: true, sms: false, compliance: true, weekly: true });
   const [email, setEmail] = useState('');
   const [weights, setWeights] = useState<Record<string, number> | null>(null);
   const [labels, setLabels] = useState<Record<string, string>>({});
@@ -48,7 +32,8 @@ export default function SettingsPage() {
   }
 
   const org = [
-    { label: 'Organisation', value: 'Starff Recruitment Ltd' },
+    { label: 'Organisation', value: 'Starff Ltd' },
+    { label: 'Company no.', value: '17166246' },
     { label: 'Signed in as', value: email || '—' },
     { label: 'Plan', value: 'Platform (self-hosted)' },
     { label: 'Region', value: 'United Kingdom' },
@@ -56,20 +41,6 @@ export default function SettingsPage() {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
-      <Card title="Notifications">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {TOGGLES.map((t) => (
-            <div key={t.key} className="fx ac jb">
-              <div>
-                <div className="nm">{t.label}</div>
-                <div className="sub2">{t.desc}</div>
-              </div>
-              <Switch on={state[t.key]} onClick={() => setState((s) => ({ ...s, [t.key]: !s[t.key] }))} />
-            </div>
-          ))}
-        </div>
-      </Card>
-
       <Card title="Organisation">
         <div>
           {org.map((d) => (
