@@ -1,0 +1,32 @@
+[
+  { "file": "profile-navy.png",  "w": 640,  "h": 640,  "t": "profile", "bg": "#0F172A" },
+  { "file": "profile-white.png", "w": 640,  "h": 640,  "t": "profile", "bg": "#FFFFFF" },
+
+  { "file": "01-welcome.png", "t": "hero", "tag": "FOR CANDIDATES",
+    "l1": "Local temp shifts.", "l2": "Posted here first.",
+    "sub": "Follow this channel for paid temporary shifts across London — rate, location and what you need, every time." },
+
+  { "file": "02-how-it-works.png", "t": "steps", "tag": "FOR CANDIDATES",
+    "l1": "New to Starff?", "l2": "Three steps.",
+    "steps": ["Register at starff.co.uk", "Upload your right-to-work ID", "We message you when shifts match"] },
+
+  { "file": "03-shift-alert-EXAMPLE.png", "t": "shift",
+    "role": "Warehouse Operative", "location": "Park Royal, NW10",
+    "rate": "£13.50", "rateUnit": "per hour",
+    "when": "Sat 14 Nov", "hours": "07:00 – 15:00",
+    "needs": "Safety boots", "spaces": "6 workers",
+    "cta": "Message us to apply" },
+
+  { "file": "04-weekly-roundup-EXAMPLE.png", "t": "roundup",
+    "l1": "Shifts this week.", "l2": "Pick yours.",
+    "items": [
+      { "role": "Warehouse Operative", "where": "Park Royal · Sat–Sun", "rate": "£13.50/hr" },
+      { "role": "Event Steward",       "where": "Wembley · Fri eve",    "rate": "£13.00/hr" },
+      { "role": "Delivery Driver",     "where": "Croydon · Mon–Fri",    "rate": "£14.25/hr" },
+      { "role": "Labourer (CSCS)",     "where": "Stratford · Tue–Thu",  "rate": "£15.00/hr" }
+    ] },
+
+  { "file": "05-employers.png", "t": "hero", "tag": "FOR EMPLOYERS",
+    "l1": "Short staffed?", "l2": "We'll fill the shift.",
+    "sub": "Vetted temporary workers for logistics, events, construction and delivery. Tell us the shift — we'll do the rest." }
+]
