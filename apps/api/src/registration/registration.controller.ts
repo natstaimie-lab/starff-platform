@@ -3,15 +3,18 @@ import {
   Controller,
   Get,
   Headers,
+  HttpCode,
   Param,
   Post,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { RegistrationService } from './registration.service';
 import { RegisterCandidateDto } from './dto/register-candidate.dto';
 import { RegisterClientDto } from './dto/register-client.dto';
+import { PrecheckCandidateDto } from './dto/precheck-candidate.dto';
 import { Public } from '../auth/public.decorator';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
@@ -38,6 +41,19 @@ export class RegistrationController {
   ) {
     this.assertWebhook(secret);
     return this.registration.registerCandidate(dto);
+  }
+
+  /**
+   * Sign-up pre-check for the candidate portal and mobile app (no secret — those
+   * are public clients). Tight rate limit because it's unauthenticated; the reply
+   * never says whose account a duplicate belongs to.
+   */
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('candidate/precheck')
+  @HttpCode(200)
+  precheckCandidate(@Body() dto: PrecheckCandidateDto) {
+    return this.registration.precheckCandidate(dto);
   }
 
   @Public()

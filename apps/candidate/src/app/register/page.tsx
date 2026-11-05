@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
+import { precheckSignup } from '@/lib/api';
+import { checkEmail } from '@/lib/email-check';
 
 const SECTORS = [
   'Warehouse & Logistics', 'Driving & Delivery', 'Construction & Trades',
@@ -47,6 +49,7 @@ export default function RegisterPage() {
   const [f, setF] = useState({ firstName: '', lastName: '', email: '', password: '', phone: '', postcode: '', dob: '', rtw: '' });
   const [sectors, setSectors] = useState<string[]>([]);
   const [error, setError] = useState('');
+  const [suggestion, setSuggestion] = useState('');
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -55,6 +58,13 @@ export default function RegisterPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setSuggestion('');
+    const emailCheck = checkEmail(f.email);
+    if (!emailCheck.ok) {
+      setError(emailCheck.suggestion ? `That email address looks mistyped. Did you mean ${emailCheck.suggestion}?` : 'That email address looks mistyped. Please check it.');
+      setSuggestion(emailCheck.suggestion ?? '');
+      return;
+    }
     if (sectors.length === 0) { setError('Please pick at least one type of work you’re looking for.'); return; }
     if (!/^(?:0|\+44)[0-9 ]{9,13}$/.test(f.phone.trim())) { setError('Please enter a valid UK mobile number.'); return; }
     if (!/^[A-Za-z]{1,2}\d[A-Za-z\d]?\s*\d[A-Za-z]{2}$/.test(f.postcode.trim())) { setError('Please enter a valid UK postcode.'); return; }
@@ -64,8 +74,19 @@ export default function RegisterPage() {
     if (!f.rtw) { setError('Please tell us your right-to-work status.'); return; }
     setLoading(true);
     setError('');
+    // Stop typos and second accounts before the login is created.
+    const pre = await precheckSignup({
+      email: f.email.trim(), firstName: f.firstName.trim(), lastName: f.lastName.trim(),
+      phone: f.phone.trim(), dateOfBirth: iso,
+    });
+    if (!pre.ok) {
+      setLoading(false);
+      setError(pre.message);
+      setSuggestion(pre.suggestion ?? '');
+      return;
+    }
     const { data, error } = await supabase.auth.signUp({
-      email: f.email,
+      email: f.email.trim(),
       password: f.password,
       options: { data: {
         firstName: f.firstName, lastName: f.lastName, preferredSectors: sectors,
@@ -152,6 +173,12 @@ export default function RegisterPage() {
             </div>
 
             {error && <p style={{ color: 'var(--error-600)', fontSize: 13, background: 'var(--error-100)', borderRadius: 8, padding: '8px 12px', marginBottom: 16 }}>{error}</p>}
+            {suggestion && (
+              <button type="button" onClick={() => { setF({ ...f, email: suggestion }); setSuggestion(''); setError(''); }}
+                style={{ marginTop: -8, marginBottom: 16, background: 'none', border: 'none', padding: 0, color: 'var(--text-link)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                Use {suggestion}
+              </button>
+            )}
             <button type="submit" disabled={loading} className="btn-primary" style={{ width: '100%' }}>{loading ? 'Creating…' : 'Create account'}</button>
           </>
         )}

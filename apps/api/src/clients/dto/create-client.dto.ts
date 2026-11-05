@@ -1,3 +1,4 @@
+import { IsLikelyRealEmail } from '../../common/email-check';
 import { IsEmail, IsEnum, IsOptional, IsString } from 'class-validator';
 import { ClientStatus } from '@prisma/client';
 
@@ -16,6 +17,7 @@ export class CreateClientDto {
 
   @IsOptional()
   @IsEmail()
+  @IsLikelyRealEmail()
   contactEmail?: string;
 
   @IsOptional()

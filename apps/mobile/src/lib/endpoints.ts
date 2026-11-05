@@ -334,3 +334,23 @@ export const notificationsApi = {
   removePushToken: (token: string) =>
     apiFetch('/notifications/push-tokens', { method: 'DELETE', body: { token } }),
 };
+
+// ── Public: sign-up pre-check (no login yet) ───────────────────────────────
+export type SignupPrecheck =
+  | { ok: true }
+  | { ok: false; reason: 'EMAIL_TYPO' | 'EMAIL_IN_USE' | 'POSSIBLE_DUPLICATE'; message: string; suggestion?: string };
+
+export const signupApi = {
+  /**
+   * POST /registration/candidate/precheck — run BEFORE supabase.auth.signUp so a
+   * mistyped email or a second account is caught on the form. Fails open: if the
+   * API can't be reached the sign-up carries on (staff are alerted server-side).
+   */
+  precheckCandidate: async (input: { email: string; firstName?: string; lastName?: string; phone?: string; dateOfBirth?: string }): Promise<SignupPrecheck> => {
+    try {
+      return await apiFetch<SignupPrecheck>('/registration/candidate/precheck', { method: 'POST', body: input });
+    } catch {
+      return { ok: true };
+    }
+  },
+};

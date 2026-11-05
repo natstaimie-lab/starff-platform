@@ -153,6 +153,8 @@ export class NotificationsService {
     source?: string | null; // RegistrationSource: WEBSITE | MOBILE | PORTAL | ADMIN
     lookingFor?: string[]; // sectors the worker is looking for
     link?: string;
+    /** Things staff should check — mistyped email, possible duplicate profile. */
+    flags?: string[];
   }): Promise<void> {
     try {
       const staff = await this.prisma.user.findMany({
@@ -164,8 +166,10 @@ export class NotificationsService {
       const where = this.sourceLabel(input.source);
       const name = input.name.trim() || (input.audience === 'worker' ? 'A new worker' : 'A new employer');
       const wants = input.lookingFor?.length ? ` Looking for: ${input.lookingFor.join(', ')}.` : '';
-      const subject = `New ${input.audience} sign-up — ${name}`;
-      const body = `${name} just signed up as ${who}${where ? ` from ${where}` : ''}.${wants}`;
+      const flagged = !!input.flags?.length;
+      const subject = `${flagged ? '⚠ Check: ' : ''}New ${input.audience} sign-up — ${name}`;
+      const checks = flagged ? `\n\nPlease check: ${input.flags!.join(' ')}` : '';
+      const body = `${name} just signed up as ${who}${where ? ` from ${where}` : ''}.${wants}${checks}`;
       await Promise.all(
         staff.map((s) =>
           this.send({ to: s.email, userId: s.id, kind: 'NEW_SIGNUP', subject, body, actionUrl: input.link })
