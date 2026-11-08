@@ -80,7 +80,7 @@ export default function TimesheetsPage() {
 
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16, marginBottom: 6 }}>
+      <div className="kpi-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16, marginBottom: 6 }}>
         {kpis.map((k) => {
           const on = filter === k.status;
           return (

@@ -135,7 +135,7 @@ export default function DashboardHome() {
       </div>
 
       {/* KPI row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 16 }}>
+      <div className="kpi-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 16 }}>
         <Kpi label="Active Jobs" value={num(activeJobs || undefined)} hint={`${requireStaff} require staff`} icon={<Ic.Briefcase width={24} />} bg="var(--blue-500)" />
         <Kpi label="Available Workers" value={num(stats?.workers)} hint="Ready for work" icon={<Ic.Users width={24} />} bg="var(--success-500)" />
         <Kpi label="Booked Shifts" value={num(wf?.counts.upcomingShifts)} hint="Next 7 days" icon={<Ic.Calendar width={24} />} bg="var(--orange-500)" />

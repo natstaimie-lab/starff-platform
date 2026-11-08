@@ -163,7 +163,7 @@ export default function PayrollPage() {
 
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
+      <div className="kpi-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
         {kpis.map((k) => <KPIStat key={k.label} label={k.label} value={String(k.value)} icon={k.icon} tone={k.tone} />)}
       </div>
 

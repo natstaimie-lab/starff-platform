@@ -107,7 +107,7 @@ export default function ClientDashboard() {
       )}
 
       {/* KPI row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 16 }}>
+      <div className="kpi-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 16 }}>
         <Kpi label="Active Bookings" value={String(ov?.activeBookings ?? '—')} hint="Live jobs" icon={<Ic.Calendar width={20} />} bg="var(--blue-100)" fg="var(--blue-600)" />
         <Kpi label="Workers On Shift" value={String(ov?.workersOnSiteToday ?? '—')} hint="Right now" icon={<Ic.HardHat width={20} />} bg="#efe7fd" fg="var(--purple-500)" />
         <Kpi label="Fill Rate" value={`${fillRate}%`} hint="Across your jobs" icon={<Ic.BarChart width={20} />} bg="var(--success-100)" fg="var(--success-600)" />

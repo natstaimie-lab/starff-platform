@@ -39,7 +39,7 @@ function NotificationBell() {
       {open && (
         <>
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-          <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 344, maxHeight: 440, overflowY: 'auto', background: 'var(--surface-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', boxShadow: '0 14px 36px rgba(11,31,58,.18)', zIndex: 50 }}>
+          <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 'min(344px, calc(100vw - 24px))', maxHeight: 440, overflowY: 'auto', background: 'var(--surface-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', boxShadow: '0 14px 36px rgba(11,31,58,.18)', zIndex: 50 }}>
             <div className="fx ac jb" style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-subtle)', position: 'sticky', top: 0, background: 'var(--surface-card)' }}>
               <span style={{ fontWeight: 800, fontSize: 14 }}>Notifications{unread > 0 ? ` (${unread})` : ''}</span>
               {unread > 0 && <button onClick={markAll} className="link" style={{ fontSize: 12.5, background: 'none', border: 'none', cursor: 'pointer' }}>Mark all read</button>}
@@ -71,9 +71,9 @@ export function Topbar({ company, contact }: { company: string; contact: string 
         <div className="ptitle" style={{ fontSize: 24 }}>{company || '—'}</div>
       </div>
       <div className="fx ac gap10">
-        <Link href="/dashboard/book" className="btn-primary" style={{ textDecoration: 'none' }}><Ic.Plus width={16} /> Book Staff</Link>
+        <Link href="/dashboard/book" className="btn-primary" style={{ textDecoration: 'none' }}><Ic.Plus width={16} /> Book<span className="hide-sm"> Staff</span></Link>
         <NotificationBell />
-        <Avatar name={contact || company || 'Client'} size={40} />
+        <span className="hide-sm"><Avatar name={contact || company || 'Client'} size={40} /></span>
       </div>
     </div>
   );

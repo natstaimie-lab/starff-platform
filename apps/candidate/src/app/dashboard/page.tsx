@@ -178,7 +178,7 @@ export default function Dashboard() {
           <div className="fx ac jb" style={{ marginBottom: 8 }}>
             <span style={{ fontWeight: 700, fontSize: 14 }}>{MON[today.getMonth()]} {today.getFullYear()}</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, textAlign: 'center' }}>
+          <div className="keep-cols" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, textAlign: 'center' }}>
             {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <div key={i} className="dim" style={{ fontSize: 10.5, fontWeight: 700, padding: 2 }}>{d}</div>)}
             {cells.map((n, i) => {
               if (n === null) return <div key={i} />;
