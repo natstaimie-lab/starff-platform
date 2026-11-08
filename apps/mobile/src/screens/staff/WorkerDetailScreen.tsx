@@ -13,12 +13,11 @@ import type { StaffCandidate, StaffDocument } from '@/lib/types';
 import { ReasonModal } from '@/screens/staff/ReasonModal';
 import { formatDate, fullName, titleCase } from '@/screens/staff/format';
 
-// The same five checks as the admin dashboard's compliance checklist.
+// The same four checks as the admin dashboard's compliance checklist.
 const REQUIRED = [
   { type: 'SELFIE', label: 'Identity photo (selfie)' },
   { type: 'RIGHT_TO_WORK', label: 'Right to Work' },
   { type: 'ID', label: 'Proof of ID' },
-  { type: 'DBS_CHECK', label: 'DBS Check' },
   { type: 'CV', label: 'CV / Work History' },
 ];
 

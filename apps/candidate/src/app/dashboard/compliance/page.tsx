@@ -29,7 +29,7 @@ export default function CompliancePage() {
     catch (e: any) { alert(e.message); } finally { setBusy(null); }
   }
 
-  const { checks, done, total, pct, cleared } = complianceChecks(me?.status, me?.documents ?? []);
+  const { checks, optional, done, total, pct, cleared } = complianceChecks(me?.status, me?.documents ?? []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -53,6 +53,15 @@ export default function CompliancePage() {
               <div className="mut" style={{ fontSize: 12, fontWeight: 400 }}>{c.desc}</div>
             </div>
             <ComplianceBadge status={c.status} />
+          </div>
+        ))}
+        {optional.map((c) => (
+          <div key={c.type} className="crow">
+            <div className="clabel">
+              <div>{c.label}</div>
+              <div className="mut" style={{ fontSize: 12, fontWeight: 400 }}>{c.desc}</div>
+            </div>
+            {c.status === 'missing' ? <Badge tone="info">Optional</Badge> : <ComplianceBadge status={c.status} />}
           </div>
         ))}
         {!cleared && pct < 100 && <p className="mut" style={{ fontSize: 13, marginTop: 14 }}>Upload the missing documents to become fully compliant and start receiving shift offers.</p>}

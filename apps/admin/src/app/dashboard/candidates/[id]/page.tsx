@@ -46,7 +46,6 @@ const REQUIRED = [
   { type: 'SELFIE', label: 'Identity photo (selfie)' },
   { type: 'RIGHT_TO_WORK', label: 'Right to Work' },
   { type: 'ID', label: 'Proof of ID' },
-  { type: 'DBS_CHECK', label: 'DBS Check' },
   { type: 'CV', label: 'CV / Work History' },
 ];
 const typeLabel: Record<string, string> = {
