@@ -565,6 +565,7 @@ model Job {
   transportRequirements  String?  // transport / travel requirements
   clientRequirements     String?  // client-specific requirements
   bookingUrgency         String?  // "Standard" | "Urgent" | "Emergency"
+  dbsRequired            DbsLevel? // minimum DBS level this job needs; null = not needed
   breakInfo              String?
   notes                  String?  // additional notes from the client
   distributionMode       String?  // "manual" | "assisted"

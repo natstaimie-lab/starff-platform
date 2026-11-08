@@ -61,6 +61,7 @@ export class ClientPortalController {
       transportRequirements?: string;
       clientRequirements?: string;
       bookingUrgency?: string;
+      dbsRequired?: string;
       breakInfo?: string;
       notes?: string;
       startDate?: string;
@@ -102,6 +103,7 @@ export class ClientPortalController {
       transportRequirements?: string;
       clientRequirements?: string;
       bookingUrgency?: string;
+      dbsRequired?: string;
       breakInfo?: string;
       notes?: string;
       startDate?: string | null;

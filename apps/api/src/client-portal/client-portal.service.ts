@@ -14,6 +14,10 @@ import { ReliabilityService } from '../reliability/reliability.service';
 import { RatingsService } from '../ratings/ratings.service';
 import { CLIENT_AGREEMENT, clientAgreementSnapshot } from './client-agreement';
 
+
+/** Client-sent DBS requirement → enum value or null ('' / unknown = not needed). */
+const cleanDbs = (v?: string | null) => (v && ['BASIC', 'STANDARD', 'ENHANCED'].includes(v) ? v : null);
+
 @Injectable()
 export class ClientPortalService {
   constructor(
@@ -192,6 +196,7 @@ export class ClientPortalService {
       transportRequirements: job.transportRequirements,
       clientRequirements: job.clientRequirements,
       bookingUrgency: job.bookingUrgency,
+      dbsRequired: job.dbsRequired,
       breakInfo: job.breakInfo,
       notes: job.notes,
       startDate: job.startDate?.toISOString() ?? null,
@@ -228,6 +233,7 @@ export class ClientPortalService {
       transportRequirements?: string;
       clientRequirements?: string;
       bookingUrgency?: string;
+      dbsRequired?: string;
       breakInfo?: string;
       notes?: string;
       startDate?: string | null;
@@ -255,6 +261,7 @@ export class ClientPortalService {
       'bookingUrgency', 'breakInfo', 'notes',
     ];
     for (const k of scalar) if (dto[k] !== undefined) data[k] = dto[k];
+    if (dto.dbsRequired !== undefined) data.dbsRequired = cleanDbs(dto.dbsRequired);
     if (dto.payRate !== undefined) data.payRate = dto.payRate;
     if (dto.chargeRate !== undefined) data.chargeRate = dto.chargeRate;
     if (dto.openings !== undefined) data.openings = dto.openings;
@@ -563,6 +570,7 @@ export class ClientPortalService {
       transportRequirements?: string;
       clientRequirements?: string;
       bookingUrgency?: string;
+      dbsRequired?: string;
       breakInfo?: string;
       notes?: string;
       startDate?: string;
@@ -602,6 +610,7 @@ export class ClientPortalService {
         transportRequirements: dto.transportRequirements,
         clientRequirements: dto.clientRequirements,
         bookingUrgency: dto.bookingUrgency,
+        dbsRequired: cleanDbs(dto.dbsRequired) as any,
         breakInfo: dto.breakInfo,
         notes: dto.notes,
         startDate: dto.startDate ? new Date(dto.startDate) : undefined,

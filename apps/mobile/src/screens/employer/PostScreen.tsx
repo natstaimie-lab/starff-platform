@@ -82,8 +82,8 @@ export function EmployerPostScreen() {
             />
           </Field>
           <Muted>
-            Starff verifies right-to-work, DBS and licences on every worker before they
-            arrive.
+            Starff checks right-to-work and licences on every worker before they
+            arrive, plus DBS where the job needs it.
           </Muted>
         </Card>
 
