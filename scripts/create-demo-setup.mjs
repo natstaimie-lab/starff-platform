@@ -233,9 +233,9 @@ async function create() {
   console.log(`\n✅ Demo setup ready — stage: ${STAGE}`);
   console.log('   ─────────────────────────────────────────────');
   console.log(`   Candidate  ${CANDIDATE_EMAIL} / ${PASSWORD}   ${tick(candOk)}`);
-  console.log('              https://starff-platform-candidate.vercel.app  (local :3002)');
+  console.log('              https://my.starff.co.uk  (local :3002)');
   console.log(`   Client     ${CLIENT_EMAIL} / ${PASSWORD}   ${tick(clientOk)}`);
-  console.log('              https://starff-platform-client.vercel.app     (local :3003)');
+  console.log('              https://client.starff.co.uk  (local :3003)');
   console.log(`   Job        ${JOB_TITLE} @ ${COMPANY}  [${job.status}]  id ${job.id}`);
   console.log(`   Application ${app.status}  id ${app.id}${shift && STAGE === 'booked' ? `   Shift ${shift.id}` : ''}`);
   console.log('   ─────────────────────────────────────────────');
