@@ -982,3 +982,84 @@ a.link:hover {
     font-size: 20px !important;
   }
 }
+
+/* ---------- phones & small tablets (820px and below — same point the sidebar
+   becomes the ☰ drawer): make every page fit a small screen ---------- */
+.show-sm {
+  display: none;
+}
+@media (max-width: 820px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+  .hide-sm {
+    display: none !important;
+  }
+  .show-sm {
+    display: initial;
+  }
+  .phead {
+    padding: 12px 14px 12px 64px !important;
+    min-height: 68px;
+    gap: 10px;
+  }
+  .content {
+    padding: 12px 12px 28px !important;
+    gap: 14px;
+  }
+  .card-pad {
+    padding: 14px;
+  }
+  /* stat tiles: two per row */
+  .g6,
+  .g4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .g3,
+  .gmid,
+  .gbot {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  /* Any side-by-side layout written directly on a page stacks into one column.
+     (Add className="keep-cols" to an element to keep its columns on phones.) */
+  [style*="grid-template-columns"]:not(.keep-cols) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  /* Rows of number tiles (KPIs) sit two per row rather than one long column */
+  .kpi-row[style*="grid-template-columns"]:not(.keep-cols) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  /* Rows with text on the left and buttons on the right: buttons drop underneath */
+  .content .fx.jb,
+  .content [style*="space-between"] {
+    flex-wrap: wrap;
+  }
+  /* Card headers with filters/buttons on the right: let them wrap underneath */
+  .card-head {
+    flex-wrap: wrap;
+  }
+  .card-head > *,
+  .card-head [style*="inline-flex"] {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+  /* Wide tables scroll sideways inside their card instead of squashing */
+  table,
+  .tbl {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tbl th,
+  .tbl td {
+    white-space: nowrap;
+  }
+  /* Stop iPhone zooming in when you tap a form box */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
