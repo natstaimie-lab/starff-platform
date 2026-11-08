@@ -11,7 +11,7 @@ type JobDetail = Record<string, any>;
 const empty = {
   title: '', sector: '', payRate: '', chargeRate: '', openings: '1', siteId: '',
   startDate: '', endDate: '', breakInfo: '', ppe: '', uniform: '', requiredQualifications: '',
-  experienceRequirements: '', transportRequirements: '', clientRequirements: '', bookingUrgency: 'Standard',
+  experienceRequirements: '', transportRequirements: '', clientRequirements: '', bookingUrgency: 'Standard', dbsRequired: '',
   reportingContact: '', reportingInstructions: '', siteInstructions: '', notes: '', responseNote: '',
 };
 const DAYS = [{ n: 1, l: 'Mon' }, { n: 2, l: 'Tue' }, { n: 3, l: 'Wed' }, { n: 4, l: 'Thu' }, { n: 5, l: 'Fri' }, { n: 6, l: 'Sat' }, { n: 0, l: 'Sun' }];
@@ -59,7 +59,7 @@ export default function BookStaffPage() {
           breakInfo: str(j.breakInfo), ppe: str(j.ppe), uniform: str(j.uniform),
           requiredQualifications: str(j.requiredQualifications), experienceRequirements: str(j.experienceRequirements),
           transportRequirements: str(j.transportRequirements), clientRequirements: str(j.clientRequirements),
-          bookingUrgency: str(j.bookingUrgency) || 'Standard', reportingContact: str(j.reportingContact),
+          bookingUrgency: str(j.bookingUrgency) || 'Standard', dbsRequired: str(j.dbsRequired), reportingContact: str(j.reportingContact),
           reportingInstructions: str(j.reportingInstructions), siteInstructions: str(j.siteInstructions),
           notes: str(j.notes), responseNote: '',
         });
@@ -114,6 +114,7 @@ export default function BookStaffPage() {
       transportRequirements: form.transportRequirements || undefined,
       clientRequirements: form.clientRequirements || undefined,
       bookingUrgency: form.bookingUrgency || undefined,
+      dbsRequired: form.dbsRequired,
       reportingContact: form.reportingContact || undefined,
       reportingInstructions: form.reportingInstructions || undefined,
       siteInstructions: form.siteInstructions || undefined,
@@ -228,6 +229,15 @@ export default function BookStaffPage() {
               <select value={form.bookingUrgency} onChange={(e) => setForm({ ...form, bookingUrgency: e.target.value })} style={input}>
                 {['Standard', 'Urgent', 'Emergency'].map((u) => <option key={u} value={u}>{u}</option>)}
               </select>
+            </label>
+            <label><span style={label}>DBS check needed?</span>
+              <select value={form.dbsRequired} onChange={(e) => setForm({ ...form, dbsRequired: e.target.value })} style={input}>
+                <option value="">Not needed</option>
+                <option value="BASIC">Basic DBS</option>
+                <option value="STANDARD">Standard DBS</option>
+                <option value="ENHANCED">Enhanced DBS</option>
+              </select>
+              <span style={{ display: 'block', fontSize: 12, color: 'var(--text-muted, #64748B)', marginTop: 4 }}>Most warehouse, cleaning, hospitality and event roles don’t need one. Standard or Enhanced is only allowed for roles such as working with children or vulnerable adults.</span>
             </label>
             <label><span style={label}>Required skills / qualifications / licences</span><input value={form.requiredQualifications} onChange={(e) => setForm({ ...form, requiredQualifications: e.target.value })} placeholder="FLT counterbalance licence" style={input} /></label>
             <label><span style={label}>Experience required</span><input value={form.experienceRequirements} onChange={(e) => setForm({ ...form, experienceRequirements: e.target.value })} placeholder="6+ months warehouse experience" style={input} /></label>

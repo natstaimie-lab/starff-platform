@@ -55,6 +55,7 @@ type Job = {
   reportingContact?: string | null; reportingInstructions?: string | null;
   requiredQualifications?: string | null; experienceRequirements?: string | null;
   transportRequirements?: string | null; clientRequirements?: string | null; bookingUrgency?: string | null;
+  dbsRequired?: 'BASIC' | 'STANDARD' | 'ENHANCED' | null;
   breakInfo?: string | null; notes?: string | null;
   distributionMode?: string | null; submittedAt?: string | null; approvedAt?: string | null; reviewNote?: string | null;
   client: { id: string; name: string; city?: string | null; contacts: Contact[] };
@@ -182,7 +183,7 @@ export default function JobDetail() {
       startDate: toLocalInput(j.startDate), endDate: toLocalInput(j.endDate),
       shiftStartTime: j.shiftStartTime ?? '', shiftEndTime: j.shiftEndTime ?? '',
       breakInfo: j.breakInfo ?? '', requiredQualifications: j.requiredQualifications ?? '',
-      experienceRequirements: j.experienceRequirements ?? '', bookingUrgency: j.bookingUrgency ?? 'Standard',
+      experienceRequirements: j.experienceRequirements ?? '', bookingUrgency: j.bookingUrgency ?? 'Standard', dbsRequired: j.dbsRequired ?? '',
       ppe: j.ppe ?? '', uniform: j.uniform ?? '', transportRequirements: j.transportRequirements ?? '',
       clientRequirements: j.clientRequirements ?? '',
       reportingContact: j.reportingContact ?? '', reportingInstructions: j.reportingInstructions ?? '',
@@ -211,7 +212,7 @@ export default function JobDetail() {
           shiftEndTime: efRecurring ? ef.shiftEndTime : null,
           openEnded: efRecurring ? efOpenEnded : false,
           breakInfo: ef.breakInfo || undefined, requiredQualifications: ef.requiredQualifications || undefined,
-          experienceRequirements: ef.experienceRequirements || undefined, bookingUrgency: ef.bookingUrgency || undefined,
+          experienceRequirements: ef.experienceRequirements || undefined, bookingUrgency: ef.bookingUrgency || undefined, dbsRequired: ef.dbsRequired ?? '',
           ppe: ef.ppe || undefined, uniform: ef.uniform || undefined,
           transportRequirements: ef.transportRequirements || undefined, clientRequirements: ef.clientRequirements || undefined,
           reportingContact: ef.reportingContact || undefined,
@@ -424,6 +425,15 @@ export default function JobDetail() {
               </select>
             </Field>
           </div>
+          <Field label="DBS required">
+            <select value={ef.dbsRequired ?? ''} onChange={(e) => setEf({ ...ef, dbsRequired: e.target.value })} style={{ width: '100%', height: 38, padding: '0 10px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', fontSize: 14 }}>
+              <option value="">Not needed</option>
+              <option value="BASIC">Basic</option>
+              <option value="STANDARD">Standard</option>
+              <option value="ENHANCED">Enhanced</option>
+            </select>
+            <div className="sub2" style={{ marginTop: 4 }}>Standard/Enhanced are only allowed for eligible roles (e.g. work with children or vulnerable adults). Security staff need an SIA licence instead.</div>
+          </Field>
           <Field label="Required skills / quals / licences"><TextInput value={ef.requiredQualifications} onChange={(e) => setEf({ ...ef, requiredQualifications: e.target.value })} /></Field>
           <Field label="Experience required"><TextInput value={ef.experienceRequirements} onChange={(e) => setEf({ ...ef, experienceRequirements: e.target.value })} /></Field>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -504,6 +514,7 @@ export default function JobDetail() {
           </Card>
 
           <Card title="Requirements & instructions">
+            <Row k="DBS required" v={j.dbsRequired ? j.dbsRequired.charAt(0) + j.dbsRequired.slice(1).toLowerCase() : 'Not needed'} />
             <Row k="Required skills / quals / licences" v={j.requiredQualifications ?? '—'} />
             <Row k="Experience required" v={j.experienceRequirements ?? '—'} />
             <Row k="PPE" v={j.ppe ?? '—'} />

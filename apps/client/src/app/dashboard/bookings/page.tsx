@@ -116,6 +116,7 @@ export default function BookingsPage() {
                 <Row k="Reporting" v={detail.reportingContact ?? '—'} />
                 <Row k="On arrival" v={detail.reportingInstructions ?? '—'} />
                 <Row k="Site info" v={detail.siteInstructions ?? '—'} />
+                <Row k="DBS" v={detail.dbsRequired ? `${detail.dbsRequired.charAt(0)}${detail.dbsRequired.slice(1).toLowerCase()} DBS` : 'Not needed'} />
                 <Row k="Requirements" v={detail.requiredQualifications ?? '—'} />
                 <Row k="Notes" v={detail.notes ?? '—'} />
               </div>

@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsDateString, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 /** Amend an existing job's operational details. Every field is optional — only
  *  the ones provided are changed. Status changes go through the status/review
@@ -26,6 +26,8 @@ export class UpdateJobDto {
   @IsOptional() @IsString() transportRequirements?: string;
   @IsOptional() @IsString() clientRequirements?: string;
   @IsOptional() @IsString() bookingUrgency?: string;
+  // '' = not needed. Only some jobs (e.g. working with children/vulnerable adults) may lawfully ask for Standard/Enhanced.
+  @IsOptional() @IsIn(['', 'BASIC', 'STANDARD', 'ENHANCED']) dbsRequired?: string;
   @IsOptional() @IsString() breakInfo?: string;
   @IsOptional() @IsString() notes?: string;
 

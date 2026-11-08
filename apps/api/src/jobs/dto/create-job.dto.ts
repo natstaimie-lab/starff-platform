@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 import { JobStatus } from '@prisma/client';
 
 export class CreateJobDto {
@@ -45,6 +45,8 @@ export class CreateJobDto {
   @IsOptional() @IsString() transportRequirements?: string;
   @IsOptional() @IsString() clientRequirements?: string;
   @IsOptional() @IsString() bookingUrgency?: string;
+  // '' = not needed. Only some jobs (e.g. working with children/vulnerable adults) may lawfully ask for Standard/Enhanced.
+  @IsOptional() @IsIn(['', 'BASIC', 'STANDARD', 'ENHANCED']) dbsRequired?: string;
   @IsOptional() @IsString() breakInfo?: string;
   @IsOptional() @IsString() notes?: string;
 

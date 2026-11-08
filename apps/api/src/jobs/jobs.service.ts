@@ -32,10 +32,11 @@ export class JobsService {
   ) {}
 
   create(dto: CreateJobDto) {
-    const { startDate, endDate, ...rest } = dto;
+    const { startDate, endDate, dbsRequired, ...rest } = dto;
     return this.prisma.job.create({
       data: {
         ...rest,
+        dbsRequired: (dbsRequired || null) as any,
         startDate: startDate ? new Date(startDate) : undefined,
         endDate: endDate ? new Date(endDate) : undefined,
       },
@@ -74,8 +75,9 @@ export class JobsService {
   /** Amend an existing job's operational details (admin edit). */
   async update(id: string, dto: import('./dto/update-job.dto').UpdateJobDto, actorId?: string) {
     await this.requireJob(id);
-    const { startDate, endDate, siteId, ...rest } = dto;
+    const { startDate, endDate, siteId, dbsRequired, ...rest } = dto;
     const data: Record<string, unknown> = { ...rest };
+    if (dbsRequired !== undefined) data.dbsRequired = dbsRequired || null;
     if (startDate !== undefined) data.startDate = startDate ? new Date(startDate) : null;
     if (endDate !== undefined) data.endDate = endDate ? new Date(endDate) : null;
     if (siteId !== undefined) data.siteId = siteId || null;
