@@ -34,6 +34,7 @@ import { ProfileEditScreen } from '@/screens/candidate/ProfileEditScreen';
 import { PaymentScreen } from '@/screens/candidate/PaymentScreen';
 import { DocumentCaptureScreen } from '@/screens/candidate/DocumentCaptureScreen';
 import { DrivingLicenceScreen } from '@/screens/candidate/DrivingLicenceScreen';
+import { DbsScreen } from '@/screens/candidate/DbsScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -75,6 +76,7 @@ function ProfileStack() {
       <ProfileStackNav.Screen name="Payment" component={PaymentScreen} />
       <ProfileStackNav.Screen name="DocumentCapture" component={DocumentCaptureScreen} />
       <ProfileStackNav.Screen name="DrivingLicence" component={DrivingLicenceScreen} />
+      <ProfileStackNav.Screen name="Dbs" component={DbsScreen} />
     </ProfileStackNav.Navigator>
   );
 }

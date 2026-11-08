@@ -107,6 +107,15 @@ export class MeController {
     return this.me.setDrivingLicence(user.id, dto);
   }
 
+  // ── DBS details (optional) ──
+  @Put('dbs')
+  setDbs(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: { level?: string | null; issueDate?: string | null; certificateNumber?: string | null; updateService?: boolean | null },
+  ) {
+    return this.me.setDbs(user.id, dto);
+  }
+
   // ── Employment history ──
   @Get('employment')
   listEmployment(@CurrentUser() user: AuthUser) {

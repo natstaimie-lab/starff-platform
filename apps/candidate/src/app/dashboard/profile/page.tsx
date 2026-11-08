@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { Card, Avatar, ComplianceBadge } from '@/components/ui';
 import * as Ic from '@/components/icons';
+import { DbsCard, DbsFields } from '@/components/DbsCard';
 
 type Me = {
   id: string; firstName: string; lastName: string; status: string;
@@ -12,7 +13,7 @@ type Me = {
   addressLine1?: string | null; addressLine2?: string | null; city?: string | null; postcode?: string | null;
   emergencyName?: string | null; emergencyPhone?: string | null; emergencyRelationship?: string | null;
   bankAccountName?: string | null; bankSortCode?: string | null; bankAccountNumber?: string | null;
-};
+} & DbsFields;
 
 const SECTORS = [
   'Warehouse & Logistics', 'Driving & Delivery', 'Construction & Trades',
@@ -135,6 +136,8 @@ export default function ProfilePage() {
           <Input label="Account number" value={form.bankAccountNumber} onChange={(v) => set('bankAccountNumber', v)} placeholder="12345678" />
         </Grid>
       </Card>
+
+      <DbsCard me={me} />
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'sticky', bottom: 0, padding: '12px 0' }}>
         <button className="btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save details'}</button>

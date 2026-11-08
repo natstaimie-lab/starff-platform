@@ -166,6 +166,15 @@ export function DocumentsScreen() {
               <Icon name="chevron-right" size={18} color={colors.textFaint} />
             </Pressable>
 
+            <Pressable onPress={() => nav.navigate('Dbs')} style={styles.doc}>
+              <View style={styles.docIcon}><Icon name="shield-check" size={19} color={colors.orange} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.docTitle}>DBS check (optional)</Text>
+                <Muted>Add your DBS to unlock jobs that need one</Muted>
+              </View>
+              <Icon name="chevron-right" size={18} color={colors.textFaint} />
+            </Pressable>
+
             <Text style={styles.sectionLabel}>YOUR DOCUMENTS</Text>
             {docs.length === 0 ? (
               <EmptyState icon="file-text" title="No documents yet" subtitle="Upload your right-to-work, ID and certificates to get cleared to work." />

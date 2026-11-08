@@ -512,6 +512,49 @@ export class MeService {
     return { ok: true };
   }
 
+  /** Save the worker's own DBS details (optional — only some jobs need DBS).
+   * Any change clears admin verification, so admin must re-check. Sending
+   * level: null removes the details entirely. */
+  async setDbs(
+    userId: string,
+    dto: { level?: string | null; issueDate?: string | null; certificateNumber?: string | null; updateService?: boolean | null },
+  ) {
+    const candidate = await this.candidateFor(userId);
+    const clearVerification = { dbsVerifiedAt: null, dbsVerifiedById: null };
+    if (dto.level === null || dto.level === '') {
+      await this.prisma.candidate.update({
+        where: { id: candidate.id },
+        data: { dbsLevel: null, dbsIssueDate: null, dbsCertificateNumber: null, dbsUpdateService: null, dbsSuppliedAt: null, ...clearVerification },
+      });
+      return { ok: true };
+    }
+    const LEVELS = ['BASIC', 'STANDARD', 'ENHANCED'];
+    const level = String(dto.level ?? '').toUpperCase();
+    if (!LEVELS.includes(level)) throw new BadRequestException('Choose Basic, Standard or Enhanced');
+    let issueDate: Date | null = null;
+    if (dto.issueDate) {
+      issueDate = new Date(dto.issueDate);
+      if (isNaN(issueDate.getTime())) throw new BadRequestException('Issue date is not a valid date');
+      if (issueDate.getTime() > Date.now()) throw new BadRequestException('Issue date can’t be in the future');
+    }
+    const certificateNumber = (dto.certificateNumber ?? '').replace(/\D/g, '').slice(0, 12) || null;
+    if (certificateNumber && certificateNumber.length !== 12) {
+      throw new BadRequestException('A DBS certificate number is 12 digits');
+    }
+    await this.prisma.candidate.update({
+      where: { id: candidate.id },
+      data: {
+        dbsLevel: level as any,
+        dbsIssueDate: issueDate,
+        dbsCertificateNumber: certificateNumber,
+        dbsUpdateService: dto.updateService == null ? null : !!dto.updateService,
+        dbsSuppliedAt: new Date(),
+        ...clearVerification,
+      },
+    });
+    return { ok: true };
+  }
+
   // ── Employment history ──
   async listEmployment(userId: string) {
     const candidate = await this.candidateFor(userId);
