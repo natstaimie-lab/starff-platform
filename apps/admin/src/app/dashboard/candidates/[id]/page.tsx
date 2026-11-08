@@ -29,6 +29,8 @@ type Candidate = {
   agreementAccepted?: boolean; signatureName?: string | null; signedAt?: string | null;
   submittedAt?: string | null; registrationSource?: string | null; createdAt?: string | null; preferredSectors?: string[];
   drivingLicenceNumber?: string | null; dvlaCheckCode?: string | null; dvlaCheckCodeAt?: string | null;
+  dbsLevel?: 'BASIC' | 'STANDARD' | 'ENHANCED' | null; dbsIssueDate?: string | null; dbsCertificateNumber?: string | null;
+  dbsUpdateService?: boolean | null; dbsSuppliedAt?: string | null; dbsVerifiedAt?: string | null;
   userId?: string; loginEmail?: string | null; hasLogin?: boolean;
   documents: Doc[]; skills: { skill: { name: string } }[]; availability: { dayOfWeek: number }[];
   employmentHistory: Job[]; references: Ref[];
@@ -324,6 +326,35 @@ export default function CandidateProfile() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Link href="/dashboard/candidates" className="link" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>← Back to candidates</Link>
+
+      {c.dbsLevel && (
+        <Card
+          title="DBS check (optional)"
+          subtitle="Details entered by the worker. Check the original certificate or the DBS Update Service before verifying."
+          action={c.dbsVerifiedAt ? <Badge tone="success">Verified {fmt(c.dbsVerifiedAt)}</Badge> : <Badge tone="warning">Not checked yet</Badge>}
+        >
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center' }}>
+            <div><div className="sub2">Level</div><div style={{ fontWeight: 700 }}>{c.dbsLevel.charAt(0) + c.dbsLevel.slice(1).toLowerCase()}</div></div>
+            <div><div className="sub2">Issue date</div><div style={{ fontWeight: 600 }}>{c.dbsIssueDate ? fmt(c.dbsIssueDate) : '—'}</div></div>
+            {isAdmin && <div><div className="sub2">Certificate no.</div><div style={{ fontWeight: 700, fontFamily: 'var(--font-mono, monospace)' }}>{c.dbsCertificateNumber || '—'}</div></div>}
+            <div><div className="sub2">Update Service</div><div style={{ fontWeight: 600 }}>{c.dbsUpdateService ? 'Yes' : 'No'}</div></div>
+            {isAdmin && (
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                {c.dbsUpdateService && (
+                  <a href="https://www.gov.uk/dbs-update-service" target="_blank" rel="noopener noreferrer" className="link" style={{ fontSize: 13, alignSelf: 'center' }}>Update Service check →</a>
+                )}
+                <button
+                  onClick={async () => {
+                    try { await apiFetch(`/candidates/${id}/dbs/verify`, { method: 'PATCH', body: JSON.stringify({ verified: !c.dbsVerifiedAt }) }); load(); }
+                    catch (e: any) { alert(e.message); }
+                  }}
+                  style={{ border: 'none', background: c.dbsVerifiedAt ? 'var(--surface-sunken)' : 'var(--orange-500)', color: c.dbsVerifiedAt ? 'inherit' : '#fff', fontWeight: 700, fontSize: 13, padding: '8px 14px', borderRadius: 8, cursor: 'pointer' }}
+                >{c.dbsVerifiedAt ? 'Undo verification' : 'Mark as verified'}</button>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
 
       {isAdmin && (c.drivingLicenceNumber || c.dvlaCheckCode) && (
         <Card title="Driving licence (DVLA)" subtitle="Check entitlements & penalty points on gov.uk">

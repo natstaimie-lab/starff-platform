@@ -122,6 +122,10 @@ export const candidateApi = {
   setDrivingLicence: (input: { licenceNumber?: string; checkCode?: string }) =>
     apiFetch('/me/driving-licence', { method: 'PUT', body: input }),
 
+  /** PUT /me/dbs — save optional DBS details (level: null removes them). */
+  setDbs: (input: { level: string | null; issueDate?: string | null; certificateNumber?: string | null; updateService?: boolean }) =>
+    apiFetch('/me/dbs', { method: 'PUT', body: input }),
+
   /** PUT /me/declarations — GDPR consent, agreement, e-signature. */
   setDeclarations: (input: Record<string, unknown>) =>
     apiFetch('/me/declarations', { method: 'PUT', body: input }),

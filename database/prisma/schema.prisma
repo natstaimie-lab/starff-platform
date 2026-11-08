@@ -33,6 +33,12 @@ enum Role {
   CLIENT       // hiring companies
 }
 
+enum DbsLevel {
+  BASIC
+  STANDARD
+  ENHANCED
+}
+
 enum CandidateStatus {
   NEW          // just registered / applied
   SCREENING    // being vetted by a recruiter
@@ -248,6 +254,14 @@ model Candidate {
   drivingLicenceNumber   String?         // the driver's DVLA licence number
   dvlaCheckCode          String?         // driver-generated "share code" from gov.uk/view-driving-licence (21-day validity)
   dvlaCheckCodeAt        DateTime?       // when the driver last supplied a check code
+  // ── DBS (optional — only some jobs need it). Details only, admin verifies ──
+  dbsLevel               DbsLevel?
+  dbsIssueDate           DateTime?
+  dbsCertificateNumber   String?         // 12-digit certificate number (redacted for recruiters)
+  dbsUpdateService       Boolean?        // subscribed to the DBS Update Service
+  dbsSuppliedAt          DateTime?       // when the worker last entered/changed details
+  dbsVerifiedAt          DateTime?       // set by ADMIN after checking; cleared if details change
+  dbsVerifiedById        String?         // User.id of the admin who verified
   // ── declarations / consents / agreement / e-signature ──
   healthDeclaration      Boolean         @default(false)
   healthNotes            String?

@@ -239,7 +239,7 @@ export class CandidatesService {
    * can't reach the document files (only their type + status). Enforced here on
    * the server so the sensitive fields are simply never sent, not just hidden.
    */
-  private static readonly SENSITIVE = ['nationalInsurance', 'bankAccountName', 'bankSortCode', 'bankAccountNumber', 'healthNotes'] as const;
+  private static readonly SENSITIVE = ['nationalInsurance', 'bankAccountName', 'bankSortCode', 'bankAccountNumber', 'healthNotes', 'dbsCertificateNumber'] as const;
 
   private redactForRole<T extends Record<string, any>>(candidate: T, role?: string): T {
     // Only recruiters are restricted. Admins and the worker themselves see all.
@@ -250,6 +250,7 @@ export class CandidatesService {
     c.bankSortCode = null;
     c.bankAccountNumber = null;
     c.healthNotes = null;
+    c.dbsCertificateNumber = null;
     if (Array.isArray(c.documents)) {
       // Keep type/status/expiry/pre-check; strip the file so it can't be opened.
       c.documents = c.documents.map((d: any) => ({ ...d, fileUrl: null, fileName: null }));
@@ -315,6 +316,25 @@ export class CandidatesService {
     if (data.preferredSectors !== undefined) data.preferredSectors = cleanSectors(data.preferredSectors);
     const updated = await this.prisma.candidate.update({ where: { id }, data });
     return this.redactForRole(updated, actor.role);
+  }
+
+  /** ADMIN marks the worker's DBS details as checked (or un-checks them). */
+  async setDbsVerified(candidateId: string, verified: boolean, adminId: string) {
+    const c = await this.prisma.candidate.findUnique({ where: { id: candidateId }, select: { id: true, dbsLevel: true } });
+    if (!c) throw new NotFoundException('Candidate not found');
+    if (verified && !c.dbsLevel) throw new BadRequestException('This worker has no DBS details to verify');
+    await this.prisma.candidate.update({
+      where: { id: candidateId },
+      data: verified ? { dbsVerifiedAt: new Date(), dbsVerifiedById: adminId } : { dbsVerifiedAt: null, dbsVerifiedById: null },
+    });
+    await this.audit.log({
+      actorId: adminId,
+      action: verified ? 'candidate.dbs.verified' : 'candidate.dbs.unverified',
+      entity: 'Candidate',
+      entityId: candidateId,
+      meta: { level: c.dbsLevel },
+    });
+    return { ok: true };
   }
 
   /**

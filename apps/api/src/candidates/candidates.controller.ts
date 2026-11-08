@@ -106,6 +106,13 @@ export class CandidatesController {
     return this.candidates.sendEmail(id, user.id, dto);
   }
 
+  // Mark DBS details as checked — ADMIN only (compliance decision).
+  @Patch(':id/dbs/verify')
+  @Roles(Role.ADMIN)
+  setDbsVerified(@Param('id') id: string, @Body('verified') verified: boolean, @CurrentUser() user: AuthUser) {
+    return this.candidates.setDbsVerified(id, verified !== false, user.id);
+  }
+
   // Verify / reject a compliance document — ADMIN only (compliance decision).
   @Patch(':id/documents/:docId')
   @Roles(Role.ADMIN)

@@ -7,7 +7,7 @@ import { Card, ComplianceBadge, Badge } from '@/components/ui';
 import { complianceChecks } from '@/lib/compliance';
 
 type Doc = { type: string; status: string };
-type Me = { status?: string; documents: Doc[] };
+type Me = { status?: string; documents: Doc[]; dbsLevel?: string | null; dbsVerifiedAt?: string | null };
 type RelIncident = { id: string; typeLabel: string; reason: string; occurredAt: string; status: string; canAppeal: boolean; appealNote: string | null };
 type Rel = { level: 'LOW' | 'WATCH' | 'MEDIUM' | 'HIGH'; concernNote: string; stats: { completedShifts: number; completionRate: number | null }; incidents: RelIncident[] };
 
@@ -61,7 +61,11 @@ export default function CompliancePage() {
               <div>{c.label}</div>
               <div className="mut" style={{ fontSize: 12, fontWeight: 400 }}>{c.desc}</div>
             </div>
-            {c.status === 'missing' ? <Badge tone="info">Optional</Badge> : <ComplianceBadge status={c.status} />}
+            {c.type === 'DBS_CHECK' && me?.dbsLevel
+              ? (me.dbsVerifiedAt ? <Badge tone="success">Verified</Badge> : <Badge tone="warning">Waiting for check</Badge>)
+              : c.status === 'missing'
+              ? <Link href="/dashboard/profile" className="link" style={{ fontSize: 13 }}>Add details</Link>
+              : <ComplianceBadge status={c.status} />}
           </div>
         ))}
         {!cleared && pct < 100 && <p className="mut" style={{ fontSize: 13, marginTop: 14 }}>Upload the missing documents to become fully compliant and start receiving shift offers.</p>}
