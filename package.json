@@ -19,6 +19,7 @@
     "seed": "node --env-file=.env scripts/seed.mjs",
     "setup-storage": "node --env-file=.env scripts/setup-storage.mjs",
     "create-test-user": "node --env-file=.env scripts/create-test-user.mjs",
+    "demo:setup": "node --env-file=.env scripts/create-demo-setup.mjs",
     "test:e2e": "node --env-file=.env scripts/e2e/run.mjs"
   },
   "devDependencies": {
