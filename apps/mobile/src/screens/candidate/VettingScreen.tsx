@@ -42,7 +42,8 @@ const STEPS: VettingStep[] = [
     label: 'DBS check',
     icon: 'fingerprint',
     docType: 'DBS_CHECK',
-    items: [{ t: 'DBS certificate', s: 'Enhanced DBS where required' }],
+    optional: true,
+    items: [{ t: 'DBS certificate', s: 'Optional. Only needed if a job asks for it' }],
   },
   {
     key: 'cv',

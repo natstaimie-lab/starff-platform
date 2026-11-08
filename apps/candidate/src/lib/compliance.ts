@@ -15,8 +15,13 @@ export type CheckStatus = 'compliant' | 'pending' | 'expired' | 'missing';
 export const REQUIRED = [
   { type: 'RIGHT_TO_WORK', label: 'Right to Work', desc: 'Passport, visa or share code' },
   { type: 'ID', label: 'Proof of ID', desc: 'Photo ID' },
-  { type: 'DBS_CHECK', label: 'DBS Certificate', desc: 'Background check' },
   { type: 'CV', label: 'CV / Work History', desc: 'Your experience' },
+];
+
+// Not needed to register or to be cleared. Only some jobs ask for these, so they
+// never count towards the compliance %. Shown so workers know they unlock more jobs.
+export const OPTIONAL = [
+  { type: 'DBS_CHECK', label: 'DBS Certificate', desc: 'Optional. Only needed if a job asks for it' },
 ];
 
 const perDoc = (doc?: DocLike): CheckStatus =>
@@ -38,5 +43,9 @@ export function complianceChecks(status: string | undefined, documents: DocLike[
   const done = checks.filter((c) => c.status === 'compliant').length;
   const total = checks.length;
   const pct = Math.round((done / total) * 100);
-  return { checks, done, total, pct, cleared };
+  const optional = OPTIONAL.map((r) => {
+    const doc = documents.find((d) => d.type === r.type);
+    return { ...r, status: doc ? perDoc(doc) : ('missing' as CheckStatus) };
+  });
+  return { checks, optional, done, total, pct, cleared };
 }

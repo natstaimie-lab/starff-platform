@@ -27,7 +27,6 @@ import type { CandidateProfile, CandidateStatus, CandidateInvitation, Shift } fr
 const REQUIRED = [
   { type: 'RIGHT_TO_WORK', label: 'Right to work' },
   { type: 'ID', label: 'Identity verified' },
-  { type: 'DBS_CHECK', label: 'DBS check' },
   { type: 'CV', label: 'CV on file' },
 ] as const;
 
