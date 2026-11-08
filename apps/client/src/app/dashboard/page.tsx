@@ -6,6 +6,9 @@ import { apiFetch } from '@/lib/api';
 import { Badge, Avatar } from '@/components/ui';
 import * as Ic from '@/components/icons';
 
+// Referral programme isn't live yet — flip to true to show the refer banner again.
+const SHOW_REFER_BANNER = false;
+
 type Overview = { activeBookings: number; workersOnSiteToday: number; timesheetsPending: number; spendMtd: number };
 type Job = { id: string; title: string; status: string; site?: string; filled: number; total: number };
 type Sub = { id: string; status: string; adminSummary?: string | null; job: { title: string }; candidate: { firstName: string; reference: string; role: string; skills: string[]; rating?: number | null; complianceConfirmed: boolean; travelArea?: string | null } };
@@ -220,15 +223,18 @@ export default function ClientDashboard() {
       </div>
 
       {/* Banners */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: SHOW_REFER_BANNER ? 'repeat(2, minmax(0, 1fr))' : '1fr', gap: 16 }}>
         <div className="fx ac jb" style={{ background: 'var(--navy-900)', color: '#fff', borderRadius: 16, padding: '18px 22px', gap: 12, flexWrap: 'wrap' }}>
           <div className="fx ac" style={{ gap: 12 }}><span style={{ fontSize: 20 }}>⚡</span><div><div style={{ fontWeight: 800, fontSize: 14.5 }}>Need staff urgently?</div><div style={{ fontSize: 12.5, opacity: 0.8 }}>Get qualified, vetted workers fast.</div></div></div>
           <Link href="/dashboard/book" style={{ background: 'var(--blue-500)', color: '#fff', borderRadius: 10, padding: '9px 16px', fontWeight: 700, fontSize: 13, textDecoration: 'none', whiteSpace: 'nowrap' }}>Book Staff</Link>
         </div>
+        {/* Refer banner — hidden for now. Set SHOW_REFER_BANNER = true to bring it back. */}
+        {SHOW_REFER_BANNER && (
         <div className="fx ac jb" style={{ background: 'var(--surface-card)', border: '1px solid var(--border-subtle)', borderRadius: 16, padding: '18px 22px', gap: 12, flexWrap: 'wrap' }}>
           <div className="fx ac" style={{ gap: 12 }}><span style={{ fontSize: 20 }}>🎁</span><div><div style={{ fontWeight: 800, fontSize: 14.5 }}>Refer a business</div><div className="dim" style={{ fontSize: 12.5 }}>Recommend Starff and earn rewards.</div></div></div>
           <Link href="/dashboard/help" className="btn-outline" style={{ textDecoration: 'none', height: 36, whiteSpace: 'nowrap' }}>Refer &amp; Earn</Link>
         </div>
+        )}
       </div>
     </div>
   );

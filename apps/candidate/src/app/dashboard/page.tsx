@@ -6,6 +6,9 @@ import { apiFetch } from '@/lib/api';
 import { ComplianceBadge } from '@/components/ui';
 import { complianceChecks } from '@/lib/compliance';
 
+// Referral programme isn't live yet — flip to true to show the refer banner again.
+const SHOW_REFER_BANNER = false;
+
 type Doc = { type: string; status: string; expiryDate?: string | null };
 type Shift = { id: string; startAt: string; endAt: string; status: string; payRate: string; breakMinutes?: number; checkInAt?: string | null; job: { title: string; client: { name: string } }; site?: { name: string; city?: string } };
 type TS = { id: string; shiftId?: string; status: string; hoursWorked?: string; shift: { startAt: string; payRate?: string; job: { title: string; client: { name: string } } } };
@@ -320,7 +323,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Refer banner */}
+      {/* Refer banner — hidden for now. Set SHOW_REFER_BANNER = true to bring it back. */}
+      {SHOW_REFER_BANNER && (
       <div className="fx ac jb" style={{ background: 'var(--navy-900)', color: '#fff', borderRadius: 16, padding: '18px 24px', flexWrap: 'wrap', gap: 12 }}>
         <div className="fx ac" style={{ gap: 12 }}>
           <span style={{ fontSize: 22 }}>👥</span>
@@ -331,6 +335,7 @@ export default function Dashboard() {
         </div>
         <Link href="/dashboard/help" style={{ background: '#fff', color: 'var(--navy-900)', borderRadius: 10, padding: '9px 18px', fontWeight: 700, fontSize: 13.5, textDecoration: 'none', whiteSpace: 'nowrap' }}>Refer Now →</Link>
       </div>
+      )}
     </div>
   );
 }
