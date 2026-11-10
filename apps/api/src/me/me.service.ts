@@ -114,6 +114,7 @@ export class MeService {
   /** Worker checks out — completes the shift. */
   async checkOut(userId: string, shiftId: string) {
     const { candidate, shift } = await this.ownShift(userId, shiftId);
+    if (shift.status === ShiftStatus.CANCELLED) throw new BadRequestException('This shift was cancelled');
     await this.prisma.shift.update({
       where: { id: shiftId },
       data: { checkOutAt: new Date(), status: ShiftStatus.COMPLETED },
@@ -416,6 +417,15 @@ export class MeService {
     const candidate = await this.candidateFor(userId);
     const shift = await this.prisma.shift.findUnique({ where: { id: shiftId } });
     if (!shift || shift.candidateId !== candidate.id) throw new NotFoundException('Shift not found');
+    // Only a worked shift can be timesheeted.
+    if (shift.status !== ShiftStatus.COMPLETED && shift.status !== ShiftStatus.IN_PROGRESS && !shift.checkOutAt) {
+      throw new BadRequestException('You can submit a timesheet once the shift has been worked');
+    }
+    // Never reset a timesheet the client or Starff has already approved.
+    const existing = await this.prisma.timesheet.findUnique({ where: { shiftId }, select: { status: true } });
+    if (existing?.status === TimesheetStatus.APPROVED) {
+      throw new BadRequestException('This timesheet has already been approved');
+    }
     const hours = Math.max(0, (shift.endAt.getTime() - shift.startAt.getTime()) / 3600000 - shift.breakMinutes / 60);
     return this.prisma.timesheet.upsert({
       where: { shiftId },

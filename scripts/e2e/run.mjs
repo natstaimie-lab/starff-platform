@@ -17,6 +17,81 @@ async function flow(name, fn) {
   finally { await cleanup(created); }
 }
 
+// ── Full journey: client books → admin approves/invites → worker accepts → booked →
+//    worker acknowledges, checks in/out, submits timesheet → client approves.
+//    Uses only the real endpoints each role hits (no DB shortcuts for state changes).
+async function fullJourney(created) {
+  const admin = await makeUser(created, 'ADMIN', 'adm');
+  const clientUser = await makeUser(created, 'CLIENT', 'cli');
+  const candUser = await makeUser(created, 'CANDIDATE', 'cand');
+  const company = await p.client.create({ data: { name: `E2E Journey ${Date.now()}`, status: 'ACTIVE', registrationSource: 'MOBILE', billingEmail: clientUser.email } });
+  created.clientIds.push(company.id);
+  await p.clientContact.create({ data: { clientId: company.id, userId: clientUser.id, email: clientUser.email, firstName: 'E2E', lastName: 'Client', isPrimary: true } });
+  const cand = await p.candidate.create({ data: { userId: candUser.id, firstName: 'E2E', lastName: 'Journeyworker', status: 'COMPLIANT' } });
+  created.candidateIds.push(cand.id);
+
+  // 1. Client posts a one-off shift request (a past date, so it can be worked + timesheeted now)
+  const start = new Date(Date.now() - 10 * H); start.setMinutes(0, 0, 0);
+  const end = new Date(start.getTime() + 8 * H);
+  const post = await req('/client/jobs', clientUser.bearer, 'POST', { title: 'E2E Journey Warehouse Operative', payRate: 13.5, chargeRate: 19.5, openings: 1, startDate: start.toISOString(), endDate: end.toISOString(), sector: 'warehouse' });
+  const job = await post.json();
+  if (job?.id) created.jobIds.push(job.id);
+  check('1. client posts request → SUBMITTED', post.status === 201 && job.status === 'SUBMITTED');
+  const clientJobs = await req('/client/jobs', clientUser.bearer, 'GET').then((r) => r.json());
+  check('   client sees it in their jobs list', Array.isArray(clientJobs) && clientJobs.some((j) => j.id === job.id));
+
+  // 2. Admin approves
+  const appr = await req(`/jobs/${job.id}/approve`, admin.bearer, 'POST', {});
+  check('2. admin approves → RECRUITING', appr.status === 201 && (await p.job.findUnique({ where: { id: job.id }, select: { status: true } })).status === 'RECRUITING');
+
+  // 3. Admin invites the worker; worker sees + accepts the offer
+  const inv = await req(`/jobs/${job.id}/invite`, admin.bearer, 'POST', { candidateIds: [cand.id] });
+  check('3. admin invites worker', inv.status === 201);
+  const invites = await req('/me/invitations', candUser.bearer, 'GET').then((r) => r.json());
+  const invite = Array.isArray(invites) ? invites.find((i) => i.job?.title === 'E2E Journey Warehouse Operative' && i.status === 'INVITED') : null;
+  check('   worker sees the offer', !!invite);
+  const resp = await req(`/me/invitations/${invite?.id}/respond`, candUser.bearer, 'POST', { response: 'INTERESTED' });
+  check('4. worker accepts → INTERESTED', resp.status === 201);
+
+  // 5. Admin submits to client; client accepts the (redacted) worker
+  const sub = await req(`/jobs/${job.id}/submit-to-client`, admin.bearer, 'POST', { applicationIds: [invite?.id] });
+  check('5. admin submits worker to client', sub.status === 201);
+  const subs = await req('/client/submissions', clientUser.bearer, 'GET').then((r) => r.json());
+  const mine = Array.isArray(subs) ? subs.find((s) => s.id === invite?.id) : null;
+  check('   client sees worker, surname redacted', !!mine && !JSON.stringify(mine).includes(cand.lastName));
+  const dec = await req(`/client/submissions/${invite?.id}/decision`, clientUser.bearer, 'POST', { decision: 'ACCEPT' });
+  check('6. client accepts worker', dec.status === 201);
+
+  // 7. Admin confirms booking → shift created
+  const bookR = await req(`/applications/${invite?.id}/book`, admin.bearer);
+  const booked = await bookR.json();
+  check('7. admin books → 1 shift', bookR.status === 201 && booked.shiftCount === 1);
+  const shiftId = booked.shiftId;
+
+  // 8. Worker acknowledges, checks in, checks out
+  const ack = await req(`/me/shifts/${shiftId}/acknowledge`, candUser.bearer);
+  check('8. worker acknowledges → CONFIRMED', ack.status === 201 && (await p.shift.findUnique({ where: { id: shiftId }, select: { status: true } })).status === 'CONFIRMED');
+  const early = await req(`/me/timesheets/${shiftId}`, candUser.bearer);
+  check('   guard: timesheet blocked before shift is worked (4xx)', early.status >= 400 && early.status < 500);
+  await p.timesheet.deleteMany({ where: { shiftId } }); // undo if the guard is missing, so the rest of the run is clean
+  const ci = await req(`/me/shifts/${shiftId}/check-in`, candUser.bearer);
+  const co = await req(`/me/shifts/${shiftId}/check-out`, candUser.bearer);
+  check('9. check-in → check-out → COMPLETED', ci.status === 201 && co.status === 201 && (await p.shift.findUnique({ where: { id: shiftId }, select: { status: true } })).status === 'COMPLETED');
+
+  // 10. Worker submits timesheet; client approves
+  const ts = await req(`/me/timesheets/${shiftId}`, candUser.bearer);
+  const tsRow = await p.timesheet.findUnique({ where: { shiftId }, select: { id: true, status: true, hoursWorked: true } });
+  check('10. worker submits timesheet → SUBMITTED', ts.status === 201 && tsRow?.status === 'SUBMITTED' && Number(tsRow.hoursWorked) > 0);
+  const pending = await req('/client/timesheets', clientUser.bearer, 'GET').then((r) => r.json());
+  check('    client sees it to approve', Array.isArray(pending) && pending.some((t) => t.id === tsRow?.id));
+  const ap = await req(`/client/timesheets/${tsRow?.id}/approve`, clientUser.bearer, 'PATCH');
+  check('11. client approves → APPROVED', ap.status === 200 && (await p.timesheet.findUnique({ where: { id: tsRow.id }, select: { status: true } })).status === 'APPROVED');
+
+  // Integrity guard: an approved timesheet must not be reset by the worker re-submitting
+  await req(`/me/timesheets/${shiftId}`, candUser.bearer);
+  check('    guard: approved timesheet stays APPROVED after worker re-submit', (await p.timesheet.findUnique({ where: { id: tsRow.id }, select: { status: true } })).status === 'APPROVED');
+}
+
 // ── Booking: one-off, fixed-range recurring, open-ended recurring + extend ──
 async function booking(created) {
   const admin = await makeUser(created, 'ADMIN', 'adm');
@@ -228,6 +303,7 @@ async function enquiry(created) {
 
 // ── Run everything ──
 try {
+  await flow('Full journey: client books → worker accepts → timesheet approved', fullJourney);
   await flow('Booking (one-off / fixed / open-ended)', booking);
   await flow('Replacement loop', replacement);
   await flow('Client submissions decision', submissions);
