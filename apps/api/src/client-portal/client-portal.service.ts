@@ -385,6 +385,9 @@ export class ClientPortalService {
     });
     if (!ts) throw new NotFoundException('Timesheet not found');
     if (ts.shift.job.clientId !== client.id) throw new ForbiddenException('Not your timesheet');
+    if (ts.status !== TimesheetStatus.SUBMITTED) {
+      throw new BadRequestException('Only submitted timesheets can be approved');
+    }
     return this.prisma.timesheet.update({ where: { id: timesheetId }, data: { status: TimesheetStatus.APPROVED, approvedAt: new Date() } });
   }
 
