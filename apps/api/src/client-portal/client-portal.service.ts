@@ -354,6 +354,7 @@ export class ClientPortalService {
         body: `${who} is contesting invoice ${invoice.number} (£${Number(invoice.total).toFixed(2)}): ${reason}`,
         userId: s.id,
         actionUrl: '/dashboard/timesheets',
+        portal: 'admin',
       })),
     );
     return { ok: true };

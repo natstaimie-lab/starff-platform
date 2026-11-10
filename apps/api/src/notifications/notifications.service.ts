@@ -52,10 +52,28 @@ interface NotifyInput {
   body: string;
   actionUrl?: string;
   actionLabel?: string;
+  /**
+   * Which site a relative actionUrl (e.g. "/dashboard/candidates/123") lives on.
+   * Email buttons need a full URL — a bare path renders as "http:///dashboard/…"
+   * in mail apps — so it's prefixed with this portal's base in the email only.
+   * The in-app/push link stays relative for the portal's own router.
+   */
+  portal?: 'admin' | 'candidate' | 'client';
   /** if we know the platform user, also drop an in-app notification */
   userId?: string;
   /** set false to send in-app + push only, skipping the email (default true) */
   email?: boolean;
+}
+
+/** Public base URL of each portal, with no trailing slash. */
+function portalBaseUrl(portal: 'admin' | 'candidate' | 'client'): string {
+  const raw =
+    portal === 'admin'
+      ? process.env.ADMIN_PORTAL_URL || 'https://admin.starff.co.uk'
+      : portal === 'client'
+        ? process.env.CLIENT_PORTAL_URL || 'http://localhost:3003'
+        : process.env.CANDIDATE_PORTAL_URL || 'http://localhost:3002';
+  return raw.replace(/\/$/, '');
 }
 
 // The all-white logo, served publicly by the admin portal, for the orange email header.
@@ -172,7 +190,7 @@ export class NotificationsService {
       const body = `${name} just signed up as ${who}${where ? ` from ${where}` : ''}.${wants}${checks}`;
       await Promise.all(
         staff.map((s) =>
-          this.send({ to: s.email, userId: s.id, kind: 'NEW_SIGNUP', subject, body, actionUrl: input.link })
+          this.send({ to: s.email, userId: s.id, kind: 'NEW_SIGNUP', subject, body, actionUrl: input.link, actionLabel: 'View in admin', portal: 'admin' })
             .catch(() => {}),
         ),
       );
@@ -267,9 +285,17 @@ export class NotificationsService {
     }
   }
 
+  /** The email button's href — relative paths are made absolute for the right portal. */
+  private emailHref(input: NotifyInput): string | undefined {
+    const url = input.actionUrl;
+    if (!url || /^https?:\/\//i.test(url) || !url.startsWith('/')) return url;
+    return `${portalBaseUrl(input.portal ?? 'admin')}${url}`;
+  }
+
   private render(input: NotifyInput): string {
-    const button = input.actionUrl
-      ? `<p style="margin:24px 0"><a href="${input.actionUrl}" style="background:#F47A20;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:600;display:inline-block">${input.actionLabel ?? 'Continue'}</a></p>`
+    const href = this.emailHref(input);
+    const button = href
+      ? `<p style="margin:24px 0"><a href="${href}" style="background:#F47A20;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:600;display:inline-block">${input.actionLabel ?? 'Continue'}</a></p>`
       : '';
     // Tables and inline styles, as email clients ignore most modern CSS. The alt
     // text stands in for the logo when a mail app blocks images.

@@ -238,6 +238,7 @@ export class InvoicesService {
             : `Your invoice ${inv.number} for ${gbp(Number(updated.total))} is now available. Payment is due by ${due}.`,
           actionUrl: '/dashboard/invoices',
           actionLabel: 'View invoice',
+          portal: 'client',
         }),
       ),
     );
