@@ -932,3 +932,25 @@ model ReliabilityIncident {
   @@index([candidateId])
   @@index([status])
 }
+
+// ══════════════════════════════════════════════
+// QUOTES — rate settings for the quote calculator (CRM Phase 1)
+// Singleton row (id "default"), edited by admins. Percentages are stored as
+// plain numbers (12.07 = 12.07%). Money follows the Decimal(10,2) convention.
+// ══════════════════════════════════════════════
+
+model RateSettings {
+  id                   String   @id @default("default")
+  holidayPct           Float    @default(12.07)  // holiday pay accrual, on top of pay
+  employerNiPct        Float    @default(15)     // employer National Insurance
+  niThresholdWeekly    Decimal  @default(96)  @db.Decimal(10, 2) // NI secondary threshold, £/week
+  pensionPct           Float    @default(3)      // employer auto-enrolment contribution
+  pensionLowerWeekly   Decimal  @default(120) @db.Decimal(10, 2) // qualifying earnings lower limit, £/week
+  bufferPct            Float    @default(1)      // sick pay / insurance buffer
+  defaultMarginPerHour Decimal  @default(1.75) @db.Decimal(10, 2) // Starff margin, £/hour
+  minimumWage          Decimal  @default(12.71) @db.Decimal(10, 2) // National Living Wage 21+, £/hour
+  londonLivingWage     Decimal  @default(15.45) @db.Decimal(10, 2) // voluntary London Living Wage, £/hour
+
+  updatedById          String?  @db.Uuid
+  updatedAt            DateTime @updatedAt
+}
