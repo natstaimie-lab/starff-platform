@@ -94,7 +94,9 @@ JWTs (ES256/JWKS) and resolved against the `User` row by the API guard.
 
 ## Deployment
 
-API deploys to Railway via `nixpacks.toml` (builds **only** `apps/api`). The
+API deploys to Railway via the root `Dockerfile` (selected by `railway.toml`;
+builds **only** `apps/api` on the official Node 22 image — NestJS 12 needs
+Node >= 22.12, which Nixpacks cannot provide, so `nixpacks.toml` is unused). The
 three portals deploy to Vercel (`starff-platform-{admin,candidate,client}.vercel.app`);
 those origins plus `starff.co.uk` are allow-listed in the API's CORS config in
 `apps/api/src/main.ts` — a new deployed origin must be added there or via
