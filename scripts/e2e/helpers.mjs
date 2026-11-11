@@ -5,6 +5,7 @@
 // and clean up everything they create. Run the API first, then:
 //   node --env-file=.env scripts/e2e/run.mjs
 import { PrismaClient } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 
 export const p = new PrismaClient();
 export const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -40,6 +41,16 @@ export async function makeUser(created, role, tag) {
   }).then((r) => r.json());
   if (!tok.access_token) throw new Error(`no token for ${tag}`);
   return { id: cr.id, email, bearer: tok.access_token };
+}
+
+/** A temp, compliance-cleared worker (DB rows only, no login). Cleaned up by cleanup(). */
+export async function makeWorker(created, tag, data = {}) {
+  const id = randomUUID();
+  await p.user.create({ data: { id, email: `e2e-wkr-${tag}-${Date.now()}-${Math.floor(Math.random() * 1e4)}@starff.test`, role: 'CANDIDATE', isActive: true, firstName: 'E2E', lastName: tag } });
+  created.userIds.push(id);
+  const c = await p.candidate.create({ data: { userId: id, firstName: 'E2E', lastName: `Wkr${tag}`, status: 'COMPLIANT', rightToWorkType: 'British Citizen', ...data } });
+  created.candidateIds.push(c.id);
+  return c;
 }
 
 /** Authenticated request to the API. */
