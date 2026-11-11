@@ -1,7 +1,7 @@
 # Railway (Nixpacks) build config for the Starff API.
 # The repo is an npm-workspaces monorepo; this builds ONLY apps/api.
 [phases.setup]
-nixPkgs = ["nodejs_20", "openssl"]
+nixPkgs = ["nodejs_22", "openssl"]
 
 [phases.install]
 cmds = ["npm install"]
