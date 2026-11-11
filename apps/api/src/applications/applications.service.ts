@@ -4,6 +4,24 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AuditService } from '../audit/audit.service';
 
+/** Why a candidate can't legally be placed yet (empty = OK to book). */
+export function bookingBlockers(c: {
+  status: string;
+  archivedAt: Date | null;
+  rightToWorkType: string | null;
+  documents: { type: string; status: string; expiryDate: Date | null }[];
+}): string[] {
+  const out: string[] = [];
+  const now = new Date();
+  if (c.archivedAt) out.push('archived');
+  if (c.status !== 'COMPLIANT' && c.status !== 'ACTIVE') out.push(`not compliance-cleared (${c.status.toLowerCase()})`);
+  const rtw = c.documents.filter((d) => d.type === 'RIGHT_TO_WORK');
+  const rtwVerified = rtw.some((d) => d.status === 'VERIFIED' && !(d.expiryDate && d.expiryDate < now));
+  if (!rtwVerified && !c.rightToWorkType) out.push('no right-to-work evidence');
+  if (rtw.some((d) => d.status === 'EXPIRED' || (d.expiryDate && d.expiryDate < now))) out.push('right-to-work document expired');
+  return out;
+}
+
 /** Statuses from which an admin may confirm a booking. */
 const BOOKABLE: ApplicationStatus[] = ['CLIENT_ACCEPTED', 'SUBMITTED_TO_CLIENT', 'INTERESTED'];
 
@@ -25,10 +43,21 @@ export class ApplicationsService {
       where: { id: applicationId },
       include: {
         job: { include: { site: true } },
-        candidate: { include: { user: { select: { id: true, email: true } } } },
+        candidate: {
+          include: {
+            user: { select: { id: true, email: true } },
+            documents: { select: { type: true, status: true, expiryDate: true } },
+          },
+        },
       },
     });
     if (!app) throw new NotFoundException('Application not found');
+    // Compliance gate: only cleared workers with right-to-work evidence can be
+    // booked (same rules matching uses to exclude candidates).
+    const blockers = bookingBlockers(app.candidate);
+    if (blockers.length) {
+      throw new BadRequestException(`This worker can't be booked yet: ${blockers.join('; ')}`);
+    }
     if (app.shiftId) throw new BadRequestException('This candidate is already booked for this job');
     if (!BOOKABLE.includes(app.status)) {
       throw new BadRequestException('Only interested / client-accepted candidates can be booked');

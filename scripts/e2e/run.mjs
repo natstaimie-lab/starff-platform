@@ -5,7 +5,7 @@
 // SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY, WORDPRESS_WEBHOOK_SECRET.
 //
 //   npm run test:e2e            (or: node --env-file=.env scripts/e2e/run.mjs)
-import { p, req, webhook, makeUser, track, cleanup, log, check, allPassed, API } from './helpers.mjs';
+import { p, req, webhook, makeUser, makeWorker, track, cleanup, log, check, allPassed, API } from './helpers.mjs';
 
 const H = 3600e3;
 const results = [];
@@ -27,7 +27,7 @@ async function fullJourney(created) {
   const company = await p.client.create({ data: { name: `E2E Journey ${Date.now()}`, status: 'ACTIVE', registrationSource: 'MOBILE', billingEmail: clientUser.email } });
   created.clientIds.push(company.id);
   await p.clientContact.create({ data: { clientId: company.id, userId: clientUser.id, email: clientUser.email, firstName: 'E2E', lastName: 'Client', isPrimary: true } });
-  const cand = await p.candidate.create({ data: { userId: candUser.id, firstName: 'E2E', lastName: 'Journeyworker', status: 'COMPLIANT' } });
+  const cand = await p.candidate.create({ data: { userId: candUser.id, firstName: 'E2E', lastName: 'Journeyworker', status: 'COMPLIANT', rightToWorkType: 'British Citizen' } });
   created.candidateIds.push(cand.id);
 
   // 1. Client posts a one-off shift request (a past date, so it can be worked + timesheeted now)
@@ -97,7 +97,7 @@ async function booking(created) {
   const admin = await makeUser(created, 'ADMIN', 'adm');
   const client = await p.client.create({ data: { name: `E2E ${Date.now()}`, status: 'LEAD', registrationSource: 'MOBILE' } });
   created.clientIds.push(client.id);
-  const [c1] = await p.candidate.findMany({ take: 1, select: { id: true } });
+  const c1 = await makeWorker(created, 'bk');
 
   const mkJob = (data) => p.job.create({ data: { clientId: client.id, title: 'E2E Booking', payRate: 13.5, chargeRate: 19.5, openings: 1, status: 'RECRUITING', ...data } });
   const bookApp = async (jobId) => {
@@ -111,6 +111,17 @@ async function booking(created) {
   created.jobIds.push(oneJob.id);
   const one = await bookApp(oneJob.id);
   check('one-off → 1 shift', one.r.status === 201 && one.body.shiftCount === 1);
+
+  // compliance gate: uncleared worker / no right-to-work evidence can't be booked
+  const gateJob = await mkJob({ startDate: new Date('2027-09-07T08:00:00'), endDate: new Date('2027-09-07T16:00:00') });
+  created.jobIds.push(gateJob.id);
+  const newbie = await makeWorker(created, 'new', { status: 'NEW' });
+  const noRtw = await makeWorker(created, 'nortw', { rightToWorkType: null });
+  for (const [label, w] of [['NEW status', newbie], ['no right-to-work', noRtw]]) {
+    const a = await p.application.create({ data: { jobId: gateJob.id, candidateId: w.id, status: 'CLIENT_ACCEPTED' } });
+    const r = await req(`/applications/${a.id}/book`, admin.bearer);
+    check(`gate: ${label} → booking refused (400)`, r.status === 400);
+  }
 
   // fixed-range recurring (Mon/Wed/Fri over 2 weeks = 6)
   const fixJob = await mkJob({ recurrenceDays: [1, 3, 5], shiftStartTime: '08:00', shiftEndTime: '16:00', startDate: new Date('2027-03-01T00:00:00'), endDate: new Date('2027-03-14T23:59:00') });
@@ -134,7 +145,7 @@ async function replacement(created) {
   const admin = await makeUser(created, 'ADMIN', 'adm');
   const client = await p.client.create({ data: { name: `E2E ${Date.now()}`, status: 'LEAD', registrationSource: 'MOBILE' } });
   created.clientIds.push(client.id);
-  const [c1, c2] = await p.candidate.findMany({ take: 2, select: { id: true } });
+  const c1 = await makeWorker(created, 'r1'); const c2 = await makeWorker(created, 'r2');
   const job = await p.job.create({ data: { clientId: client.id, title: 'E2E Replace', payRate: 13.5, chargeRate: 19.5, openings: 1, status: 'RECRUITING', startDate: new Date('2027-11-01T08:00:00'), endDate: new Date('2027-11-01T16:00:00') } });
   created.jobIds.push(job.id);
   const a1 = await p.application.create({ data: { jobId: job.id, candidateId: c1.id, status: 'CLIENT_ACCEPTED' } });
@@ -162,7 +173,7 @@ async function submissions(created) {
   await p.clientContact.create({ data: { clientId: company.id, userId: clientUser.id, email: clientUser.email, firstName: 'E2E', lastName: 'Client', isPrimary: true } });
   const job = await p.job.create({ data: { clientId: company.id, title: 'E2E Subs', payRate: 13.5, chargeRate: 19.5, openings: 2, status: 'RECRUITING', startDate: new Date('2027-12-06T08:00:00'), endDate: new Date('2027-12-06T16:00:00') } });
   created.jobIds.push(job.id);
-  const [c1, c2] = await p.candidate.findMany({ take: 2, select: { id: true, lastName: true } });
+  const c1 = await makeWorker(created, 's1'); const c2 = await makeWorker(created, 's2');
   const app1 = await p.application.create({ data: { jobId: job.id, candidateId: c1.id, status: 'INTERESTED' } });
   const app2 = await p.application.create({ data: { jobId: job.id, candidateId: c2.id, status: 'INTERESTED' } });
 
