@@ -16,7 +16,7 @@ services:
     envVars:
       # ── Non-secret config (safe to keep here) ──
       - key: NODE_VERSION
-        value: "20"
+        value: "22"
       - key: NODE_ENV
         value: production
       - key: MAIL_FROM
