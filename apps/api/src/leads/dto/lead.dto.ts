@@ -76,6 +76,10 @@ export class ConvertLeadDto {
   @IsOptional() @IsString() @MaxLength(100) contactLastName?: string;
   @IsOptional() @IsEmail() contactEmail?: string;
   @IsOptional() @IsString() @MaxLength(50) contactPhone?: string;
+  /** Use this existing client instead of creating one (e.g. after the duplicate check). */
+  @IsOptional() @IsString() clientId?: string;
+  /** Create a new client even though the duplicate check found possible matches. */
+  @IsOptional() @IsBoolean() createNew?: boolean;
   /** Email the portal invite now (default true). */
   @IsOptional() @IsBoolean() sendInvite?: boolean;
   @IsOptional() @IsBoolean() byAi?: boolean;

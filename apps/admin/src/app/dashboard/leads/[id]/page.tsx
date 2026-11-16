@@ -15,7 +15,17 @@ const LOG_TYPES = ['CALL', 'EMAIL', 'NOTE', 'MEETING'] as const;
 type LogForm = { type: (typeof LOG_TYPES)[number]; direction: 'outbound' | 'inbound'; subject: string; body: string; outcome: string; nextActionAt: string };
 const EMPTY_LOG: LogForm = { type: 'CALL', direction: 'outbound', subject: '', body: '', outcome: '', nextActionAt: '' };
 
-type ConvertForm = { quoteId: string; firstName: string; lastName: string; email: string; phone: string; sendInvite: boolean; error: string };
+type ClientMatch = {
+  clientId: string; reasons: ('email' | 'company')[]; name: string; status: string; city: string | null; postcode: string | null;
+  archived: boolean; primaryContact: string | null; contacts: number;
+};
+type ConvertForm = {
+  quoteId: string; firstName: string; lastName: string; email: string; phone: string; sendInvite: boolean; error: string;
+  /** Possible existing clients from the duplicate check; null while checking. */
+  matches: ClientMatch[] | null; checkedEmail: string;
+  /** '' = not chosen yet, 'new' = create a new client anyway, otherwise the existing client's id. */
+  choice: string;
+};
 type ConvertResult = { clientId: string; clientCreated: boolean; invited: boolean; quoteNumber: string | null; ratesCopied: number };
 
 type EditForm = { companyName: string; contactName: string; contactEmail: string; contactPhone: string; contactRole: string; sector: string; city: string; postcode: string; estimatedValue: string; nextActionAt: string; notes: string };
@@ -96,12 +106,26 @@ export default function LeadDetailPage() {
     if (!lead) return;
     const [first, ...rest] = (lead.contactName ?? '').trim().split(/\s+/);
     const accepted = lead.quotes.filter((q) => q.status === 'ACCEPTED');
-    setConv({ quoteId: accepted[0]?.id ?? '', firstName: first ?? '', lastName: rest.join(' '), email: lead.contactEmail ?? '', phone: lead.contactPhone ?? '', sendInvite: true, error: '' });
+    const email = lead.contactEmail ?? '';
+    setConv({ quoteId: accepted[0]?.id ?? '', firstName: first ?? '', lastName: rest.join(' '), email, phone: lead.contactPhone ?? '', sendInvite: true, error: '', matches: lead.client ? [] : null, checkedEmail: email, choice: '' });
+    if (!lead.client) checkDuplicates(email);
+  }
+
+  /** Duplicate check: existing clients with this login email or the same company name. */
+  async function checkDuplicates(email: string) {
+    try {
+      const r = await apiFetch<{ matches: ClientMatch[] }>(`/leads/${id}/convert-check${email.trim() ? `?email=${encodeURIComponent(email.trim())}` : ''}`);
+      setConv((c) => c && { ...c, matches: r.matches, checkedEmail: email, choice: r.matches.some((m) => m.clientId === c.choice) ? c.choice : '' });
+    } catch {
+      setConv((c) => c && { ...c, matches: [], checkedEmail: email });
+    }
   }
 
   async function doConvert() {
     if (!conv) return;
     if (!conv.firstName.trim() || !conv.lastName.trim() || !conv.email.trim()) { setConv({ ...conv, error: 'Add the contact\'s first name, last name and email. They get the portal login.' }); return; }
+    if (conv.matches === null) return;
+    if (conv.matches.length && !conv.choice) { setConv({ ...conv, error: 'Choose the existing client, or confirm this is a new client.' }); return; }
     setConvBusy(true);
     try {
       const body: Record<string, unknown> = {
@@ -109,10 +133,19 @@ export default function LeadDetailPage() {
       };
       if (conv.phone.trim()) body.contactPhone = conv.phone.trim();
       if (conv.quoteId) body.quoteId = conv.quoteId;
+      if (conv.choice === 'new') body.createNew = true;
+      else if (conv.choice) body.clientId = conv.choice;
       const r = await apiFetch<ConvertResult>(`/leads/${id}/convert`, { method: 'POST', body: JSON.stringify(body) });
       setConv(null); setConverted(r);
       await load();
-    } catch (e) { setConv({ ...conv, error: apiError(e, 'Could not convert') }); } finally { setConvBusy(false); }
+    } catch (e) {
+      // The duplicate check can find a match that appeared since the box opened.
+      const raw = String((e as Error)?.message ?? '');
+      const json = raw.match(/\{.*\}$/s);
+      let matches: ClientMatch[] | undefined;
+      if (json) { try { matches = JSON.parse(json[0]).matches; } catch { /* not JSON */ } }
+      setConv({ ...conv, ...(matches ? { matches, choice: '' } : {}), error: apiError(e, 'Could not convert') });
+    } finally { setConvBusy(false); }
   }
 
   async function toggleArchive() {
@@ -141,10 +174,29 @@ export default function LeadDetailPage() {
         const setC = (k: keyof ConvertForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setConv({ ...conv, [k]: e.target.value, error: '' });
         return (
           <Modal title={`Convert ${lead.companyName} to a client`} width={560} onClose={() => !convBusy && setConv(null)}
-            subtitle={lead.client ? `Uses the existing client record: ${lead.client.name}` : 'Creates a new client record'}
-            footer={<><Button variant="outline" disabled={convBusy} onClick={() => setConv(null)}>Cancel</Button><Button disabled={convBusy} onClick={doConvert}>{convBusy ? 'Converting…' : 'Convert to client'}</Button></>}>
+            subtitle={lead.client ? `Uses the existing client record: ${lead.client.name}` : conv.matches === null ? 'Checking for an existing client…' : conv.matches.length ? 'Possible existing client found. Choose below' : 'No existing client found. Creates a new client record'}
+            footer={<><Button variant="outline" disabled={convBusy} onClick={() => setConv(null)}>Cancel</Button><Button disabled={convBusy || conv.matches === null || (conv.matches.length > 0 && !conv.choice)} onClick={doConvert}>{convBusy ? 'Converting…' : conv.choice && conv.choice !== 'new' ? 'Convert to this client' : 'Convert to client'}</Button></>}>
+            {!!conv.matches?.length && (
+              <fieldset className="cv-dupes">
+                <legend>Is this one of your existing clients?</legend>
+                {conv.matches.map((m) => (
+                  <label key={m.clientId} className={`cv-dupe ${conv.choice === m.clientId ? 'is-on' : ''}`}>
+                    <input type="radio" name="cv-choice" checked={conv.choice === m.clientId} onChange={() => setConv({ ...conv, choice: m.clientId, error: '' })} />
+                    <span>
+                      <b>{m.name}</b> <span className="dim">· {m.status.toLowerCase()}{m.archived ? ' · archived' : ''}{m.city ? ` · ${m.city}` : ''}</span>
+                      <span className="cv-why">{m.reasons.includes('email') ? `${conv.checkedEmail} is already on this client` : 'Same company name'}{m.reasons.length > 1 ? ' and same name' : ''}{m.primaryContact ? ` · contact ${m.primaryContact}` : ''}</span>
+                    </span>
+                    <Link href={`/dashboard/clients/${m.clientId}`} className="link" target="_blank" style={{ fontSize: 12.5, whiteSpace: 'nowrap' }}>View</Link>
+                  </label>
+                ))}
+                <label className={`cv-dupe ${conv.choice === 'new' ? 'is-on' : ''}`}>
+                  <input type="radio" name="cv-choice" checked={conv.choice === 'new'} onChange={() => setConv({ ...conv, choice: 'new', error: '' })} />
+                  <span><b>No, it&apos;s a new client</b><span className="cv-why">Creates a separate client record for {lead.companyName}</span></span>
+                </label>
+              </fieldset>
+            )}
             <ol className="cv-steps">
-              <li>{lead.client ? 'Links the lead to the existing client.' : 'Creates the client (status Prospect until you approve their onboarding).'}</li>
+              <li>{lead.client || (conv.choice && conv.choice !== 'new') ? 'Links the lead to the existing client.' : 'Creates the client (status Prospect until you approve their onboarding).'}</li>
               <li>Sets up a client-portal login for the contact below{conv.sendInvite ? ' and emails them the activation link' : ''}.</li>
               <li>{conv.quoteId ? 'Copies the accepted quote\'s rates as their agreed rates.' : 'No agreed rates copied (no accepted quote chosen).'}</li>
               <li>Marks the lead Won.</li>
@@ -161,7 +213,7 @@ export default function LeadDetailPage() {
             <div className="lead-grid2">
               <Field label="Contact first name"><TextInput value={conv.firstName} onChange={setC('firstName')} maxLength={100} /></Field>
               <Field label="Contact last name"><TextInput value={conv.lastName} onChange={setC('lastName')} maxLength={100} /></Field>
-              <Field label="Login email"><TextInput type="email" value={conv.email} onChange={setC('email')} /></Field>
+              <Field label="Login email"><TextInput type="email" value={conv.email} onChange={setC('email')} onBlur={() => { if (!lead.client && conv.email.trim() !== conv.checkedEmail.trim()) checkDuplicates(conv.email); }} /></Field>
               <Field label="Phone (optional)"><TextInput value={conv.phone} onChange={setC('phone')} maxLength={50} /></Field>
             </div>
             <label className="cv-check">

@@ -5,6 +5,7 @@ import { AuditService } from '../audit/audit.service';
 import { RegistrationService } from '../registration/registration.service';
 import type { ChangeStageDto, ConvertLeadDto, CreateLeadDto, LogActivityDto, UpdateLeadDto } from './dto/lead.dto';
 import { clientStatusForStage, followUpBucket, londonDay, stageChangeError, stageForClientStatus } from './lead-stages';
+import { findClientMatches, type MatchReason } from './client-match';
 
 const listSelect = {
   client: { select: { id: true, name: true, status: true } },
@@ -359,6 +360,27 @@ export class LeadsService {
       if (!quote) throw new BadRequestException('That quote isn\'t an accepted quote for this lead. Mark it Accepted in Saved Quotes first.');
     }
 
+    // Which client this becomes: the one chosen in the convert box, the one the
+    // lead is already linked to, or a new one — but only after the duplicate
+    // check, so a won deal never creates a second copy of an existing client.
+    let target: { id: string; status: ClientStatus } | null = lead.client ? { id: lead.client.id, status: lead.client.status } : null;
+    let duplicates: Awaited<ReturnType<LeadsService['clientMatches']>> = [];
+    if (dto.clientId) {
+      const chosen = await this.prisma.client.findUnique({ where: { id: dto.clientId }, select: { id: true, status: true } });
+      if (!chosen) throw new BadRequestException('That client no longer exists.');
+      target = chosen;
+    } else if (!target) {
+      duplicates = await this.clientMatches(lead.companyName, email);
+      if (duplicates.length && !dto.createNew) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'POSSIBLE_DUPLICATE',
+          message: `${lead.companyName} may already be a client. Choose the existing client, or confirm it's a new one.`,
+          matches: duplicates,
+        });
+      }
+    }
+
     // The login email must not belong to someone else.
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
@@ -367,12 +389,12 @@ export class LeadsService {
     if (existingUser && existingUser.role !== Role.CLIENT) {
       throw new ConflictException(`${email} already belongs to a ${existingUser.role.toLowerCase()} account, so it can't be a client login. Use a different email.`);
     }
-    if (existingUser?.clientContact && existingUser.clientContact.clientId !== lead.clientId) {
-      throw new ConflictException(`${email} is already a contact at ${existingUser.clientContact.client.name}. Use a different email, or link this lead to that client.`);
+    if (existingUser?.clientContact && existingUser.clientContact.clientId !== target?.id) {
+      throw new ConflictException(`${email} is already a contact at ${existingUser.clientContact.client.name}. Use a different email, or choose ${existingUser.clientContact.client.name} as the client.`);
     }
 
     // 1. Client.
-    let clientId = lead.clientId;
+    let clientId = target?.id ?? null;
     let clientCreated = false;
     if (!clientId) {
       const client = await this.prisma.client.create({
@@ -391,8 +413,11 @@ export class LeadsService {
       clientCreated = true;
       // Link straight away so a retry reuses this client.
       await this.prisma.lead.update({ where: { id }, data: { clientId } });
-    } else if (lead.client?.status === ClientStatus.LEAD) {
-      await this.prisma.client.update({ where: { id: clientId }, data: { status: ClientStatus.PROSPECT } });
+    } else {
+      if (lead.clientId !== clientId) await this.prisma.lead.update({ where: { id }, data: { clientId } });
+      if (target?.status === ClientStatus.LEAD) {
+        await this.prisma.client.update({ where: { id: clientId }, data: { status: ClientStatus.PROSPECT } });
+      }
     }
 
     // 2. Portal login + invite email.
@@ -431,6 +456,7 @@ export class LeadsService {
         leadId: id, type: LeadActivityType.NOTE, subject: 'Converted to client',
         body: [
           clientCreated ? 'New client record created.' : 'Linked to the existing client record.',
+          ...(clientCreated && duplicates.length ? [`Possible duplicate${duplicates.length === 1 ? '' : 's'} (${duplicates.map((d) => d.name).join(', ')}) were checked and a new client was created anyway.`] : []),
           sendInvite ? `Client portal invite emailed to ${email}.` : `Portal login set up for ${email} (invite not emailed).`,
           quote
             ? (rates.length ? `${rates.length} agreed ${rates.length === 1 ? 'rate' : 'rates'} copied from quote ${quote.number}.` : `Agreed rates from quote ${quote.number} were already on file.`)
@@ -447,7 +473,12 @@ export class LeadsService {
       action: 'lead.converted',
       entity: 'Lead',
       entityId: id,
-      meta: { clientId, clientCreated, quoteId: quote?.id ?? null, ratesCopied: rates.length, contactEmail: email, invited: sendInvite, from: wasStage, byAi: dto.byAi ?? false },
+      meta: {
+        clientId, clientCreated, quoteId: quote?.id ?? null, ratesCopied: rates.length, contactEmail: email, invited: sendInvite, from: wasStage, byAi: dto.byAi ?? false,
+        linkedExisting: !clientCreated && !!dto.clientId,
+        // Staff saw possible duplicates and chose to create a new client anyway.
+        duplicateOverride: clientCreated && duplicates.length ? duplicates.map((d) => ({ clientId: d.clientId, reasons: d.reasons })) : null,
+      },
     });
 
     return {
@@ -459,5 +490,42 @@ export class LeadsService {
       quoteNumber: quote?.number ?? null,
       ratesCopied: rates.length,
     };
+  }
+
+  /** Existing clients that look like this company (same login/billing email or same name once tidied up). */
+  private async clientMatches(companyName: string, email: string | null | undefined) {
+    const clients = await this.prisma.client.findMany({
+      select: {
+        id: true, name: true, status: true, city: true, postcode: true, billingEmail: true, archivedAt: true, createdAt: true,
+        contacts: { select: { email: true, firstName: true, lastName: true, isPrimary: true } },
+      },
+      take: 5000,
+    });
+    const byId = new Map(clients.map((c) => [c.id, c]));
+    return findClientMatches(
+      { companyName, email },
+      clients.map((c) => ({ id: c.id, name: c.name, billingEmail: c.billingEmail, contactEmails: c.contacts.map((x) => x.email) })),
+    ).slice(0, 10).map(({ clientId, reasons }) => {
+      const c = byId.get(clientId)!;
+      const primary = c.contacts.find((x) => x.isPrimary) ?? c.contacts[0];
+      return {
+        clientId, reasons: reasons as MatchReason[],
+        name: c.name, status: c.status, city: c.city, postcode: c.postcode, archived: !!c.archivedAt, createdAt: c.createdAt,
+        primaryContact: primary ? `${primary.firstName} ${primary.lastName}`.trim() : null,
+        contacts: c.contacts.length,
+      };
+    });
+  }
+
+  /**
+   * What the convert box shows before converting: the client this lead is
+   * already linked to (if any) and any existing clients that look like it,
+   * checked against `email` (the login email typed in the box) and the name.
+   */
+  async convertCheck(id: string, email?: string) {
+    const lead = await this.prisma.lead.findUnique({ where: { id }, include: { client: { select: { id: true, name: true, status: true } } } });
+    if (!lead) throw new NotFoundException('Lead not found');
+    const matches = lead.client ? [] : await this.clientMatches(lead.companyName, email?.trim() || lead.contactEmail);
+    return { linkedClient: lead.client, matches };
   }
 }
