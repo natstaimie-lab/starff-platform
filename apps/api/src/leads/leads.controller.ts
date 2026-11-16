@@ -49,6 +49,12 @@ export class LeadsController {
     return this.leads.summary();
   }
 
+  /** Today list: open leads grouped by follow-up (overdue, today, next 7 days, later, none). */
+  @Get('today')
+  today() {
+    return this.leads.today();
+  }
+
   /** Create lead. Idempotent per enquiryId. */
   @Post()
   create(@CurrentUser() u: AuthUser, @Body() dto: CreateLeadDto) {

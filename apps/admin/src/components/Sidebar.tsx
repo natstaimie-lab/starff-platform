@@ -20,6 +20,7 @@ const sections: Section[] = [
       { key: 'clients', label: 'Clients', href: '/dashboard/clients', icon: <Ic.Building /> },
       { key: 'enquiries', label: 'Enquiries', href: '/dashboard/enquiries', icon: <Ic.FileText /> },
       { key: 'leads', label: 'Leads', href: '/dashboard/leads', icon: <Ic.TrendUp /> },
+      { key: 'followups', label: 'Follow-ups today', href: '/dashboard/leads/today', icon: <Ic.Bell /> },
     ],
   },
   {
@@ -71,13 +72,13 @@ export function Sidebar() {
   useEffect(() => { setOpen(false); }, [pathname]);
 
   useEffect(() => {
-    const loadBadges = () =>
+    const loadBadges = () => {
       apiFetch<{
         pendingTimesheets: number; complianceAttention: number; newEnquiries: number;
         unreadMessages: number; pendingDeletions: number; newCandidates: number;
         newClients: number; jobsAwaitingAdmin: number; openShifts: number; overdueInvoices: number;
       }>('/stats/overview')
-        .then((s) => setBadges({
+        .then((s) => setBadges((b) => ({ ...b,
           candidates: s.newCandidates,
           clients: s.newClients,
           enquiries: s.newEnquiries,
@@ -88,16 +89,25 @@ export function Sidebar() {
           timesheets: s.pendingTimesheets,
           payroll: s.overdueInvoices,
           messages: s.unreadMessages,
-        }))
+        })))
         .catch(() => {});
+      // CRM follow-ups due today (UK) or overdue — separate call so a stats hiccup can't hide it.
+      apiFetch<{ followUpsDue: number }>('/leads/summary')
+        .then((s) => setBadges((b) => ({ ...b, followups: s.followUpsDue })))
+        .catch(() => {});
+    };
     loadBadges();
     // Refresh the counts periodically so new items show up without a reload.
     const t = setInterval(loadBadges, 30000);
     return () => clearInterval(t);
   }, [pathname]);
 
-  const isActive = (href: string) =>
+  // Highlight the most specific match, so /dashboard/leads/today lights up
+  // "Follow-ups today" and not "Leads" as well.
+  const matches = (href: string) =>
     href === '/dashboard' ? pathname === '/dashboard' : (pathname === href || pathname.startsWith(href + '/'));
+  const activeHref = sections.flatMap((s) => s.items.map((i) => i.href)).filter(matches).sort((a, b) => b.length - a.length)[0];
+  const isActive = (href: string) => href === activeHref;
 
   async function signOut() {
     await supabase.auth.signOut();

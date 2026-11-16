@@ -116,6 +116,7 @@ export default function PipelineBoardPage() {
         <div className="fx ac" style={{ gap: 8 }}>
           <Link href="/dashboard/leads" className="pb-tab">List</Link>
           <span className="pb-tab is-on" aria-current="page">Board</span>
+          <Link href="/dashboard/leads/today" className="pb-tab">Today</Link>
         </div>
         <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search company, contact or email" aria-label="Search leads" className="lead-search" />
       </div>

@@ -98,6 +98,7 @@ export default function LeadsPage() {
         title="Leads"
         subtitle="Companies you're working to win. Website enquiries can be turned into leads from the Enquiries page."
         action={<div className="fx ac" style={{ gap: 8 }}>
+          <Link href="/dashboard/leads/today" className="pb-tab">Today</Link>
           <Link href="/dashboard/leads/board" className="pb-tab">Board view</Link>
           <button className="aibtn" onClick={() => { setFormError(''); setForm({ ...EMPTY }); }}>+ Add lead</button>
         </div>}

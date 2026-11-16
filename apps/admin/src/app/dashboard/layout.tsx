@@ -17,6 +17,7 @@ const TITLES: Record<string, [string, string]> = {
   '/dashboard/enquiries': ['Enquiries', 'Submissions from the website forms'],
   '/dashboard/leads': ['Leads', 'Your sales pipeline: calls, emails and notes'],
   '/dashboard/leads/board': ['Pipeline', 'Drag leads from New through to Won'],
+  '/dashboard/leads/today': ['Today', 'Follow-ups due: who to chase today'],
   '/dashboard/bookings': ['Job Bookings', 'Open and confirmed staffing requests'],
   '/dashboard/shifts': ['Shifts', 'Upcoming shifts and staffing progress'],
   '/dashboard/timesheets': ['Timesheets', 'Review and approve submitted hours'],
