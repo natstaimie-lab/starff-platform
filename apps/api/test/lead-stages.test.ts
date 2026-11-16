@@ -28,7 +28,7 @@ test('unknown stage is refused', () => {
 });
 
 test('linked client: LEAD becomes PROSPECT once we are talking', () => {
-  for (const s of ['CONTACTED', 'QUALIFIED', 'QUOTED', 'WON'] as const) {
+  for (const s of ['CONTACTED', 'QUALIFIED', 'QUOTED', 'READY_TO_CLOSE', 'WON'] as const) {
     assert.equal(clientStatusForStage(s, 'LEAD'), 'PROSPECT', s);
   }
   assert.equal(clientStatusForStage('NEW', 'LEAD'), null);
