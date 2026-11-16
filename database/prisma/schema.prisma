@@ -482,6 +482,7 @@ model Client {
   sites         ClientSite[]
   jobs          Job[]
   invoices      Invoice[]
+  quotes        Quote[]
 
   @@index([status])
 }
@@ -953,4 +954,78 @@ model RateSettings {
 
   updatedById          String?  @db.Uuid
   updatedAt            DateTime @updatedAt
+}
+
+// ══════════════════════════════════════════════
+// QUOTES — saved quotes (CRM Phase 1)
+// A quote is for an existing Client OR a prospect (company name only). Each
+// line is one role priced by the quote calculator; figures are worked out by
+// the API on save, never trusted from the browser. The rates used are kept in
+// ratesSnapshot so an old quote still explains itself after rates change.
+// "Expired" is not stored: a DRAFT/SENT quote past validUntil shows as expired.
+// ══════════════════════════════════════════════
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  DECLINED
+}
+
+model Quote {
+  id            String      @id @default(cuid())
+  number        String      @unique // Q-2026-0001
+  status        QuoteStatus @default(DRAFT)
+
+  clientId      String?
+  client        Client?     @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  prospectName  String?     // company name when not (yet) a client
+  contactName   String?
+  contactEmail  String?
+
+  title         String?
+  notes         String?
+  validUntil    DateTime
+
+  total         Decimal     @default(0) @db.Decimal(12, 2)
+  totalCost     Decimal     @default(0) @db.Decimal(12, 2)
+  profit        Decimal     @default(0) @db.Decimal(12, 2)
+  ratesSnapshot Json?
+
+  createdById   String?     @db.Uuid
+  sentAt        DateTime?
+  decidedAt     DateTime?   // accepted or declined
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  lines         QuoteLine[]
+
+  @@index([clientId])
+  @@index([status])
+  @@index([validUntil])
+}
+
+model QuoteLine {
+  id              String  @id @default(cuid())
+  quoteId         String
+  quote           Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  position        Int     @default(0)
+
+  description     String  // e.g. "Warehouse operative"
+  payRate         Decimal @db.Decimal(10, 2)
+  marginPerHour   Decimal @db.Decimal(10, 2)
+  hoursPerShift   Decimal @db.Decimal(5, 2)
+  shifts          Int
+  temps           Int
+  shiftType       String  // standard | night | weekend | bank_holiday
+  pensionEnrolled Boolean @default(true)
+
+  costPerHour     Decimal @db.Decimal(10, 2)
+  chargeRate      Decimal @db.Decimal(10, 2)
+  totalHours      Decimal @db.Decimal(10, 2)
+  total           Decimal @db.Decimal(12, 2)
+  totalCost       Decimal @db.Decimal(12, 2)
+  profit          Decimal @db.Decimal(12, 2)
+
+  @@index([quoteId])
 }

@@ -19,6 +19,7 @@ const TITLES: Record<string, [string, string]> = {
   '/dashboard/shifts': ['Shifts', 'Upcoming shifts and staffing progress'],
   '/dashboard/timesheets': ['Timesheets', 'Review and approve submitted hours'],
   '/dashboard/payroll': ['Payroll & Invoices', 'Worker pay runs and client invoicing'],
+  '/dashboard/quotes/saved': ['Saved Quotes', 'Quotes you have built, their status and valid-until dates'],
   '/dashboard/quotes': ['Quote Calculator', 'Price a booking: on-costs, charge rate and profit'],
   '/dashboard/compliance': ['Compliance Dashboard', 'Right to work, documents, licences & training'],
   '/dashboard/invoices': ['Payroll & Invoices', 'Billing, payments and payroll runs'],
