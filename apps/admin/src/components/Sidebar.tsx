@@ -19,6 +19,7 @@ const sections: Section[] = [
       { key: 'workers', label: 'Workers', href: '/dashboard/workers', icon: <Ic.HardHat /> },
       { key: 'clients', label: 'Clients', href: '/dashboard/clients', icon: <Ic.Building /> },
       { key: 'enquiries', label: 'Enquiries', href: '/dashboard/enquiries', icon: <Ic.FileText /> },
+      { key: 'leads', label: 'Leads', href: '/dashboard/leads', icon: <Ic.TrendUp /> },
     ],
   },
   {
