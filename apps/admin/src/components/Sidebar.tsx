@@ -40,6 +40,7 @@ const sections: Section[] = [
     items: [
       { key: 'timesheets', label: 'Timesheets', href: '/dashboard/timesheets', icon: <Ic.Clock /> },
       { key: 'payroll', label: 'Payroll & Invoices', href: '/dashboard/payroll', icon: <Ic.Receipt /> },
+      { key: 'quotes', label: 'Quote Calculator', href: '/dashboard/quotes', icon: <Ic.PoundSterling /> },
     ],
   },
   {
