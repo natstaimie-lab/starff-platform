@@ -7,13 +7,17 @@ import { clientStatusForStage, stageChangeError, stageForClientStatus } from './
 
 const listSelect = {
   client: { select: { id: true, name: true, status: true } },
-  _count: { select: { activities: true } },
+  _count: { select: { activities: true, quotes: true } },
 } satisfies Prisma.LeadInclude;
 
 const detailInclude = {
   client: { select: { id: true, name: true, status: true } },
   enquiry: { select: { id: true, type: true, status: true, message: true, createdAt: true } },
   activities: { orderBy: { occurredAt: 'desc' }, take: 200 },
+  quotes: {
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, number: true, status: true, title: true, total: true, profit: true, validUntil: true, sentAt: true, createdAt: true },
+  },
 } satisfies Prisma.LeadInclude;
 
 const blank = (s?: string | null) => (s?.trim() ? s.trim() : undefined);

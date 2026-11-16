@@ -982,6 +982,8 @@ model Quote {
   clientId      String?
   client        Client?     @relation(fields: [clientId], references: [id], onDelete: SetNull)
   prospectName  String?     // company name when not (yet) a client
+  leadId        String?     // CRM lead this quote was made for (CRM Phase 2)
+  lead          Lead?       @relation(fields: [leadId], references: [id], onDelete: SetNull)
   contactName   String?
   contactEmail  String?
 
@@ -1003,6 +1005,7 @@ model Quote {
   lines         QuoteLine[]
 
   @@index([clientId])
+  @@index([leadId])
   @@index([status])
   @@index([validUntil])
 }
@@ -1102,6 +1105,7 @@ model Lead {
   updatedAt DateTime @updatedAt
 
   activities LeadActivity[]
+  quotes         Quote[]
 
   @@index([stage])
   @@index([clientId])

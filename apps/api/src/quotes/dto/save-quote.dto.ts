@@ -23,6 +23,8 @@ export class SaveQuoteDto {
   /** An existing client, or leave out and give prospectName. */
   @IsOptional() @IsString() clientId?: string;
   @IsOptional() @IsString() @MaxLength(200) prospectName?: string;
+  /** The CRM lead this quote is for. Leave out to keep the current link when editing. */
+  @IsOptional() @IsString() leadId?: string;
   @IsOptional() @IsString() @MaxLength(200) contactName?: string;
   @IsOptional() @IsEmail() contactEmail?: string;
   @IsOptional() @IsString() @MaxLength(200) title?: string;

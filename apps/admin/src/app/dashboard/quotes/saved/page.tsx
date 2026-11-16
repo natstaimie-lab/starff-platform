@@ -14,6 +14,7 @@ type QuoteLine = {
 type Quote = {
   id: string; number: string; status: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'DECLINED'; expired: boolean;
   client: { id: string; name: string } | null; prospectName: string | null;
+  lead: { id: string; companyName: string } | null;
   contactName: string | null; contactEmail: string | null; title: string | null; notes: string | null;
   validUntil: string; total: string; profit: string; createdAt: string; lines: QuoteLine[];
 };
@@ -164,6 +165,7 @@ export default function SavedQuotesPage() {
                     <td>
                       {q.client ? <Link href={`/dashboard/clients/${q.client.id}`} className="link" onClick={(e) => e.stopPropagation()}>{q.client.name}</Link> : <span>{q.prospectName} <span className="dim" style={{ fontSize: 12 }}>(prospect)</span></span>}
                       {q.contactName && <div className="dim" style={{ fontSize: 12 }}>{q.contactName}</div>}
+                      {q.lead && <Link href={`/dashboard/leads/${q.lead.id}`} className="link" style={{ fontSize: 12 }} onClick={(e) => e.stopPropagation()}>View lead →</Link>}
                     </td>
                     <td>{q.expired ? <Badge tone="warning">Expired</Badge> : <Badge tone={TONE[q.status]}>{LABEL[q.status]}</Badge>}</td>
                     <td>{fmtDate(q.validUntil)}</td>
