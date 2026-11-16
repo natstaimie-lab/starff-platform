@@ -340,6 +340,8 @@ async function leads(created) {
   const st = await req(`/leads/${lead.id}/stage`, admin.bearer, 'PATCH', { stage: 'CONTACTED', note: 'First call done' });
   const stBody = await st.json();
   check('change stage → CONTACTED with STAGE_CHANGE activity', st.status === 200 && stBody.stage === 'CONTACTED' && stBody.activities.some((a) => a.type === 'STAGE_CHANGE' && a.meta?.to === 'CONTACTED'));
+  const rtc = await req(`/leads/${lead.id}/stage`, admin.bearer, 'PATCH', { stage: 'READY_TO_CLOSE' });
+  check('change stage → READY_TO_CLOSE (board column)', rtc.status === 200 && (await rtc.json()).stage === 'READY_TO_CLOSE');
   check('LOST without reason refused (400)', (await req(`/leads/${lead.id}/stage`, admin.bearer, 'PATCH', { stage: 'LOST' })).status === 400);
   check('stage change audited', !!(await p.auditLog.findFirst({ where: { entity: 'Lead', entityId: lead.id, action: 'lead.stage_changed' } })));
 

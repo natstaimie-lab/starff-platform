@@ -97,7 +97,10 @@ export default function LeadsPage() {
       <Card
         title="Leads"
         subtitle="Companies you're working to win. Website enquiries can be turned into leads from the Enquiries page."
-        action={<button className="aibtn" onClick={() => { setFormError(''); setForm({ ...EMPTY }); }}>+ Add lead</button>}
+        action={<div className="fx ac" style={{ gap: 8 }}>
+          <Link href="/dashboard/leads/board" className="pb-tab">Board view</Link>
+          <button className="aibtn" onClick={() => { setFormError(''); setForm({ ...EMPTY }); }}>+ Add lead</button>
+        </div>}
       >
         <div className="fx ac" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
           {pill('', 'Open', openCount)}

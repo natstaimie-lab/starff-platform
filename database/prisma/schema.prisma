@@ -1046,6 +1046,7 @@ enum LeadStage {
   CONTACTED // we've reached out / spoken
   QUALIFIED // real need, right fit, decision-maker known
   QUOTED // a quote has gone out
+  READY_TO_CLOSE // verbally agreed, sorting terms / first booking
   WON // became a client
   LOST // not going ahead (lostReason says why)
 }

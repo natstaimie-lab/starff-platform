@@ -1,14 +1,14 @@
 // Shared types, labels and helpers for the CRM leads screens.
 // Stage names match the Prisma LeadStage enum — no display-only states.
 
-export const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'QUOTED', 'WON', 'LOST'] as const;
+export const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'QUOTED', 'READY_TO_CLOSE', 'WON', 'LOST'] as const;
 export type Stage = (typeof STAGES)[number];
 
 export const STAGE_LABEL: Record<Stage, string> = {
-  NEW: 'New', CONTACTED: 'Contacted', QUALIFIED: 'Qualified', QUOTED: 'Quoted', WON: 'Won', LOST: 'Lost',
+  NEW: 'New', CONTACTED: 'Contacted', QUALIFIED: 'Qualified', QUOTED: 'Quote sent', READY_TO_CLOSE: 'Ready to close', WON: 'Won', LOST: 'Lost',
 };
 export const STAGE_TONE: Record<Stage, 'neutral' | 'info' | 'warning' | 'success' | 'error'> = {
-  NEW: 'warning', CONTACTED: 'info', QUALIFIED: 'info', QUOTED: 'info', WON: 'success', LOST: 'error',
+  NEW: 'warning', CONTACTED: 'info', QUALIFIED: 'info', QUOTED: 'info', READY_TO_CLOSE: 'warning', WON: 'success', LOST: 'error',
 };
 export const SOURCE_LABEL: Record<string, string> = {
   ENQUIRY: 'Website enquiry', CLIENT: 'Existing client', MANUAL: 'Added by staff', AI: 'AI salesperson', REFERRAL: 'Referral', OUTBOUND: 'Outbound',

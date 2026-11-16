@@ -4,7 +4,7 @@
  * so `node --test` can load this file directly.
  */
 
-export const LEAD_STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'QUOTED', 'WON', 'LOST'] as const;
+export const LEAD_STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'QUOTED', 'READY_TO_CLOSE', 'WON', 'LOST'] as const;
 export type LeadStageName = (typeof LEAD_STAGES)[number];
 
 export type ClientStatusName = 'LEAD' | 'PROSPECT' | 'ACTIVE' | 'ON_HOLD' | 'CLOSED';
