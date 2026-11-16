@@ -249,7 +249,9 @@ export default function QuotesPage() {
   const p = result?.perHour;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, alignItems: 'start' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Calculator + breakdown share the full width; they stack on narrow screens. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, alignItems: 'start' }}>
       <Card title="Booking details" subtitle="Change any figure — the breakdown updates as you type">
         <div style={{ marginBottom: 14 }}>
           <Field label="Role / line description" hint="Shown on the quote, e.g. Warehouse operative">
@@ -341,8 +343,9 @@ export default function QuotesPage() {
           </div>
         )}
       </Card>
+      </div>
 
-      <div style={{ gridColumn: '1 / -1' }}>
+      <div>
         <Card
           title={editing ? `Edit quote ${editing.number}` : 'Quote'}
           subtitle="Add one line per role, then save. Saved quotes are re-priced by the server with the current rates."
