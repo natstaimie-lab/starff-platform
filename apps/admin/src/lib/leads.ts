@@ -21,6 +21,8 @@ export type Lead = {
   id: string; stage: Stage; source: string; companyName: string;
   contactName: string | null; contactEmail: string | null; contactPhone: string | null; contactRole: string | null;
   sector: string | null; city: string | null; postcode: string | null; estimatedValue: string | null; notes: string | null;
+  /** Set when they asked not to be emailed. */
+  unsubscribedAt?: string | null; unsubscribeNote?: string | null;
   clientId: string | null; enquiryId: string | null; ownerId: string | null; createdByAi: boolean;
   nextActionAt: string | null; lastActivityAt: string | null; stageChangedAt: string; lostReason: string | null;
   archivedAt: string | null; createdAt: string;

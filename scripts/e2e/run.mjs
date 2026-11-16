@@ -529,6 +529,78 @@ async function aiQueue(created) {
   check('lead detail carries pending drafts (none after skip)', Array.isArray(leadView.aiDrafts) && leadView.aiDrafts.length === 0);
 }
 
+// ── CRM Phase 4c: employer replies. Needs RESEND_INBOUND_WEBHOOK_SECRET set the same on
+//    the API and here. Replies are inserted as stored rows and processed via retry, so no
+//    Resend fetch is needed; the "interested" reply makes one real AI call.
+async function aiReplies(created) {
+  const secret = process.env.RESEND_INBOUND_WEBHOOK_SECRET;
+  if (!secret) { log('   (skipped: RESEND_INBOUND_WEBHOOK_SECRET not set)'); return; }
+  const { createHmac } = await import('node:crypto');
+  const admin = await makeUser(created, 'ADMIN', 'adm');
+  const stamp = Date.now();
+  const key = Buffer.from(secret.replace(/^whsec_/, ''), 'base64');
+  const post = (body, { good = true, ts = Math.floor(Date.now() / 1000) } = {}) => {
+    const raw = JSON.stringify(body); const id = `msg_${stamp}_${Math.random().toString(36).slice(2)}`;
+    const sig = good ? createHmac('sha256', key).update(`${id}.${ts}.${raw}`).digest('base64') : 'bad';
+    return fetch(`${API}/inbound/resend`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'svix-id': id, 'svix-timestamp': String(ts), 'svix-signature': `v1,${sig}` }, body: raw });
+  };
+  const inboundIds = [];
+  const done = async () => { if (inboundIds.length) await p.inboundEmail.deleteMany({ where: { id: { in: inboundIds } } }); };
+  try {
+    check('webhook: bad signature → 401', (await post({ type: 'email.received', data: { email_id: `e2e-bad-${stamp}` } }, { good: false })).status === 401);
+    check('webhook: old timestamp → 401', (await post({ type: 'email.received', data: { email_id: `e2e-old-${stamp}` } }, { ts: Math.floor(Date.now() / 1000) - 3600 })).status === 401);
+    check('webhook: other event types ignored (200)', (await post({ type: 'email.sent', data: {} })).status === 200);
+    const ev = { type: 'email.received', data: { email_id: `e2e-${stamp}`, from: `Nobody <nobody-${stamp}@example.com>`, to: ['replies@example.com'], subject: 'Re: test' } };
+    const r1 = await post(ev);
+    const b1 = await r1.json();
+    if (b1.id) inboundIds.push(b1.id);
+    check('webhook: signed email.received → stored (200)', r1.status === 200 && !!b1.id);
+    const r2 = await post(ev).then((r) => r.json());
+    check('webhook: same email again → not stored twice', r2.duplicate === true && (await p.inboundEmail.count({ where: { resendEmailId: `e2e-${stamp}` } })) === 1);
+
+    const lead = await p.lead.create({ data: { companyName: `E2E Reply Co ${stamp}`, contactName: 'Sam Reply', contactRole: 'Warehouse Manager', contactEmail: `reply-${stamp}@example.com`, sector: 'Warehouse & Logistics', city: 'Dagenham', source: 'OUTBOUND', stage: 'CONTACTED' } });
+    created.leadIds.push(lead.id);
+    await p.leadActivity.create({ data: { leadId: lead.id, type: 'EMAIL', direction: 'outbound', subject: 'Warehouse cover this peak', body: 'Hi Sam, we supply vetted warehouse temps in Dagenham...', occurredAt: new Date(Date.now() - 864e5) } });
+    const stored = async (text, extra = {}) => {
+      const row = await p.inboundEmail.create({ data: { resendEmailId: `e2e-${stamp}-${Math.random()}`, fromEmail: lead.contactEmail, fromName: 'Sam Reply', subject: 'Re: Warehouse cover this peak', text, ...extra } });
+      inboundIds.push(row.id);
+      const res = await req(`/inbound/${row.id}/retry`, admin.bearer, 'POST', {});
+      return { row, res, after: await p.inboundEmail.findUnique({ where: { id: row.id } }) };
+    };
+
+    const yes = await stored('Yes, we could use 4 pickers from 1 Dec, nights. Can you send prices?');
+    check('reply: matched to the lead, logged as inbound email', yes.res.status === 200 && yes.after.status === 'MATCHED' && yes.after.leadId === lead.id
+      && (await p.leadActivity.count({ where: { leadId: lead.id, type: 'EMAIL', direction: 'inbound' } })) === 1);
+    if (process.env.ANTHROPIC_API_KEY) {
+      const draft = await p.aiDraft.findFirst({ where: { leadId: lead.id, kind: 'REPLY', inboundEmailId: yes.row.id } });
+      check('reply: AI tags it interested/question + suggests a stage + drafts an answer', !!draft && ['interested', 'question'].includes(draft.intent) && !!draft.suggestedStage && draft.body.length > 30);
+      log(`   intent=${draft?.intent} stage=${draft?.suggestedStage} subject=${draft?.subject}`);
+      check('reply: answer quotes no prices', !/£\s?\d/.test(draft?.body ?? ''));
+      const q = await req('/ai-sales/drafts', admin.bearer, 'GET').then((r) => r.json());
+      check('reply draft is in AI approvals with their email', q.some((x) => x.id === draft?.id && x.theirEmail?.text?.includes('4 pickers')));
+      const fu = await req(`/ai-sales/drafts/${draft.id}/skip`, admin.bearer, 'POST', { applyStage: true });
+      check('file it with "move stage" → lead moves to the suggested stage', fu.status === 200 && (await p.lead.findUnique({ where: { id: lead.id } })).stage === draft.suggestedStage);
+    } else log('   (AI parts skipped: ANTHROPIC_API_KEY not set)');
+
+    const unsub = await stored('Please remove me from your list.');
+    const l2 = await p.lead.findUnique({ where: { id: lead.id } });
+    check('unsubscribe reply → lead marked do-not-email, no draft', unsub.after.status === 'UNSUBSCRIBED' && !!l2.unsubscribedAt
+      && (await p.aiDraft.count({ where: { inboundEmailId: unsub.row.id } })) === 0);
+    check('unsubscribed: sending is refused (400)', (await req(`/leads/${lead.id}/email`, admin.bearer, 'POST', { subject: 'Hi', body: 'Hello' })).status === 400);
+    check('unsubscribed: AI draft is refused (400)', (await req(`/leads/${lead.id}/ai-draft`, admin.bearer, 'POST', {})).status === 400);
+    check('unsubscribed: no pending drafts left', (await p.aiDraft.count({ where: { leadId: lead.id, status: 'PENDING' } })) === 0);
+    const re = await req(`/leads/${lead.id}/unsubscribe`, admin.bearer, 'PATCH', { unsubscribed: false });
+    check('staff can allow emails again', re.status === 200 && (await re.json()).unsubscribedAt === null);
+
+    const unknown = await p.inboundEmail.create({ data: { resendEmailId: `e2e-u-${stamp}`, fromEmail: `stranger-${stamp}@example.com`, subject: 'Hello', text: 'Who is this?' } });
+    inboundIds.push(unknown.id);
+    await req(`/inbound/${unknown.id}/retry`, admin.bearer, 'POST', {});
+    const un = await req('/inbound/unhandled', admin.bearer, 'GET').then((r) => r.json());
+    check('reply from an unknown address → listed to check', un.some((x) => x.id === unknown.id && x.status === 'UNMATCHED'));
+    check('dismiss it', (await req(`/inbound/${unknown.id}/dismiss`, admin.bearer, 'POST', {})).status === 200 && (await p.inboundEmail.findUnique({ where: { id: unknown.id } })).status === 'IGNORED');
+  } finally { await done(); }
+}
+
 // ── Run everything ──
 try {
   await flow('Full journey: client books → worker accepts → timesheet approved', fullJourney);
@@ -543,6 +615,7 @@ try {
   await flow('CRM leads + activity log', leads);
   await flow('CRM AI salesperson (auto leads + AI draft)', aiSales);
   await flow('CRM AI approvals queue', aiQueue);
+  await flow('CRM AI replies (inbound)', aiReplies);
   log(`\n${allPassed() ? '✅ ALL E2E FLOWS PASSED' : '❌ SOME CHECKS FAILED'}`);
 } finally {
   await p.$disconnect();

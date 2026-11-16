@@ -5,7 +5,7 @@ import { LeadActivityType, LeadStage, Role } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { LeadsService } from './leads.service';
-import { AiDraftDto, ChangeStageDto, ConvertLeadDto, CreateLeadDto, LogActivityDto, SendLeadEmailDto, UpdateLeadDto } from './dto/lead.dto';
+import { AiDraftDto, UnsubscribeLeadDto, ChangeStageDto, ConvertLeadDto, CreateLeadDto, LogActivityDto, SendLeadEmailDto, UpdateLeadDto } from './dto/lead.dto';
 import { AiSalesService } from './ai-sales.service';
 
 class ArchiveDto {
@@ -119,6 +119,13 @@ export class LeadsController {
   @HttpCode(200)
   sendEmail(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: SendLeadEmailDto) {
     return this.leads.sendEmail(id, dto, u);
+  }
+
+  /** Do-not-email on/off (every lead sharing the email). */
+  @Patch(':id/unsubscribe')
+  @HttpCode(200)
+  unsubscribe(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: UnsubscribeLeadDto) {
+    return this.leads.setUnsubscribed(id, dto.unsubscribed, dto.note, u.id);
   }
 
   @Patch(':id/archive')

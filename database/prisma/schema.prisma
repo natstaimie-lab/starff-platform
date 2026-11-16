@@ -1102,6 +1102,9 @@ model Lead {
   stageChangedAt DateTime  @default(now())
   lostReason     String?
   archivedAt     DateTime?
+  /// They asked not to be emailed (e.g. replied "unsubscribe"). Nothing is drafted or sent while set.
+  unsubscribedAt DateTime?
+  unsubscribeNote String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1109,6 +1112,7 @@ model Lead {
   activities LeadActivity[]
   quotes         Quote[]
   aiDrafts       AiDraft[]
+  inboundEmails  InboundEmail[]
 
   @@index([stage])
   @@index([clientId])
@@ -1204,9 +1208,55 @@ model AiDraft {
   /// The EMAIL activity written when it was sent.
   activityId  String?
 
+  // Phase 4c: answers to employer replies.
+  /// "FOLLOW_UP" (morning run) or "REPLY" (answer to an inbound email)
+  kind              String     @default("FOLLOW_UP")
+  /// interested | question | not_now | not_interested | wrong_person | other
+  intent            String?
+  theirSummary      String?
+  /// The stage the AI suggests moving the lead to (applied only if staff tick it).
+  suggestedStage    LeadStage?
+  suggestedReason   String?
+  inboundEmailId    String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([leadId, forDay])
   @@index([status, createdAt])
+}
+
+// ─── CRM Phase 4c: employer replies received through Resend inbound ─────────
+enum InboundStatus {
+  RECEIVED // stored, not processed yet
+  MATCHED // linked to a lead and handled
+  UNMATCHED // from an address no lead has
+  UNSUBSCRIBED // they asked to stop; leads with this address are opted out
+  IGNORED // out-of-office / auto-reply, or dismissed by staff
+  FAILED // could not fetch or process
+}
+
+model InboundEmail {
+  id            String        @id @default(cuid())
+  /// Resend's email_id; makes the webhook safe to retry.
+  resendEmailId String        @unique
+  status        InboundStatus @default(RECEIVED)
+  fromEmail     String
+  fromName      String?
+  toEmails      Json?
+  subject       String?
+  /// Their new text, with the quoted thread removed.
+  text          String?       @db.Text
+  messageId     String?
+  receivedAt    DateTime      @default(now())
+  leadId        String?
+  lead          Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  intent        String?
+  summary       String?
+  error         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([status, createdAt])
+  @@index([fromEmail])
 }

@@ -28,9 +28,16 @@ export class LeadMailer {
     return process.env.QUOTES_FROM || 'Starff <hello@starff.co.uk>';
   }
 
-  replyTo(senderEmail?: string | null): string {
-    if (senderEmail && /@starff\.co\.uk$/i.test(senderEmail)) return senderEmail;
-    return process.env.MAIL_REPLY_TO || 'hello@starff.co.uk';
+  /**
+   * Replies go to the staff member (if they have a Starff address) or the
+   * shared inbox, AND, when LEAD_INBOUND_ADDRESS is set, to the Resend
+   * receiving address so the AI salesperson can read them. Mail apps reply to
+   * every Reply-To address, so the person still gets the reply in their inbox.
+   */
+  replyTo(senderEmail?: string | null): string[] {
+    const human = senderEmail && /@starff\.co\.uk$/i.test(senderEmail) ? senderEmail : process.env.MAIL_REPLY_TO || 'hello@starff.co.uk';
+    const inbound = process.env.LEAD_INBOUND_ADDRESS?.trim();
+    return inbound && inbound.toLowerCase() !== human.toLowerCase() ? [human, inbound] : [human];
   }
 
   private sign(senderName?: string | null) {

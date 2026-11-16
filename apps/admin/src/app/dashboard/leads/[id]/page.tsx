@@ -189,6 +189,19 @@ export default function LeadDetailPage() {
     } finally { setConvBusy(false); }
   }
 
+  async function toggleUnsubscribed() {
+    if (!lead) return;
+    const unsubscribed = !lead.unsubscribedAt;
+    const msg = unsubscribed
+      ? `Stop all emails to ${lead.contactEmail ?? lead.companyName}? Nothing will be drafted or sent to them.`
+      : `Allow emails to ${lead.contactEmail ?? lead.companyName} again? Only do this if they asked to hear from you.`;
+    if (!confirm(msg)) return;
+    try {
+      const updated = await apiFetch<LeadDetail>(`/leads/${id}/unsubscribe`, { method: 'PATCH', body: JSON.stringify({ unsubscribed }) });
+      setLead(updated); setAi({ ...EMPTY_AI });
+    } catch (e) { alert(apiError(e, 'Could not change it')); }
+  }
+
   async function toggleArchive() {
     if (!lead) return;
     const archived = !lead.archivedAt;
@@ -323,6 +336,7 @@ export default function LeadDetailPage() {
             action={<Badge tone={STAGE_TONE[lead.stage]}>{STAGE_LABEL[lead.stage]}</Badge>}
           >
             {lead.archivedAt && <p className="dim" style={{ marginTop: 0 }}>Archived {fmtDate(lead.archivedAt)}.</p>}
+            {lead.unsubscribedAt && <p className="cv-warn" style={{ marginBottom: 12 }}><b>Do not email.</b> {lead.unsubscribeNote ?? 'They asked not to be emailed.'} Since {fmtDate(lead.unsubscribedAt)}.</p>}
             <Field label="Stage">
               <SelectInput aria-label="Change stage" value="" onChange={(e) => { if (e.target.value) { setStageError(''); setStageForm({ stage: e.target.value as Stage, reason: '', note: '' }); } }}>
                 <option value="">Move to…</option>
@@ -346,12 +360,13 @@ export default function LeadDetailPage() {
               {!(lead.stage === 'WON' && lead.client) && !lead.archivedAt && <Button onClick={openConvert}>Convert to client</Button>}
               <Button variant="outline" onClick={openEdit}>Edit details</Button>
               <Button variant="outline" onClick={toggleArchive}>{lead.archivedAt ? 'Restore' : 'Archive'}</Button>
+              {lead.contactEmail && <Button variant="outline" onClick={toggleUnsubscribed}>{lead.unsubscribedAt ? 'Allow emails again' : 'Do not email'}</Button>}
             </div>
           </Card>
         </div>
 
         <div className="lead-main">
-          {!lead.archivedAt && lead.stage !== 'WON' && (
+          {!lead.archivedAt && lead.stage !== 'WON' && !lead.unsubscribedAt && (
             <Card title="AI salesperson" subtitle="Drafts the next follow-up from this lead's history. Nothing is sent until you press Send."
               action={!ai.draft ? <Button disabled={ai.busy} onClick={draftWithAi}>{ai.busy ? 'Writing…' : 'Draft follow-up'}</Button> : undefined}>
               {ai.sentTo && <p role="status" className="ai-ok">Sent to {ai.sentTo} and logged below.</p>}
