@@ -3,9 +3,10 @@ import { EnquiriesController } from './enquiries.controller';
 import { EnquiriesService } from './enquiries.service';
 import { RegistrationModule } from '../registration/registration.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { LeadsModule } from '../leads/leads.module';
 
 @Module({
-  imports: [RegistrationModule, NotificationsModule],
+  imports: [RegistrationModule, NotificationsModule, LeadsModule],
   controllers: [EnquiriesController],
   providers: [EnquiriesService],
 })

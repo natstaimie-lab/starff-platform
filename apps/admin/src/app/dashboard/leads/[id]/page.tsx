@@ -28,6 +28,21 @@ type ConvertForm = {
 };
 type ConvertResult = { clientId: string; clientCreated: boolean; invited: boolean; quoteNumber: string | null; ratesCopied: number };
 
+type AiDraft = { configured: true; subject: string; body: string; callScript: string; nextFollowUpDays: number; reasoning: string; warnings: string[] };
+type AiState = {
+  instructions: string; busy: boolean; error: string; sending: boolean; sentTo: string;
+  draft: AiDraft | null; subject: string; body: string; followUp: string;
+};
+const EMPTY_AI: AiState = { instructions: '', busy: false, error: '', sending: false, sentTo: '', draft: null, subject: '', body: '', followUp: '' };
+
+/** n working days (Mon–Fri) from today, as yyyy-mm-dd. */
+function workingDaysFromNow(n: number) {
+  const d = new Date();
+  let left = n;
+  while (left > 0) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0 && d.getDay() !== 6) left--; }
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 type EditForm = { companyName: string; contactName: string; contactEmail: string; contactPhone: string; contactRole: string; sector: string; city: string; postcode: string; estimatedValue: string; nextActionAt: string; notes: string };
 
 export default function LeadDetailPage() {
@@ -47,6 +62,7 @@ export default function LeadDetailPage() {
   const [converted, setConverted] = useState<ConvertResult | null>(null);
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState('');
+  const [ai, setAi] = useState<AiState>({ ...EMPTY_AI });
 
   const load = () => apiFetch<LeadDetail>(`/leads/${id}`).then(setLead).catch((e) => setError(apiError(e, 'Could not load this lead')));
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
@@ -73,6 +89,31 @@ export default function LeadDetailPage() {
       const updated = await apiFetch<LeadDetail>(`/leads/${id}/stage`, { method: 'PATCH', body: JSON.stringify(body) });
       setLead(updated); setStageForm(null);
     } catch (e) { setStageError(apiError(e, 'Could not change the stage')); } finally { setStageBusy(false); }
+  }
+
+  async function draftWithAi() {
+    setAi((a) => ({ ...a, busy: true, error: '', sentTo: '' }));
+    try {
+      const r = await apiFetch<AiDraft | { configured: false; message: string }>(`/leads/${id}/ai-draft`, {
+        method: 'POST', body: JSON.stringify(ai.instructions.trim() ? { instructions: ai.instructions.trim() } : {}),
+      });
+      if (!r.configured) { setAi((a) => ({ ...a, busy: false, error: r.message })); return; }
+      setAi((a) => ({ ...a, busy: false, draft: r, subject: r.subject, body: r.body, followUp: workingDaysFromNow(r.nextFollowUpDays) }));
+    } catch (e) { setAi((a) => ({ ...a, busy: false, error: apiError(e, 'The AI could not write a draft') })); }
+  }
+
+  async function sendAiDraft() {
+    if (!ai.draft || !lead?.contactEmail) return;
+    if (!confirm(`Send this email to ${lead.contactEmail}?`)) return;
+    setAi((a) => ({ ...a, sending: true, error: '' }));
+    try {
+      const edited = ai.subject.trim() !== ai.draft.subject || ai.body.trim() !== ai.draft.body;
+      const body: Record<string, unknown> = { subject: ai.subject.trim(), body: ai.body.trim(), aiDrafted: true, edited };
+      if (ai.followUp) body.nextActionAt = ai.followUp;
+      const r = await apiFetch<{ to: string }>(`/leads/${id}/email`, { method: 'POST', body: JSON.stringify(body) });
+      setAi({ ...EMPTY_AI, sentTo: r.to });
+      await load();
+    } catch (e) { setAi((a) => ({ ...a, sending: false, error: apiError(e, 'Could not send the email') })); }
   }
 
   function openEdit() {
@@ -310,6 +351,41 @@ export default function LeadDetailPage() {
         </div>
 
         <div className="lead-main">
+          {!lead.archivedAt && lead.stage !== 'WON' && (
+            <Card title="AI salesperson" subtitle="Drafts the next follow-up from this lead's history. Nothing is sent until you press Send."
+              action={!ai.draft ? <Button disabled={ai.busy} onClick={draftWithAi}>{ai.busy ? 'Writing…' : 'Draft follow-up'}</Button> : undefined}>
+              {ai.sentTo && <p role="status" className="ai-ok">Sent to {ai.sentTo} and logged below.</p>}
+              {!ai.draft ? (
+                <Field label="Steer it (optional)">
+                  <TextInput value={ai.instructions} maxLength={1000} placeholder="e.g. mention Christmas cover, or they asked about 5 pickers in Dagenham"
+                    onChange={(e) => setAi({ ...ai, instructions: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter' && !ai.busy) draftWithAi(); }} />
+                </Field>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {ai.draft.reasoning && <p className="dim" style={{ margin: 0, fontSize: 13 }}><b>Why this angle:</b> {ai.draft.reasoning}</p>}
+                  {ai.draft.warnings.map((w) => <p key={w} className="cv-warn" style={{ margin: 0 }}>{w}</p>)}
+                  <Field label="Subject"><TextInput value={ai.subject} maxLength={200} onChange={(e) => setAi({ ...ai, subject: e.target.value })} /></Field>
+                  <Field label={`Email to ${lead.contactEmail ?? '(no email on file)'}`}>
+                    <textarea className="lead-textarea" rows={9} maxLength={10000} value={ai.body} onChange={(e) => setAi({ ...ai, body: e.target.value })} />
+                  </Field>
+                  <p className="dim" style={{ margin: 0, fontSize: 12 }}>Your name, the landline and an unsubscribe line are added at the bottom automatically.</p>
+                  {ai.draft.callScript && (
+                    <details><summary className="link" style={{ cursor: 'pointer', fontSize: 13 }}>Prefer to call? Call script</summary>
+                      <p className="lead-act-body">{ai.draft.callScript}</p></details>
+                  )}
+                  <Field label="Next follow-up if no reply"><TextInput type="date" value={ai.followUp} onChange={(e) => setAi({ ...ai, followUp: e.target.value })} /></Field>
+                  {ai.error && <p role="alert" className="lead-error">{ai.error}</p>}
+                  <div className="fx ac" style={{ gap: 8, flexWrap: 'wrap' }}>
+                    <Button disabled={ai.sending || !lead.contactEmail || !ai.subject.trim() || !ai.body.trim()} onClick={sendAiDraft}>{ai.sending ? 'Sending…' : 'Send email'}</Button>
+                    <Button variant="outline" disabled={ai.busy || ai.sending} onClick={() => setAi({ ...ai, draft: null })}>Redo with new steer</Button>
+                    <Button variant="outline" disabled={ai.sending} onClick={() => setAi({ ...EMPTY_AI })}>Discard</Button>
+                  </div>
+                </div>
+              )}
+              {!ai.draft && ai.error && <p role="alert" className="lead-error">{ai.error}</p>}
+            </Card>
+          )}
+
           <Card
             title="Quotes"
             subtitle={lead.quotes.length ? `${lead.quotes.length} for this lead, newest first` : 'No quotes for this lead yet'}

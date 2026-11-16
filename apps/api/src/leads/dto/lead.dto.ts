@@ -84,3 +84,20 @@ export class ConvertLeadDto {
   @IsOptional() @IsBoolean() sendInvite?: boolean;
   @IsOptional() @IsBoolean() byAi?: boolean;
 }
+
+export class SendLeadEmailDto {
+  @IsString() @MaxLength(200) subject: string;
+  /** Plain text. No sign-off: the email template adds it, plus the opt-out line. */
+  @IsString() @MaxLength(10000) body: string;
+  /** Set the next follow-up date at the same time. */
+  @IsOptional() @IsDateString() nextActionAt?: string;
+  /** The AI salesperson wrote the draft (a person reviewed and sent it). */
+  @IsOptional() @IsBoolean() aiDrafted?: boolean;
+  /** The person changed the AI draft before sending. */
+  @IsOptional() @IsBoolean() edited?: boolean;
+}
+
+export class AiDraftDto {
+  /** Optional steer, e.g. "mention Christmas cover" or "they asked for 5 pickers in Dagenham". */
+  @IsOptional() @IsString() @MaxLength(1000) instructions?: string;
+}

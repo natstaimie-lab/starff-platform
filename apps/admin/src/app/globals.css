@@ -845,6 +845,7 @@ a.link:hover {
 
 /* ── CRM convert to client ── */
 .cv-steps { margin: 0; padding-left: 20px; list-style: decimal; font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); }
+.ai-ok { margin: 0 0 12px; font-size: 13px; padding: 10px 12px; border-radius: var(--radius-md); background: #F0FDF4; border: 1px solid var(--success, #22C55E); color: var(--text-primary); }
 .cv-warn { margin: 0; font-size: 13px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--warning-50, #FFF7ED); border: 1px solid var(--orange-500); color: var(--text-primary); }
 .cv-check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
 .cv-check input { width: 18px; height: 18px; accent-color: var(--blue-500); }

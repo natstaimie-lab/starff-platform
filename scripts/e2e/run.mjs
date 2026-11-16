@@ -9,7 +9,10 @@ import { p, req, webhook, makeUser, makeWorker, track, cleanup, log, check, allP
 
 const H = 3600e3;
 const results = [];
+// E2E_ONLY="CRM" runs only the flows whose name contains that text.
+const ONLY = process.env.E2E_ONLY?.toLowerCase();
 async function flow(name, fn) {
+  if (ONLY && !name.toLowerCase().includes(ONLY)) return;
   const created = track();
   log(`\n━━ ${name} ━━`);
   try { await fn(created); }
@@ -429,6 +432,58 @@ async function leads(created) {
   check('summary has stage counts', typeof sum?.counts?.CONTACTED === 'number');
 }
 
+// ── CRM Phase 4a: employer enquiries become leads automatically; the AI
+//    salesperson drafts a follow-up (never sends); sending is guarded.
+async function aiSales(created) {
+  const admin = await makeUser(created, 'ADMIN', 'adm');
+  const stamp = Date.now();
+
+  const job = await webhook({ type: 'POST_A_JOB', name: 'Auto Lead', company: `E2E Auto Co ${stamp}`, email: `auto-${stamp}@example.com`, message: 'Need 3 pickers in Barking from Monday' }).then((r) => r.json());
+  if (job.id) created.enquiryIds.push(job.id);
+  const auto = await p.lead.findUnique({ where: { enquiryId: job.id }, include: { activities: true } });
+  if (auto?.id) created.leadIds.push(auto.id);
+  check('Post a job enquiry → lead created automatically (NEW, ENQUIRY, due now)', !!auto && auto.stage === 'NEW' && auto.source === 'ENQUIRY'
+    && auto.companyName === `E2E Auto Co ${stamp}` && !!auto.nextActionAt && auto.nextActionAt.getTime() <= Date.now());
+  check('auto lead has the "created automatically" note', auto?.activities.some((a) => a.type === 'NOTE' && /automatically/.test(a.subject ?? '')));
+  const again = await req('/leads', admin.bearer, 'POST', { enquiryId: job.id }).then((r) => r.json());
+  check('pressing "Lead" afterwards returns the same lead', again.id === auto?.id && again.existing === true);
+
+  const worker = await webhook({ type: 'CONTACT', name: 'Just A Worker', email: `worker-${stamp}@example.com`, message: 'Any shifts?' }).then((r) => r.json());
+  if (worker.id) created.enquiryIds.push(worker.id);
+  check('Contact form with no company → no lead', (await p.lead.count({ where: { enquiryId: worker.id } })) === 0);
+  const firm = await webhook({ type: 'CONTACT', name: 'Ops Person', company: `E2E Contact Co ${stamp}`, email: `ops-${stamp}@example.com`, message: 'Do you do cleaners?' }).then((r) => r.json());
+  if (firm.id) created.enquiryIds.push(firm.id);
+  check('Contact form with a company → lead', (await p.lead.count({ where: { enquiryId: firm.id } })) === 1);
+  const spam = await webhook({ type: 'POST_A_JOB', name: 'Spammer', company: 'Casino Co', email: `s-${stamp}@example.com`, message: 'best casino bonus' }).then((r) => r.json());
+  if (spam.id) created.enquiryIds.push(spam.id);
+  check('spam enquiry → no lead', (await p.lead.count({ where: { enquiryId: spam.id } })) === 0);
+
+  // Sending is guarded (no real email is sent by this test).
+  const noEmail = await req('/leads', admin.bearer, 'POST', { companyName: `E2E No Email ${stamp}` }).then((r) => r.json());
+  if (noEmail.id) created.leadIds.push(noEmail.id);
+  check('send email to a lead with no address → 400', (await req(`/leads/${noEmail.id}/email`, admin.bearer, 'POST', { subject: 'Hi', body: 'Hello' })).status === 400);
+  await req(`/leads/${auto.id}/stage`, admin.bearer, 'PATCH', { stage: 'LOST', reason: 'Asked to unsubscribe' });
+  check('send email to an unsubscribed lead → 400', (await req(`/leads/${auto.id}/email`, admin.bearer, 'POST', { subject: 'Hi', body: 'Hello' })).status === 400);
+  check('AI draft for an unsubscribed lead → 400', (await req(`/leads/${auto.id}/ai-draft`, admin.bearer, 'POST', {})).status === 400);
+
+  // The AI draft itself (needs ANTHROPIC_API_KEY on the API; one real model call).
+  const firmLead = await p.lead.findUnique({ where: { enquiryId: firm.id } });
+  if (firmLead?.id) created.leadIds.push(firmLead.id);
+  const before = await p.leadActivity.count({ where: { leadId: firmLead.id } });
+  const dr = await req(`/leads/${firmLead.id}/ai-draft`, admin.bearer, 'POST', { instructions: 'They asked about cleaners.' });
+  const draft = await dr.json();
+  if (draft.configured === false) {
+    log('   (AI draft skipped: ANTHROPIC_API_KEY not set on the API)');
+  } else {
+    check('AI draft → subject, body, call script, follow-up days', dr.status === 200 && !!draft.subject && draft.body?.length > 40 && !!draft.callScript && draft.nextFollowUpDays >= 1 && draft.nextFollowUpDays <= 14);
+    log(`   draft subject: ${draft.subject}`);
+    if (process.env.E2E_SHOW_DRAFT) log(`   draft body:\n${draft.body}\n   call script:\n${draft.callScript}\n   reasoning: ${draft.reasoning}\n   warnings: ${JSON.stringify(draft.warnings)}`);
+    check('AI draft states no prices', !/£\s?\d/.test(`${draft.subject}\n${draft.body}`));
+    check('drafting saves nothing on the lead', (await p.leadActivity.count({ where: { leadId: firmLead.id } })) === before);
+    check('drafting is audited', !!(await p.auditLog.findFirst({ where: { entity: 'Lead', entityId: firmLead.id, action: 'lead.ai_drafted' } })));
+  }
+}
+
 // ── Run everything ──
 try {
   await flow('Full journey: client books → worker accepts → timesheet approved', fullJourney);
@@ -441,6 +496,7 @@ try {
   await flow('Reliability appeal', reliability);
   await flow('WordPress enquiry webhook', enquiry);
   await flow('CRM leads + activity log', leads);
+  await flow('CRM AI salesperson (auto leads + AI draft)', aiSales);
   log(`\n${allPassed() ? '✅ ALL E2E FLOWS PASSED' : '❌ SOME CHECKS FAILED'}`);
 } finally {
   await p.$disconnect();

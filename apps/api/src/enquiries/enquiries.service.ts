@@ -5,6 +5,7 @@ import { CreateEnquiryDto } from './dto/create-enquiry.dto';
 import { RegistrationService } from '../registration/registration.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AuditService } from '../audit/audit.service';
+import { LeadsService } from '../leads/leads.service';
 
 // Conservative spam signals — tuned to avoid false positives on genuine enquiries.
 const SPAM_KEYWORDS = [
@@ -30,6 +31,7 @@ export class EnquiriesService {
     private readonly registration: RegistrationService,
     private readonly notifications: NotificationsService,
     private readonly audit: AuditService,
+    private readonly leads: LeadsService,
   ) {}
 
   /**
@@ -116,6 +118,9 @@ export class EnquiriesService {
 
     // Spam is filed quietly to the spam bucket — no bell, no badge, no email.
     if (spam) return enquiry;
+
+    // Employer enquiries go straight into the CRM as a NEW lead due today (best-effort).
+    await this.leads.createFromEnquiry(enquiry.id);
 
     // Notify staff in-app so a new enquiry shows on the admin bell (best-effort).
     try {

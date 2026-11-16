@@ -3,9 +3,11 @@ import { ClientStatus, LeadActivityType, LeadSource, LeadStage, Prisma, Registra
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { RegistrationService } from '../registration/registration.service';
-import type { ChangeStageDto, ConvertLeadDto, CreateLeadDto, LogActivityDto, UpdateLeadDto } from './dto/lead.dto';
+import type { ChangeStageDto, ConvertLeadDto, CreateLeadDto, LogActivityDto, SendLeadEmailDto, UpdateLeadDto } from './dto/lead.dto';
 import { clientStatusForStage, followUpBucket, londonDay, stageChangeError, stageForClientStatus } from './lead-stages';
 import { findClientMatches, type MatchReason } from './client-match';
+import { LeadMailer } from './lead-mailer';
+import { optedOut } from './ai-sales.service';
 
 const listSelect = {
   client: { select: { id: true, name: true, status: true } },
@@ -31,7 +33,117 @@ export class LeadsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly registration: RegistrationService,
+    private readonly mailer: LeadMailer,
   ) {}
+
+  /**
+   * Called by the website webhook: every genuine employer enquiry becomes a
+   * NEW lead straight away, due for follow-up today, so nobody has to press
+   * "Lead" on the Enquiries page. "Post a job" always counts; a Contact form
+   * counts only when it names a company (workers use it too). Idempotent per
+   * enquiry and best-effort: it never throws, so the form never fails.
+   */
+  async createFromEnquiry(enquiryId: string): Promise<{ id: string } | null> {
+    try {
+      const enq = await this.prisma.enquiry.findUnique({ where: { id: enquiryId }, include: { lead: { select: { id: true } } } });
+      if (!enq || enq.spam) return null;
+      if (enq.lead) return enq.lead;
+      const isEmployer = enq.type === 'POST_A_JOB' || (enq.type === 'CONTACT' && !!blank(enq.company));
+      if (!isEmployer) return null;
+
+      const payload = (enq.payload ?? {}) as Record<string, unknown>;
+      const pick = (...keys: string[]) => {
+        for (const k of keys) {
+          const v = payload[k];
+          if (typeof v === 'string' && v.trim()) return v.trim();
+          if (Array.isArray(v) && typeof v[0] === 'string' && v[0].trim()) return v[0].trim();
+        }
+        return undefined;
+      };
+      const owner = await this.prisma.user.findFirst({
+        where: { role: Role.ADMIN, isActive: true },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      const now = new Date();
+      const lead = await this.prisma.lead.create({
+        data: {
+          companyName: blank(enq.company) ?? blank(enq.name) ?? 'Website enquiry',
+          contactName: blank(enq.name),
+          contactEmail: blank(enq.email)?.toLowerCase(),
+          contactPhone: blank(enq.phone),
+          sector: pick('sector', 'your-sector', 'industry'),
+          postcode: pick('postcode', 'your-postcode')?.toUpperCase(),
+          notes: blank(enq.message),
+          enquiryId: enq.id,
+          source: LeadSource.ENQUIRY,
+          stage: LeadStage.NEW,
+          ownerId: owner?.id,
+          nextActionAt: now,
+          activities: {
+            create: {
+              type: LeadActivityType.NOTE,
+              subject: 'Created automatically from a website enquiry',
+              body: enq.type === 'POST_A_JOB' ? 'From the "Post a job" form.' : 'From the Contact form.',
+              meta: { enquiryId: enq.id, auto: true },
+              occurredAt: now,
+            },
+          },
+        },
+        select: { id: true },
+      });
+      await this.audit.log({ action: 'lead.created', entity: 'Lead', entityId: lead.id, meta: { source: 'ENQUIRY', enquiryId: enq.id, auto: true } });
+      return lead;
+    } catch (e) {
+      // Unique clash = a lead was made for this enquiry at the same moment. Anything else: staff can still press "Lead".
+      if ((e as { code?: string }).code !== 'P2002') console.error(`[leads] auto-lead from enquiry ${enquiryId} failed: ${(e as Error).message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Send a one-to-one email to the lead's contact (typed by staff, or drafted
+   * by the AI salesperson and approved by staff), log it on the timeline,
+   * set the next follow-up and move a NEW lead to CONTACTED.
+   */
+  async sendEmail(id: string, dto: SendLeadEmailDto, user: { id: string; email?: string }) {
+    const lead = await this.prisma.lead.findUnique({ where: { id } });
+    if (!lead) throw new NotFoundException('Lead not found');
+    if (lead.archivedAt) throw new BadRequestException('This lead is archived. Restore it first.');
+    if (optedOut(lead)) throw new BadRequestException(`${lead.companyName} asked not to be contacted.`);
+    if (!lead.contactEmail) throw new BadRequestException('This lead has no email address. Add one first.');
+    const subject = dto.subject.trim();
+    const message = dto.body.trim();
+    if (!subject || !message) throw new BadRequestException('Add a subject and a message.');
+
+    const sender = await this.prisma.user.findUnique({ where: { id: user.id }, select: { email: true, firstName: true, lastName: true } });
+    const senderName = [sender?.firstName, sender?.lastName].filter(Boolean).join(' ') || null;
+    const sent = await this.mailer.send({ to: lead.contactEmail, subject, message, senderEmail: sender?.email ?? user.email, senderName });
+
+    const now = new Date();
+    const aiDrafted = dto.aiDrafted ?? false;
+    await this.prisma.$transaction([
+      this.prisma.leadActivity.create({
+        data: {
+          leadId: id, type: LeadActivityType.EMAIL, direction: 'outbound', subject, body: message,
+          meta: { resendId: sent.id ?? null, to: lead.contactEmail, aiDrafted, edited: dto.edited ?? null, approvedBy: aiDrafted ? user.id : null },
+          occurredAt: now, createdById: user.id, byAi: aiDrafted,
+        },
+      }),
+      this.prisma.lead.update({
+        where: { id },
+        data: { lastActivityAt: now, ...(dto.nextActionAt ? { nextActionAt: new Date(dto.nextActionAt) } : {}) },
+      }),
+    ]);
+    await this.audit.log({
+      actorId: user.id, action: 'lead.email_sent', entity: 'Lead', entityId: id,
+      meta: { to: lead.contactEmail, subject, resendId: sent.id ?? null, aiDrafted, edited: dto.edited ?? null },
+    });
+    if (lead.stage === LeadStage.NEW) {
+      await this.changeStage(id, { stage: LeadStage.CONTACTED, note: 'First email sent.', byAi: aiDrafted }, user.id);
+    }
+    return { sent: true, resendId: sent.id ?? null, to: lead.contactEmail };
+  }
 
   list(f: { stage?: LeadStage; q?: string; ownerId?: string; clientId?: string; dueBefore?: Date; includeArchived?: boolean }) {
     const where: Prisma.LeadWhereInput = {};
