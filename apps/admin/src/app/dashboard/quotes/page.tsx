@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { Card } from '@/components/ui';
+import { SECTORS, SECTOR_ROLES, type Sector } from '@/lib/sectors';
 import { calculateQuote, type QuoteResult, type QuoteSettings, type ShiftType } from '@/lib/quoteCalculator';
 
 /** Rate settings as stored by the API (percentages as 12.07, not 0.1207). */
@@ -108,6 +109,7 @@ export default function QuotesPage() {
   });
   const [copied, setCopied] = useState(false);
   const [description, setDescription] = useState('');
+  const [sector, setSector] = useState<Sector>('Warehouse & Logistics');
   const [lines, setLines] = useState<Line[]>([]);
   const [clients, setClients] = useState<ClientOpt[]>([]);
   const [details, setDetails] = useState<Details>({ clientId: '', prospectName: '', contactName: '', contactEmail: '', title: '', validUntil: in30Days(), notes: '' });
@@ -194,7 +196,7 @@ export default function QuotesPage() {
   function addLine() {
     if (!result) return;
     setLines((ls) => [...ls, {
-      description: description.trim() || `${shiftLabel} shift`,
+      description: description.trim() || SECTOR_ROLES[sector][0],
       payRate: Number(form.payRate), marginPerHour: Number(form.marginPerHour), hoursPerShift: Number(form.hoursPerShift),
       shifts: Number(form.shifts), temps: Number(form.temps), shiftType: form.shiftType, pensionEnrolled: form.pensionEnrolled,
     }]);
@@ -253,9 +255,17 @@ export default function QuotesPage() {
       {/* Calculator + breakdown share the full width; they stack on narrow screens. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, alignItems: 'start' }}>
       <Card title="Booking details" subtitle="Change any figure — the breakdown updates as you type">
-        <div style={{ marginBottom: 14 }}>
-          <Field label="Role / line description" hint="Shown on the quote, e.g. Warehouse operative">
-            <input aria-label="Role / line description" value={description} maxLength={200} onChange={(e) => setDescription(e.target.value)} placeholder="Warehouse operative" style={inputStyle} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 14 }}>
+          <Field label="Sector">
+            <select aria-label="Sector" value={sector} onChange={(e) => { setSector(e.target.value as Sector); setDescription(''); }} style={inputStyle}>
+              {SECTORS.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </Field>
+          <Field label="Role" hint="Pick a suggestion or type your own — shown on the quote">
+            <input aria-label="Role" list="sector-roles" value={description} maxLength={200} onChange={(e) => setDescription(e.target.value)} placeholder={SECTOR_ROLES[sector][0]} style={inputStyle} />
+            <datalist id="sector-roles">
+              {SECTOR_ROLES[sector].map((r) => <option key={r} value={r} />)}
+            </datalist>
           </Field>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14 }}>
