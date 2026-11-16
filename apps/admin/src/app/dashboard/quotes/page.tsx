@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { Card } from '@/components/ui';
 import { calculateQuote, type QuoteResult, type QuoteSettings, type ShiftType } from '@/lib/quoteCalculator';
@@ -48,6 +50,23 @@ type Form = {
   pensionEnrolled: boolean;
 };
 
+/** One role on the quote being built (inputs only — the API prices it on save). */
+type Line = {
+  description: string; payRate: number; marginPerHour: number; hoursPerShift: number;
+  shifts: number; temps: number; shiftType: ShiftType; pensionEnrolled: boolean;
+};
+type ClientOpt = { id: string; name: string };
+type SavedQuote = {
+  id: string; number: string; status: string; clientId: string | null; prospectName: string | null;
+  contactName: string | null; contactEmail: string | null; title: string | null; notes: string | null;
+  validUntil: string;
+  lines: { description: string; payRate: string; marginPerHour: string; hoursPerShift: string; shifts: number; temps: number; shiftType: ShiftType; pensionEnrolled: boolean }[];
+};
+type Details = { clientId: string; prospectName: string; contactName: string; contactEmail: string; title: string; validUntil: string; notes: string };
+
+const isoDay = (d: Date) => d.toISOString().slice(0, 10);
+const in30Days = () => { const d = new Date(); d.setDate(d.getDate() + 30); return isoDay(d); };
+
 const gbp = (n: number) => '£' + n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const inputStyle: React.CSSProperties = {
@@ -88,6 +107,14 @@ export default function QuotesPage() {
     shiftType: 'standard', pensionEnrolled: true,
   });
   const [copied, setCopied] = useState(false);
+  const [description, setDescription] = useState('');
+  const [lines, setLines] = useState<Line[]>([]);
+  const [clients, setClients] = useState<ClientOpt[]>([]);
+  const [details, setDetails] = useState<Details>({ clientId: '', prospectName: '', contactName: '', contactEmail: '', title: '', validUntil: in30Days(), notes: '' });
+  const [editing, setEditing] = useState<{ id: string; number: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const router = useRouter();
 
   useEffect(() => {
     apiFetch<{ settings: RateSettingValues }>('/quotes/rate-settings')
@@ -97,6 +124,22 @@ export default function QuotesPage() {
         setForm((f) => (f.marginPerHour === '' ? { ...f, marginPerHour: r.settings.defaultMarginPerHour.toFixed(2) } : f));
       })
       .catch((e) => setLoadError(e?.message || 'Could not load rate settings'));
+    apiFetch<ClientOpt[]>('/clients').then((cs) => setClients(cs.map((c) => ({ id: c.id, name: c.name })))).catch(() => {});
+    // ?edit=<id> opens a saved draft for editing.
+    const editId = new URLSearchParams(window.location.search).get('edit');
+    if (editId) {
+      apiFetch<SavedQuote>(`/quotes/${editId}`).then((q) => {
+        setEditing({ id: q.id, number: q.number });
+        setDetails({
+          clientId: q.clientId ?? '', prospectName: q.prospectName ?? '', contactName: q.contactName ?? '',
+          contactEmail: q.contactEmail ?? '', title: q.title ?? '', validUntil: q.validUntil.slice(0, 10), notes: q.notes ?? '',
+        });
+        setLines(q.lines.map((l) => ({
+          description: l.description, payRate: Number(l.payRate), marginPerHour: Number(l.marginPerHour),
+          hoursPerShift: Number(l.hoursPerShift), shifts: l.shifts, temps: l.temps, shiftType: l.shiftType, pensionEnrolled: l.pensionEnrolled,
+        })));
+      }).catch((e) => setSaveError(e?.message || 'Could not open that quote'));
+    }
   }, []);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => { setCopied(false); setForm((f) => ({ ...f, [k]: v })); };
@@ -146,6 +189,59 @@ export default function QuotesPage() {
     try { await navigator.clipboard.writeText(lines.join('\n')); setCopied(true); } catch { alert(lines.join('\n')); }
   }
 
+  const setD = <K extends keyof Details>(k: K, v: Details[K]) => setDetails((d) => ({ ...d, [k]: v }));
+
+  function addLine() {
+    if (!result) return;
+    setLines((ls) => [...ls, {
+      description: description.trim() || `${shiftLabel} shift`,
+      payRate: Number(form.payRate), marginPerHour: Number(form.marginPerHour), hoursPerShift: Number(form.hoursPerShift),
+      shifts: Number(form.shifts), temps: Number(form.temps), shiftType: form.shiftType, pensionEnrolled: form.pensionEnrolled,
+    }]);
+    setDescription('');
+  }
+
+  function loadLine(i: number) {
+    const l = lines[i];
+    setDescription(l.description);
+    setForm({
+      payRate: l.payRate.toFixed(2), marginPerHour: l.marginPerHour.toFixed(2), hoursPerShift: String(l.hoursPerShift),
+      shifts: String(l.shifts), temps: String(l.temps), shiftType: l.shiftType, pensionEnrolled: l.pensionEnrolled,
+    });
+    setLines((ls) => ls.filter((_, j) => j !== i));
+  }
+
+  // Each line priced with the same calculator, for the running quote total.
+  const priced = useMemo(() => {
+    if (!rates) return [];
+    return lines.map((l) => { try { return calculateQuote(l, toQuoteSettings(rates)); } catch { return null; } });
+  }, [lines, rates]);
+  const quoteTotal = priced.reduce((t, r) => t + (r?.total ?? 0), 0);
+  const quoteProfit = priced.reduce((t, r) => t + (r?.profit ?? 0), 0);
+
+  async function saveQuote() {
+    setSaveError('');
+    if (lines.length === 0) { setSaveError('Add at least one line to the quote.'); return; }
+    if (!details.clientId && !details.prospectName.trim()) { setSaveError('Choose a client or type a company name.'); return; }
+    const body = {
+      clientId: details.clientId || undefined,
+      prospectName: details.clientId ? undefined : details.prospectName.trim(),
+      contactName: details.contactName.trim() || undefined,
+      contactEmail: details.contactEmail.trim() || undefined,
+      title: details.title.trim() || undefined,
+      notes: details.notes.trim() || undefined,
+      validUntil: details.validUntil || undefined,
+      lines,
+    };
+    setSaving(true);
+    try {
+      await apiFetch(editing ? `/quotes/${editing.id}` : '/quotes', { method: editing ? 'PATCH' : 'POST', body: JSON.stringify(body) });
+      router.push('/dashboard/quotes/saved');
+    } catch (e: any) {
+      setSaveError(e?.message || 'Could not save the quote');
+    } finally { setSaving(false); }
+  }
+
   if (loadError) {
     return <Card title="Quote calculator"><p style={{ color: 'var(--error-600, #c0392b)' }}>{loadError}</p></Card>;
   }
@@ -155,6 +251,11 @@ export default function QuotesPage() {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, alignItems: 'start' }}>
       <Card title="Booking details" subtitle="Change any figure — the breakdown updates as you type">
+        <div style={{ marginBottom: 14 }}>
+          <Field label="Role / line description" hint="Shown on the quote, e.g. Warehouse operative">
+            <input aria-label="Role / line description" value={description} maxLength={200} onChange={(e) => setDescription(e.target.value)} placeholder="Warehouse operative" style={inputStyle} />
+          </Field>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14 }}>
           <Field label="Pay rate to worker" prefix="£" hint={rates ? `NLW 21+: £${rates.minimumWage.toFixed(2)}` : undefined}>
             <input aria-label="Pay rate to worker" inputMode="decimal" type="number" min={0} step="0.01" value={form.payRate} onChange={(e) => set('payRate', e.target.value)} style={{ ...inputStyle, paddingLeft: 24 }} />
@@ -181,6 +282,9 @@ export default function QuotesPage() {
           <input type="checkbox" checked={form.pensionEnrolled} onChange={(e) => set('pensionEnrolled', e.target.checked)} />
           Worker is auto-enrolled in the pension
         </label>
+        <button className="aibtn" style={{ marginTop: 16, background: 'var(--blue-500)', color: '#fff', border: 'none', opacity: result ? 1 : 0.5 }} disabled={!result} onClick={addLine}>
+          + Add to quote
+        </button>
         {rates && (
           <p className="dim" style={{ fontSize: 12, marginTop: 16, lineHeight: 1.5 }}>
             On-costs from rate settings: holiday {rates.holidayPct}% · employer NI {rates.employerNiPct}% above £{rates.niThresholdWeekly}/wk ·
@@ -237,6 +341,85 @@ export default function QuotesPage() {
           </div>
         )}
       </Card>
+
+      <div style={{ gridColumn: '1 / -1' }}>
+        <Card
+          title={editing ? `Edit quote ${editing.number}` : 'Quote'}
+          subtitle="Add one line per role, then save. Saved quotes are re-priced by the server with the current rates."
+          action={<Link href="/dashboard/quotes/saved" className="link" style={{ fontSize: 13, fontWeight: 600 }}>Saved quotes →</Link>}
+        >
+          {lines.length === 0 ? (
+            <p className="dim" style={{ fontSize: 13.5 }}>No lines yet. Fill in the booking details above and click <b>+ Add to quote</b>.</p>
+          ) : (
+            <table className="tbl" style={{ width: '100%' }}>
+              <thead><tr><th>Role</th><th>Booking</th><th style={{ textAlign: 'right' }}>Pay</th><th style={{ textAlign: 'right' }}>Charge /hr</th><th style={{ textAlign: 'right' }}>Total</th><th style={{ textAlign: 'right' }}>Profit</th><th /></tr></thead>
+              <tbody>
+                {lines.map((l, i) => {
+                  const r = priced[i];
+                  return (
+                    <tr key={i}>
+                      <td style={{ fontWeight: 600 }}>{l.description}</td>
+                      <td className="dim">{l.temps} × {l.shifts} × {r?.chargedHoursPerShift ?? l.hoursPerShift}h · {SHIFT_TYPES.find((s) => s.value === l.shiftType)!.label.toLowerCase()}</td>
+                      <td className="mono" style={{ textAlign: 'right' }}>{gbp(l.payRate)}</td>
+                      <td className="mono" style={{ textAlign: 'right' }}>{r ? gbp(r.chargeRate) : '—'}</td>
+                      <td className="mono" style={{ textAlign: 'right', fontWeight: 700 }}>{r ? gbp(r.total) : '—'}</td>
+                      <td className="mono" style={{ textAlign: 'right' }}>{r ? gbp(r.profit) : '—'}</td>
+                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <button className="link" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12.5 }} onClick={() => loadLine(i)}>Edit</button>
+                        <button className="link" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12.5, color: 'var(--error-600, #c0392b)' }} onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}>Remove</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr>
+                  <td colSpan={4} style={{ fontWeight: 800 }}>Quote total (no VAT)</td>
+                  <td className="mono" style={{ textAlign: 'right', fontWeight: 800 }}>{gbp(quoteTotal)}</td>
+                  <td className="mono" style={{ textAlign: 'right', fontWeight: 700 }}>{gbp(quoteProfit)}</td>
+                  <td />
+                </tr>
+              </tbody>
+            </table>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginTop: 18 }}>
+            <Field label="Client">
+              <select aria-label="Client" value={details.clientId} onChange={(e) => setD('clientId', e.target.value)} style={inputStyle}>
+                <option value="">— New company (not a client yet) —</option>
+                {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Field>
+            {!details.clientId && (
+              <Field label="Company name">
+                <input aria-label="Company name" value={details.prospectName} maxLength={200} onChange={(e) => setD('prospectName', e.target.value)} style={inputStyle} />
+              </Field>
+            )}
+            <Field label="Contact name">
+              <input aria-label="Contact name" value={details.contactName} maxLength={200} onChange={(e) => setD('contactName', e.target.value)} style={inputStyle} />
+            </Field>
+            <Field label="Contact email">
+              <input aria-label="Contact email" type="email" value={details.contactEmail} onChange={(e) => setD('contactEmail', e.target.value)} style={inputStyle} />
+            </Field>
+            <Field label="Quote title" hint="Optional, e.g. Christmas peak cover">
+              <input aria-label="Quote title" value={details.title} maxLength={200} onChange={(e) => setD('title', e.target.value)} style={inputStyle} />
+            </Field>
+            <Field label="Valid until">
+              <input aria-label="Valid until" type="date" value={details.validUntil} onChange={(e) => setD('validUntil', e.target.value)} style={inputStyle} />
+            </Field>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <Field label="Notes" hint="Internal notes — not sent anywhere">
+              <textarea aria-label="Notes" value={details.notes} maxLength={4000} rows={3} onChange={(e) => setD('notes', e.target.value)} style={{ ...inputStyle, height: 'auto', padding: 10 }} />
+            </Field>
+          </div>
+          {saveError && <p role="alert" style={{ color: 'var(--error-600, #c0392b)', fontSize: 13.5, marginTop: 12 }}>{saveError}</p>}
+          <div className="fx ac" style={{ gap: 12, marginTop: 16 }}>
+            <button className="aibtn" style={{ background: 'var(--blue-500)', color: '#fff', border: 'none' }} disabled={saving} onClick={saveQuote}>
+              {saving ? 'Saving…' : editing ? 'Save changes' : 'Save quote'}
+            </button>
+            {editing && <Link href="/dashboard/quotes/saved" className="link" style={{ fontSize: 13 }}>Cancel</Link>}
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }
