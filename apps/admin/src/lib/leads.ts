@@ -44,6 +44,8 @@ export type LeadDetail = Lead & {
   enquiry: { id: string; type: string; status: string; message: string | null; createdAt: string } | null;
   activities: Activity[];
   quotes: LeadQuote[];
+  /** Pending AI salesperson draft, if one is waiting in AI approvals. */
+  aiDrafts?: { id: string; subject: string; createdAt: string }[];
 };
 
 export const QUOTE_LABEL: Record<LeadQuote['status'], string> = { DRAFT: 'Draft', SENT: 'Sent', ACCEPTED: 'Accepted', DECLINED: 'Declined' };

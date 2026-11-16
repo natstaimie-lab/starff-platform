@@ -1,13 +1,28 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import Anthropic from '@anthropic-ai/sdk';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { LeadsService } from './leads.service';
+import { londonDay, optedOut } from './lead-stages';
 
 export const AI_SALES_MODEL = 'claude-opus-5-5';
 
-/** A lead that has asked not to be contacted. Nothing is drafted or sent to them. */
-export const optedOut = (lead: { stage: string; lostReason: string | null }) =>
-  lead.stage === 'LOST' && /unsubscrib|opt(ed)?[ -]?out|do not (contact|email)|don'?t (contact|email)|remove me/i.test(lead.lostReason ?? '');
+export { optedOut };
+
+/** How many leads the morning run drafts for, at most (AI_SALES_DAILY_CAP, default 15). */
+const dailyCap = () => Math.max(1, Math.min(50, Number(process.env.AI_SALES_DAILY_CAP) || 15));
+/** The 07:30 run is on in production unless AI_SALES_AUTODRAFT=off; elsewhere only with AI_SALES_AUTODRAFT=on. */
+const autodraftOn = () => {
+  const v = (process.env.AI_SALES_AUTODRAFT ?? '').toLowerCase();
+  if (v === 'off') return false;
+  return v === 'on' || process.env.NODE_ENV === 'production';
+};
+/** yyyy-mm-dd for the London day containing `d`. */
+const londonDate = (d = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(d);
+
+type Generated = Omit<FollowUpDraft, 'configured'>;
 
 export interface FollowUpDraft {
   configured: true;
@@ -56,9 +71,12 @@ Hard rules:
 export class AiSalesService {
   private readonly logger = new Logger('AiSales');
 
+  private running = false;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly leads: LeadsService,
   ) {}
 
   private async context(id: string) {
@@ -111,15 +129,8 @@ export class AiSalesService {
     return w;
   }
 
-  async draftFollowUp(id: string, userId: string, instructions?: string): Promise<FollowUpDraft | { configured: false; message: string }> {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return { configured: false, message: 'The AI salesperson is off: ANTHROPIC_API_KEY is not set on the API server.' };
-    }
-    const lead = await this.context(id);
-    if (lead.archivedAt) throw new BadRequestException('This lead is archived. Restore it first.');
-    if (optedOut(lead)) throw new BadRequestException(`${lead.companyName} asked not to be contacted, so no follow-up is drafted.`);
-    if (lead.stage === 'WON') throw new BadRequestException(`${lead.companyName} is already won. Follow-ups are for open leads.`);
-
+  /** Ask Claude for one follow-up. Throws ServiceUnavailableException with a plain message on failure. */
+  private async generate(lead: Awaited<ReturnType<AiSalesService['context']>>, instructions?: string): Promise<Generated> {
     const client = new Anthropic();
     let resp: any;
     try {
@@ -136,7 +147,7 @@ export class AiSalesService {
         } as Record<string, unknown>),
       } as any);
     } catch (e) {
-      this.logger.error(`draft failed for lead ${id}: ${(e as Error).message}`);
+      this.logger.error(`draft failed for lead ${lead.id}: ${(e as Error).message}`);
       if (e instanceof Anthropic.RateLimitError) throw new ServiceUnavailableException('The AI is busy right now. Try again in a minute.');
       if (e instanceof Anthropic.AuthenticationError) throw new ServiceUnavailableException('The AI key on the API server is invalid or expired.');
       throw new ServiceUnavailableException('The AI could not write a draft just now. Try again.');
@@ -148,31 +159,170 @@ export class AiSalesService {
     try {
       out = JSON.parse(text);
     } catch {
-      this.logger.error(`unparseable draft for lead ${id} (stop_reason ${resp.stop_reason})`);
+      this.logger.error(`unparseable draft for lead ${lead.id} (stop_reason ${resp.stop_reason})`);
       throw new ServiceUnavailableException('The AI reply came back garbled. Try again.');
     }
     const subject = (out.subject ?? '').trim();
     const body = (out.body ?? '').trim();
     if (!subject || !body) throw new ServiceUnavailableException('The AI draft was empty. Try again.');
-    const nextFollowUpDays = Math.min(14, Math.max(1, Math.round(Number(out.nextFollowUpDays) || 3)));
+    return {
+      subject,
+      body,
+      callScript: (out.callScript ?? '').trim(),
+      nextFollowUpDays: Math.min(14, Math.max(1, Math.round(Number(out.nextFollowUpDays) || 3))),
+      reasoning: (out.reasoning ?? '').trim(),
+      warnings: [...this.checks(body, subject), ...(lead.contactEmail ? [] : ['This lead has no email address. Add one, or use the call script.'])],
+      model: resp.model ?? AI_SALES_MODEL,
+    };
+  }
 
+  async draftFollowUp(id: string, userId: string, instructions?: string): Promise<FollowUpDraft | { configured: false; message: string }> {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return { configured: false, message: 'The AI salesperson is off: ANTHROPIC_API_KEY is not set on the API server.' };
+    }
+    const lead = await this.context(id);
+    if (lead.archivedAt) throw new BadRequestException('This lead is archived. Restore it first.');
+    if (optedOut(lead)) throw new BadRequestException(`${lead.companyName} asked not to be contacted, so no follow-up is drafted.`);
+    if (lead.stage === 'WON') throw new BadRequestException(`${lead.companyName} is already won. Follow-ups are for open leads.`);
+
+    const g = await this.generate(lead, instructions);
     await this.audit.log({
       actorId: userId,
       action: 'lead.ai_drafted',
       entity: 'Lead',
       entityId: id,
-      meta: { model: resp.model ?? AI_SALES_MODEL, instructions: instructions?.trim() || null, subject },
+      meta: { model: g.model, instructions: instructions?.trim() || null, subject: g.subject },
     });
+    return { configured: true, ...g };
+  }
 
-    return {
-      configured: true,
-      subject,
-      body,
-      callScript: (out.callScript ?? '').trim(),
-      nextFollowUpDays,
-      reasoning: (out.reasoning ?? '').trim(),
-      warnings: [...this.checks(body, subject), ...(lead.contactEmail ? [] : ['This lead has no email address. Add one, or use the call script.'])],
-      model: resp.model ?? AI_SALES_MODEL,
-    };
+  // ─── Phase 4b: the morning run + approvals queue ────────────────────────────
+
+  /** Leads the morning run would draft for: open, due today or overdue, with an email, not opted out, no draft yet today. */
+  private async dueLeads(forDay: string) {
+    const due = await this.prisma.lead.findMany({
+      where: {
+        archivedAt: null,
+        stage: { notIn: ['WON', 'LOST'] },
+        nextActionAt: { lt: londonDay().end },
+        aiDrafts: { none: { forDay } },
+      },
+      select: { id: true, contactEmail: true, stage: true, lostReason: true, companyName: true },
+      orderBy: { nextActionAt: 'asc' },
+      take: 500,
+    });
+    const withEmail = due.filter((l) => !!l.contactEmail && !optedOut(l) && !/^TEST\b/i.test(l.companyName));
+    return { withEmail, noEmail: due.filter((l) => !l.contactEmail).length };
+  }
+
+  /**
+   * Draft follow-ups for today's due leads into the approvals queue.
+   * Capped per day, 3 at a time, one draft per lead per day; never sends.
+   */
+  async runDaily(trigger: 'schedule' | 'manual', userId?: string) {
+    if (!process.env.ANTHROPIC_API_KEY) return { started: false, message: 'The AI salesperson is off: ANTHROPIC_API_KEY is not set on the API server.' };
+    if (this.running) throw new ConflictException('The AI salesperson is already drafting. Give it a few minutes.');
+    const forDay = londonDate();
+    const already = await this.prisma.aiDraft.count({ where: { forDay } });
+    const room = Math.max(0, dailyCap() - already);
+    const { withEmail, noEmail } = await this.dueLeads(forDay);
+    const batch = withEmail.slice(0, room);
+    if (!batch.length) {
+      return { started: false, queued: 0, noEmail, capReached: room === 0, message: room === 0 ? `Today's limit of ${dailyCap()} draft${dailyCap() === 1 ? '' : 's'} is reached.` : 'Nothing due with an email address right now.' };
+    }
+
+    this.running = true;
+    const work = (async () => {
+      let made = 0, failed = 0;
+      try {
+        const queue = [...batch];
+        const worker = async () => {
+          for (let l = queue.shift(); l; l = queue.shift()) {
+            try {
+              const lead = await this.context(l.id);
+              const g = await this.generate(lead);
+              await this.prisma.aiDraft.create({
+                data: {
+                  leadId: l.id, forDay, trigger, subject: g.subject, body: g.body, callScript: g.callScript || null,
+                  reasoning: g.reasoning || null, warnings: g.warnings as Prisma.InputJsonValue, nextFollowUpDays: g.nextFollowUpDays, model: g.model,
+                },
+              });
+              made++;
+            } catch (e) {
+              // P2002 = someone else drafted this lead today already. Anything else: skip it, it stays on Today.
+              if ((e as { code?: string }).code !== 'P2002') { failed++; this.logger.warn(`draft for ${l.id} skipped: ${(e as Error).message}`); }
+            }
+          }
+        };
+        await Promise.all([worker(), worker(), worker()]);
+      } finally {
+        this.running = false;
+        await this.audit.log({ actorId: userId ?? null, action: 'ai_sales.run', entity: 'AiDraft', entityId: forDay, meta: { trigger, asked: batch.length, made, failed, noEmail } });
+        this.logger.log(`AI salesperson ${trigger} run ${forDay}: ${made} drafted, ${failed} failed, ${noEmail} due without email`);
+      }
+      return { made, failed };
+    })();
+
+    // The morning job waits; a button press returns straight away and the page polls.
+    if (trigger === 'schedule') await work;
+    else work.catch(() => {});
+    return { started: true, queued: batch.length, noEmail, message: `Drafting ${batch.length} follow-up${batch.length === 1 ? '' : 's'}. They appear here as they're ready.` };
+  }
+
+  /** Weekdays 07:30 London: drafts are waiting when the day starts. */
+  @Cron('30 7 * * 1-5', { name: 'ai-sales-morning', timeZone: 'Europe/London' })
+  async morningRun() {
+    if (!autodraftOn()) return;
+    try { await this.runDaily('schedule'); } catch (e) { this.logger.warn(`morning run failed: ${(e as Error).message}`); }
+  }
+
+  /** The approvals queue. Pending drafts for leads that have since closed are marked stale first. */
+  async listDrafts(status: 'PENDING' | 'DONE' = 'PENDING') {
+    await this.prisma.aiDraft.updateMany({
+      where: { status: 'PENDING', lead: { OR: [{ archivedAt: { not: null } }, { stage: { in: ['WON', 'LOST'] } }] } },
+      data: { status: 'STALE', decidedAt: new Date() },
+    });
+    const rows = await this.prisma.aiDraft.findMany({
+      where: status === 'PENDING' ? { status: 'PENDING' } : { status: { not: 'PENDING' }, decidedAt: { gte: new Date(Date.now() - 7 * 864e5) } },
+      orderBy: status === 'PENDING' ? { createdAt: 'asc' } : { decidedAt: 'desc' },
+      take: 100,
+      include: { lead: { select: { id: true, companyName: true, contactName: true, contactRole: true, contactEmail: true, contactPhone: true, stage: true, sector: true, city: true, nextActionAt: true, lastActivityAt: true } } },
+    });
+    return rows.map((d) => ({ ...d, leadChanged: !!d.lead.lastActivityAt && d.lead.lastActivityAt > d.createdAt }));
+  }
+
+  async summary() {
+    const forDay = londonDate();
+    const [pending, today, { withEmail, noEmail }] = await Promise.all([
+      this.prisma.aiDraft.count({ where: { status: 'PENDING' } }),
+      this.prisma.aiDraft.count({ where: { forDay } }),
+      this.dueLeads(forDay),
+    ]);
+    return { pending, draftedToday: today, dailyCap: dailyCap(), dueWithEmail: withEmail.length, dueNoEmail: noEmail, running: this.running, autodraft: autodraftOn(), configured: !!process.env.ANTHROPIC_API_KEY };
+  }
+
+  private async pending(id: string) {
+    const d = await this.prisma.aiDraft.findUnique({ where: { id } });
+    if (!d) throw new NotFoundException('Draft not found');
+    if (d.status !== 'PENDING') throw new ConflictException(`This draft was already ${d.status.toLowerCase()}.`);
+    return d;
+  }
+
+  /** Send a queued draft (as written, or edited) through the normal lead email path. */
+  async sendDraft(id: string, dto: { subject: string; body: string; nextActionAt?: string }, user: { id: string; email?: string }) {
+    const d = await this.pending(id);
+    const edited = dto.subject.trim() !== d.subject || dto.body.trim() !== d.body;
+    const r = await this.leads.sendEmail(d.leadId, { subject: dto.subject, body: dto.body, nextActionAt: dto.nextActionAt, aiDrafted: true, edited }, user, d.id);
+    await this.prisma.aiDraft.update({ where: { id }, data: { status: 'SENT', decidedAt: new Date(), decidedById: user.id, activityId: r.activityId } });
+    return { ...r, edited };
+  }
+
+  /** Don't send. Optionally push the lead's follow-up date so it drops off Today. */
+  async skipDraft(id: string, dto: { reason?: string; nextActionAt?: string }, userId: string) {
+    const d = await this.pending(id);
+    await this.prisma.aiDraft.update({ where: { id }, data: { status: 'SKIPPED', decidedAt: new Date(), decidedById: userId, skipReason: dto.reason?.trim() || null } });
+    if (dto.nextActionAt) await this.leads.update(d.leadId, { nextActionAt: dto.nextActionAt }, userId);
+    await this.audit.log({ actorId: userId, action: 'lead.ai_draft_skipped', entity: 'Lead', entityId: d.leadId, meta: { draftId: id, reason: dto.reason?.trim() || null, nextActionAt: dto.nextActionAt ?? null } });
+    return { skipped: true };
   }
 }

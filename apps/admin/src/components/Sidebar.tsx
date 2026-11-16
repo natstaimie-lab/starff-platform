@@ -21,6 +21,7 @@ const sections: Section[] = [
       { key: 'enquiries', label: 'Enquiries', href: '/dashboard/enquiries', icon: <Ic.FileText /> },
       { key: 'leads', label: 'Leads', href: '/dashboard/leads', icon: <Ic.TrendUp /> },
       { key: 'followups', label: 'Follow-ups today', href: '/dashboard/leads/today', icon: <Ic.Bell /> },
+      { key: 'aiapprovals', label: 'AI approvals', href: '/dashboard/leads/approvals', icon: <Ic.Sparkle /> },
     ],
   },
   {
@@ -94,6 +95,10 @@ export function Sidebar() {
       // CRM follow-ups due today (UK) or overdue — separate call so a stats hiccup can't hide it.
       apiFetch<{ followUpsDue: number }>('/leads/summary')
         .then((s) => setBadges((b) => ({ ...b, followups: s.followUpsDue })))
+        .catch(() => {});
+      // AI salesperson drafts waiting for a decision.
+      apiFetch<{ pending: number }>('/ai-sales/summary')
+        .then((s) => setBadges((b) => ({ ...b, aiapprovals: s.pending })))
         .catch(() => {});
     };
     loadBadges();

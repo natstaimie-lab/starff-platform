@@ -1108,6 +1108,7 @@ model Lead {
 
   activities LeadActivity[]
   quotes         Quote[]
+  aiDrafts       AiDraft[]
 
   @@index([stage])
   @@index([clientId])
@@ -1165,4 +1166,47 @@ model ClientRate {
 
   @@index([clientId])
   @@index([quoteId])
+}
+
+// ─── CRM Phase 4b: AI salesperson approvals queue ───────────────────────────
+// Follow-ups the AI salesperson drafts (every weekday morning, or on demand)
+// wait here until staff send, edit-and-send or skip them. Nothing is sent
+// without a person pressing Send.
+
+enum AiDraftStatus {
+  PENDING // waiting for staff
+  SENT // approved and emailed
+  SKIPPED // staff chose not to send
+  STALE // the lead moved on (emailed, won, lost, archived) before review
+}
+
+model AiDraft {
+  id     String        @id @default(cuid())
+  leadId String
+  lead   Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  status AiDraftStatus @default(PENDING)
+  /// London day the draft was made for (yyyy-mm-dd); one draft per lead per day.
+  forDay String
+
+  subject          String
+  body             String  @db.Text
+  callScript       String? @db.Text
+  reasoning        String? @db.Text
+  warnings         Json?
+  nextFollowUpDays Int     @default(3)
+  model            String?
+  /// "schedule" (07:30 run) or "manual" (Draft today's list now)
+  trigger          String  @default("schedule")
+
+  decidedAt   DateTime?
+  decidedById String?   @db.Uuid
+  skipReason  String?
+  /// The EMAIL activity written when it was sent.
+  activityId  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([leadId, forDay])
+  @@index([status, createdAt])
 }

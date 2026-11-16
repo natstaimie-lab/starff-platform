@@ -355,6 +355,9 @@ export default function LeadDetailPage() {
             <Card title="AI salesperson" subtitle="Drafts the next follow-up from this lead's history. Nothing is sent until you press Send."
               action={!ai.draft ? <Button disabled={ai.busy} onClick={draftWithAi}>{ai.busy ? 'Writing…' : 'Draft follow-up'}</Button> : undefined}>
               {ai.sentTo && <p role="status" className="ai-ok">Sent to {ai.sentTo} and logged below.</p>}
+              {!ai.draft && !ai.sentTo && lead.aiDrafts?.[0] && (
+                <p className="ai-ok">A draft for this lead is waiting in <Link href="/dashboard/leads/approvals" className="link">AI approvals</Link>: &ldquo;{lead.aiDrafts[0].subject}&rdquo;</p>
+              )}
               {!ai.draft ? (
                 <Field label="Steer it (optional)">
                   <TextInput value={ai.instructions} maxLength={1000} placeholder="e.g. mention Christmas cover, or they asked about 5 pickers in Dagenham"

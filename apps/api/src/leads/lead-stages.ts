@@ -79,3 +79,7 @@ export function followUpBucket(nextActionAt: Date | null, now: Date = new Date()
   if (t < end.getTime() + 7 * 86_400_000) return 'upcoming';
   return 'later';
 }
+
+/** A lead that has asked not to be contacted (Lost with an unsubscribe-type reason). Nothing is drafted or sent to them. */
+export const optedOut = (lead: { stage: string; lostReason: string | null }) =>
+  lead.stage === 'LOST' && /unsubscrib|opt(ed)?[ -]?out|do not (contact|email)|don'?t (contact|email)|remove me/i.test(lead.lostReason ?? '');
