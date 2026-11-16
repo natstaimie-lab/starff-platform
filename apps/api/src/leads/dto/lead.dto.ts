@@ -67,3 +67,16 @@ export class ChangeStageDto {
   @IsOptional() @IsString() @MaxLength(4000) note?: string;
   @IsOptional() @IsBoolean() byAi?: boolean;
 }
+
+export class ConvertLeadDto {
+  /** The accepted quote whose rates become the client's agreed rates. Defaults to the lead's latest accepted quote. */
+  @IsOptional() @IsString() quoteId?: string;
+  /** Portal login for this person. Defaults to the lead's contact. */
+  @IsOptional() @IsString() @MaxLength(100) contactFirstName?: string;
+  @IsOptional() @IsString() @MaxLength(100) contactLastName?: string;
+  @IsOptional() @IsEmail() contactEmail?: string;
+  @IsOptional() @IsString() @MaxLength(50) contactPhone?: string;
+  /** Email the portal invite now (default true). */
+  @IsOptional() @IsBoolean() sendInvite?: boolean;
+  @IsOptional() @IsBoolean() byAi?: boolean;
+}

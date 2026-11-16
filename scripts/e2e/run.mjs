@@ -379,6 +379,25 @@ async function leads(created) {
   await req(`/leads/${lead.id}`, admin.bearer, 'PATCH', { clearNextAction: true });
   check('clear follow-up → "no follow-up set"', (await inToday(lead.id)) === 'none');
 
+  // Convert to client: accepted quote → agreed rates, portal login, lead Won.
+  check('convert refuses a staff email as the client login (409)', (await req(`/leads/${lead.id}/convert`, admin.bearer, 'POST', { contactFirstName: 'E2E', contactLastName: 'Clash', contactEmail: admin.email, sendInvite: false })).status === 409);
+  await req(`/quotes/${quote.id}/status`, admin.bearer, 'PATCH', { status: 'ACCEPTED' });
+  const loginEmail = `e2e-convert-${stamp}@starff.test`;
+  const cv = await req(`/leads/${lead.id}/convert`, admin.bearer, 'POST', { contactFirstName: 'Lead', contactLastName: 'Tester', contactEmail: loginEmail, sendInvite: false });
+  const cvb = await cv.json();
+  if (cvb.clientId) created.clientIds.push(cvb.clientId);
+  if (cvb.contactUserId) created.authUsers.push(cvb.contactUserId);
+  check('convert → 200, new client, 1 agreed rate from the accepted quote', cv.status === 200 && cvb.clientCreated === true && cvb.ratesCopied === 1 && cvb.quoteNumber === quote.number);
+  const newClient = cvb.clientId ? await p.client.findUnique({ where: { id: cvb.clientId }, include: { contacts: true, agreedRates: true } }) : null;
+  check('client is Prospect with the contact login', newClient?.status === 'PROSPECT' && newClient.contacts.some((c) => c.email === loginEmail && c.userId === cvb.contactUserId));
+  check('agreed rate matches the quote line', newClient?.agreedRates.length === 1 && Number(newClient.agreedRates[0].payRate) === 14 && newClient.agreedRates[0].quoteId === quote.id);
+  const wonLead = await p.lead.findUnique({ where: { id: lead.id }, include: { activities: true } });
+  check('lead is Won, linked, with a "Converted to client" note', wonLead.stage === 'WON' && wonLead.clientId === cvb.clientId && wonLead.activities.some((a) => a.subject === 'Converted to client'));
+  check('quote now belongs to the client', (await p.quote.findUnique({ where: { id: quote.id }, select: { clientId: true } })).clientId === cvb.clientId);
+  check('converting again is refused (409)', (await req(`/leads/${lead.id}/convert`, admin.bearer, 'POST', {})).status === 409);
+  const cprof = cvb.clientId ? await req(`/clients/${cvb.clientId}`, admin.bearer, 'GET').then((r) => r.json()) : {};
+  check('client profile lists the agreed rates', cprof.agreedRates?.length === 1);
+
   const list = await req(`/leads?q=${encodeURIComponent(`E2E Lead Co ${stamp}`)}`, admin.bearer, 'GET').then((r) => r.json());
   check('list + search finds the lead', Array.isArray(list) && list.some((l) => l.id === lead.id));
   const sum = await req('/leads/summary', admin.bearer, 'GET').then((r) => r.json());

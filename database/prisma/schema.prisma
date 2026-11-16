@@ -484,6 +484,7 @@ model Client {
   invoices      Invoice[]
   quotes        Quote[]
   leads         Lead[]
+  agreedRates   ClientRate[]
 
   @@index([status])
 }
@@ -1003,6 +1004,7 @@ model Quote {
   updatedAt     DateTime    @updatedAt
 
   lines         QuoteLine[]
+  agreedRates   ClientRate[]
 
   @@index([clientId])
   @@index([leadId])
@@ -1132,4 +1134,35 @@ model LeadActivity {
   createdAt   DateTime @default(now())
 
   @@index([leadId, occurredAt])
+}
+
+// ══════════════════════════════════════════════
+// AGREED RATES (CRM Phase 3)
+// The per-role rates a client agreed to, copied from their accepted quote when
+// a lead is converted to a client. One row per quote line. Staff can see them
+// on the client's profile; they are the reference when booking that client.
+// ══════════════════════════════════════════════
+
+model ClientRate {
+  id            String   @id @default(cuid())
+  clientId      String
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  quoteId       String?  // the accepted quote these came from
+  quote         Quote?   @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  position      Int      @default(0)
+
+  role          String   // e.g. "Warehouse operative"
+  shiftType     String   // standard | night | weekend | bank_holiday
+  payRate       Decimal  @db.Decimal(10, 2) // paid to the worker / hour
+  chargeRate    Decimal  @db.Decimal(10, 2) // charged to the client / hour
+  marginPerHour Decimal  @db.Decimal(10, 2)
+  hoursPerShift Decimal? @db.Decimal(5, 2)
+  pensionEnrolled Boolean @default(true)
+
+  agreedAt      DateTime @default(now())
+  createdById   String?  @db.Uuid
+  createdAt     DateTime @default(now())
+
+  @@index([clientId])
+  @@index([quoteId])
 }

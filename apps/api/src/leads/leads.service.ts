@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { LeadActivityType, LeadSource, LeadStage, Prisma } from '@prisma/client';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ClientStatus, LeadActivityType, LeadSource, LeadStage, Prisma, RegistrationSource, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import type { ChangeStageDto, CreateLeadDto, LogActivityDto, UpdateLeadDto } from './dto/lead.dto';
+import { RegistrationService } from '../registration/registration.service';
+import type { ChangeStageDto, ConvertLeadDto, CreateLeadDto, LogActivityDto, UpdateLeadDto } from './dto/lead.dto';
 import { clientStatusForStage, followUpBucket, londonDay, stageChangeError, stageForClientStatus } from './lead-stages';
 
 const listSelect = {
@@ -16,7 +17,7 @@ const detailInclude = {
   activities: { orderBy: { occurredAt: 'desc' }, take: 200 },
   quotes: {
     orderBy: { createdAt: 'desc' },
-    select: { id: true, number: true, status: true, title: true, total: true, profit: true, validUntil: true, sentAt: true, createdAt: true },
+    select: { id: true, number: true, status: true, title: true, total: true, profit: true, validUntil: true, sentAt: true, decidedAt: true, createdAt: true, _count: { select: { lines: true } } },
   },
 } satisfies Prisma.LeadInclude;
 
@@ -28,6 +29,7 @@ export class LeadsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly registration: RegistrationService,
   ) {}
 
   list(f: { stage?: LeadStage; q?: string; ownerId?: string; clientId?: string; dueBefore?: Date; includeArchived?: boolean }) {
@@ -313,5 +315,149 @@ export class LeadsService {
     }
     const { start, end } = londonDay(now);
     return { day: { start, end }, ...groups };
+  }
+
+  /**
+   * Convert to client: turn a won lead into a client in one go.
+   *  1. Uses the lead's linked client, or creates one (status Prospect until
+   *     staff approve their onboarding, which is what makes a client Active).
+   *  2. Sets up the contact's client-portal login and (by default) emails the
+   *     activation link.
+   *  3. Copies the accepted quote's lines as the client's agreed rates and links
+   *     the quote to the client.
+   *  4. Marks the lead Won (with a stage-change entry) and logs the conversion.
+   * Safe to run again if step 2 fails part-way: it reuses the client, the
+   * login and any rates already copied.
+   */
+  async convert(id: string, dto: ConvertLeadDto, userId: string) {
+    const lead = await this.prisma.lead.findUnique({
+      where: { id },
+      include: {
+        client: { select: { id: true, name: true, status: true } },
+        quotes: { where: { status: 'ACCEPTED' }, orderBy: { decidedAt: { sort: 'desc', nulls: 'last' } }, include: { lines: { orderBy: { position: 'asc' } } } },
+      },
+    });
+    if (!lead) throw new NotFoundException('Lead not found');
+    if (lead.archivedAt) throw new BadRequestException('This lead is archived. Restore it first.');
+    if (lead.stage === 'WON' && lead.clientId) {
+      throw new ConflictException(`${lead.companyName} has already been converted to a client.`);
+    }
+
+    // Who gets the portal login.
+    const [first, ...rest] = (lead.contactName ?? '').trim().split(/\s+/);
+    const firstName = blank(dto.contactFirstName) ?? (first || undefined);
+    const lastName = blank(dto.contactLastName) ?? (rest.join(' ') || undefined);
+    const email = (blank(dto.contactEmail) ?? lead.contactEmail ?? '').toLowerCase();
+    const phone = blank(dto.contactPhone) ?? lead.contactPhone ?? undefined;
+    if (!email) throw new BadRequestException('Add the contact\'s email so they can log in to the client portal.');
+    if (!firstName || !lastName) throw new BadRequestException('Add the contact\'s first and last name.');
+
+    // Which quote's rates to copy.
+    let quote: (typeof lead.quotes)[number] | null = lead.quotes[0] ?? null;
+    if (dto.quoteId) {
+      quote = lead.quotes.find((q) => q.id === dto.quoteId) ?? null;
+      if (!quote) throw new BadRequestException('That quote isn\'t an accepted quote for this lead. Mark it Accepted in Saved Quotes first.');
+    }
+
+    // The login email must not belong to someone else.
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+      include: { clientContact: { select: { clientId: true, client: { select: { name: true } } } } },
+    });
+    if (existingUser && existingUser.role !== Role.CLIENT) {
+      throw new ConflictException(`${email} already belongs to a ${existingUser.role.toLowerCase()} account, so it can't be a client login. Use a different email.`);
+    }
+    if (existingUser?.clientContact && existingUser.clientContact.clientId !== lead.clientId) {
+      throw new ConflictException(`${email} is already a contact at ${existingUser.clientContact.client.name}. Use a different email, or link this lead to that client.`);
+    }
+
+    // 1. Client.
+    let clientId = lead.clientId;
+    let clientCreated = false;
+    if (!clientId) {
+      const client = await this.prisma.client.create({
+        data: {
+          name: lead.companyName,
+          industry: lead.sector,
+          city: lead.city,
+          postcode: lead.postcode,
+          billingEmail: email,
+          status: ClientStatus.PROSPECT,
+          registrationSource: RegistrationSource.ADMIN,
+          notes: `Converted from CRM lead on ${new Date().toISOString().slice(0, 10)}.`,
+        },
+      });
+      clientId = client.id;
+      clientCreated = true;
+      // Link straight away so a retry reuses this client.
+      await this.prisma.lead.update({ where: { id }, data: { clientId } });
+    } else if (lead.client?.status === ClientStatus.LEAD) {
+      await this.prisma.client.update({ where: { id: clientId }, data: { status: ClientStatus.PROSPECT } });
+    }
+
+    // 2. Portal login + invite email.
+    const sendInvite = dto.sendInvite !== false;
+    const invite = await this.registration.inviteClientContact({
+      clientId, firstName, lastName, email, phone, jobTitle: lead.contactRole ?? undefined, sendInvite,
+    });
+
+    // 3 + 4. Agreed rates, quote link, Won.
+    const now = new Date();
+    const already = quote ? await this.prisma.clientRate.count({ where: { clientId, quoteId: quote.id } }) : 0;
+    const rates = quote && !already ? quote.lines.map((l, i) => ({
+      clientId: clientId!, quoteId: quote!.id, position: i,
+      role: l.description, shiftType: l.shiftType, payRate: l.payRate, chargeRate: l.chargeRate,
+      marginPerHour: l.marginPerHour, hoursPerShift: l.hoursPerShift, pensionEnrolled: l.pensionEnrolled,
+      agreedAt: quote!.decidedAt ?? now, createdById: userId,
+    })) : [];
+    const wasStage = lead.stage;
+    const ops: Prisma.PrismaPromise<unknown>[] = [];
+    if (rates.length) ops.push(this.prisma.clientRate.createMany({ data: rates }));
+    if (quote) ops.push(this.prisma.quote.update({ where: { id: quote.id }, data: { clientId } }));
+    ops.push(this.prisma.lead.update({
+      where: { id },
+      data: { clientId, stage: 'WON', stageChangedAt: now, lastActivityAt: now, lostReason: null, nextActionAt: null },
+    }));
+    if (wasStage !== 'WON') {
+      ops.push(this.prisma.leadActivity.create({
+        data: {
+          leadId: id, type: LeadActivityType.STAGE_CHANGE, subject: `${wasStage} → WON`,
+          meta: { from: wasStage, to: 'WON', reason: 'Converted to client' }, occurredAt: now, createdById: userId, byAi: dto.byAi ?? false,
+        },
+      }));
+    }
+    ops.push(this.prisma.leadActivity.create({
+      data: {
+        leadId: id, type: LeadActivityType.NOTE, subject: 'Converted to client',
+        body: [
+          clientCreated ? 'New client record created.' : 'Linked to the existing client record.',
+          sendInvite ? `Client portal invite emailed to ${email}.` : `Portal login set up for ${email} (invite not emailed).`,
+          quote
+            ? (rates.length ? `${rates.length} agreed ${rates.length === 1 ? 'rate' : 'rates'} copied from quote ${quote.number}.` : `Agreed rates from quote ${quote.number} were already on file.`)
+            : 'No accepted quote, so no agreed rates were copied.',
+        ].join(' '),
+        meta: { clientId, quoteId: quote?.id ?? null, ratesCopied: rates.length, contactUserId: invite.userId },
+        occurredAt: new Date(now.getTime() + 1), createdById: userId, byAi: dto.byAi ?? false,
+      },
+    }));
+    await this.prisma.$transaction(ops);
+
+    await this.audit.log({
+      actorId: userId,
+      action: 'lead.converted',
+      entity: 'Lead',
+      entityId: id,
+      meta: { clientId, clientCreated, quoteId: quote?.id ?? null, ratesCopied: rates.length, contactEmail: email, invited: sendInvite, from: wasStage, byAi: dto.byAi ?? false },
+    });
+
+    return {
+      clientId,
+      clientCreated,
+      contactUserId: invite.userId,
+      loginCreated: invite.invited,
+      invited: sendInvite,
+      quoteNumber: quote?.number ?? null,
+      ratesCopied: rates.length,
+    };
   }
 }
