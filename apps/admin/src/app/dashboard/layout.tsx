@@ -15,6 +15,7 @@ const TITLES: Record<string, [string, string]> = {
   '/dashboard/workers': ['Workers', 'Active workers and their availability'],
   '/dashboard/clients': ['Clients', 'Client organisations and accounts'],
   '/dashboard/enquiries': ['Enquiries', 'Submissions from the website forms'],
+  '/dashboard/leads': ['Leads', 'Your sales pipeline: calls, emails and notes'],
   '/dashboard/bookings': ['Job Bookings', 'Open and confirmed staffing requests'],
   '/dashboard/shifts': ['Shifts', 'Upcoming shifts and staffing progress'],
   '/dashboard/timesheets': ['Timesheets', 'Review and approve submitted hours'],
@@ -67,7 +68,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   if (!ready) return <div style={{ padding: 32, color: 'var(--text-secondary)' }}>Loading…</div>;
   if (!mfaOk) return <MfaGate email={email} onVerified={() => setMfaOk(true)} />;
 
-  const [title, subtitle] = TITLES[pathname] ?? ['Starff', ''];
+  const [title, subtitle] = TITLES[pathname] ?? (pathname.startsWith('/dashboard/leads/') ? ['Lead', 'Pipeline stage and activity log'] : ['Starff', '']);
 
   return (
     <div className="app">

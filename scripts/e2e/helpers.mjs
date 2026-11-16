@@ -22,7 +22,7 @@ export const check = (label, ok) => { if (!ok) PASS = false; log(`   ${ok ? '✅
 export const allPassed = () => PASS;
 
 /** A fresh resource tracker so each flow can clean up exactly what it made. */
-export const track = () => ({ authUsers: [], userIds: [], candidateIds: [], clientIds: [], jobIds: [], enquiryIds: [] });
+export const track = () => ({ authUsers: [], userIds: [], candidateIds: [], clientIds: [], jobIds: [], enquiryIds: [], leadIds: [] });
 
 /** Create a Supabase auth user + matching platform User row, return a bearer token. */
 export async function makeUser(created, role, tag) {
@@ -65,6 +65,10 @@ export const webhook = (body, secret = SECRET) => fetch(`${API}/enquiries`, {
 
 /** Delete exactly what a flow created, in dependency order. Best-effort. */
 export async function cleanup(created) {
+  // Leads first (activities cascade); by exact id only.
+  for (const lid of (created.leadIds ?? []).filter(Boolean)) {
+    await p.lead.delete({ where: { id: lid } }).catch(() => {});
+  }
   for (const jid of created.jobIds) {
     await p.timesheet.deleteMany({ where: { shift: { jobId: jid } } }).catch(() => {});
     await p.shift.deleteMany({ where: { jobId: jid } }).catch(() => {});

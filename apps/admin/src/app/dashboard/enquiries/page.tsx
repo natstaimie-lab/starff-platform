@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { Card, Badge, DataTable, type Column } from '@/components/ui';
+import { apiError } from '@/lib/leads';
 
 type Enquiry = {
   id: string;
@@ -22,6 +24,7 @@ const typeLabel: Record<string, string> = { CONTACT: 'Contact', POST_A_JOB: 'Pos
 const statusTone: Record<string, string> = { NEW: 'warning', CONTACTED: 'info', CONVERTED: 'success', CLOSED: 'neutral' };
 
 export default function EnquiriesPage() {
+  const router = useRouter();
   const [tab, setTab] = useState<'inbox' | 'spam'>('inbox');
   const [rows, setRows] = useState<Enquiry[]>([]);
   const [error, setError] = useState('');
@@ -58,6 +61,18 @@ export default function EnquiriesPage() {
     } catch (e: any) {
       alert(e?.message || 'Could not convert this enquiry.');
     } finally { setBusy(null); }
+  }
+
+  /** Open the CRM lead for this enquiry, creating it the first time. */
+  async function makeLead(id: string) {
+    setBusy(id);
+    try {
+      const lead = await apiFetch<{ id: string }>('/leads', { method: 'POST', body: JSON.stringify({ enquiryId: id }) });
+      router.push(`/dashboard/leads/${lead.id}`);
+    } catch (e) {
+      alert(apiError(e, 'Could not make a lead from this enquiry.'));
+      setBusy(null);
+    }
   }
 
   async function setSpam(id: string, spam: boolean) {
@@ -137,6 +152,7 @@ export default function EnquiriesPage() {
           return (
             <span style={{ display: 'inline-flex', gap: 8 }}>
               <button onClick={() => setView(r)} style={btn('var(--navy-900)')}>View</button>
+              <button disabled={busy === r.id} onClick={() => makeLead(r.id)} style={btn('var(--orange-500)')} title="Open or create the sales lead">Lead</button>
               <button disabled={busy === r.id} onClick={() => setSpam(r.id, true)} style={ghost} title="Mark as spam">Spam</button>
               <button disabled={busy === r.id} onClick={() => remove(r.id, r.name)} style={danger} title="Delete permanently">Delete</button>
             </span>
@@ -146,6 +162,7 @@ export default function EnquiriesPage() {
           return (
             <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
               <span className="sub2">Converted</span>
+              {r.type === 'POST_A_JOB' && <button disabled={busy === r.id} onClick={() => makeLead(r.id)} style={btn('var(--orange-500)')} title="Open or create the sales lead">Lead</button>}
               <button disabled={busy === r.id} onClick={() => remove(r.id, r.name)} style={danger} title="Delete permanently">Delete</button>
             </span>
           );
@@ -153,6 +170,7 @@ export default function EnquiriesPage() {
         return (
           <span style={{ display: 'inline-flex', gap: 8 }}>
             <button disabled={busy === r.id} onClick={() => convert(r.id)} style={btn('var(--blue-500)')}>{busy === r.id ? '…' : 'Convert'}</button>
+            {r.type === 'POST_A_JOB' && <button disabled={busy === r.id} onClick={() => makeLead(r.id)} style={btn('var(--orange-500)')} title="Open or create the sales lead">Lead</button>}
             <button disabled={busy === r.id} onClick={() => setSpam(r.id, true)} style={ghost} title="Mark as spam">Spam</button>
             <button disabled={busy === r.id} onClick={() => remove(r.id, r.name)} style={danger} title="Delete permanently">Delete</button>
           </span>

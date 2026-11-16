@@ -769,3 +769,24 @@ a.link:hover {
     font-size: 16px !important;
   }
 }
+
+/* ── CRM leads ── */
+.lead-kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.lead-kpi { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); background: var(--surface-card); cursor: pointer; font-family: var(--font-sans); color: var(--text-primary); }
+.lead-kpi[aria-pressed='true'] { border-color: var(--blue-500); box-shadow: 0 0 0 1px var(--blue-500); }
+.lead-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.lead-textarea { width: 100%; padding: 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 14px; line-height: 1.5; background: var(--surface-card); color: var(--text-primary); }
+.lead-search { margin-left: auto; height: 32px; min-width: 220px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 8px; font-size: 13px; font-family: var(--font-sans); background: var(--surface-card); color: var(--text-primary); }
+.lead-error { color: var(--error-600, #c0392b); font-size: 13.5px; margin: 0; }
+@media (max-width: 900px) { .lead-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .lead-search { margin-left: 0; width: 100%; } }
+@media (max-width: 560px) { .lead-grid2 { grid-template-columns: 1fr; } .lead-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.lead-layout { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.lead-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.lead-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; font-size: 13.5px; }
+.lead-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; }
+.lead-row > span:last-child { overflow-wrap: anywhere; }
+.lead-act { padding: 12px 0; border-top: 1px solid var(--border-subtle); }
+.lead-act:first-child { border-top: none; padding-top: 0; }
+.lead-act-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.lead-act-body { white-space: pre-wrap; font-size: 13.5px; line-height: 1.5; margin: 6px 0 0; }
+@media (max-width: 900px) { .lead-layout { grid-template-columns: 1fr; } }

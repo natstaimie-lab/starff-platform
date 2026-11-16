@@ -312,6 +312,54 @@ async function enquiry(created) {
   check('convert → candidate + enquiry CONVERTED', conv.status === 201 && convBody.kind === 'candidate' && (await p.enquiry.findUnique({ where: { id: regBody.id }, select: { status: true } })).status === 'CONVERTED');
 }
 
+// ── CRM leads: create from enquiry (idempotent), log activity, change stage,
+//    linked client nudged LEAD → PROSPECT, LOST needs a reason, staff-only.
+async function leads(created) {
+  const admin = await makeUser(created, 'ADMIN', 'adm');
+  const clientUser = await makeUser(created, 'CLIENT', 'cli');
+  const stamp = Date.now();
+
+  const enq = await webhook({ type: 'POST_A_JOB', name: 'Lead Tester', company: `E2E Lead Co ${stamp}`, email: `lead-${stamp}@example.com`, phone: '07700900456', message: 'Need 5 pickers' });
+  const enqBody = await enq.json();
+  if (enqBody.id) created.enquiryIds.push(enqBody.id);
+
+  check('leads need login (401)', (await fetch(`${API}/leads`)).status === 401);
+  check('clients cannot use leads (403)', (await req('/leads', clientUser.bearer, 'GET')).status === 403);
+
+  const c1 = await req('/leads', admin.bearer, 'POST', { enquiryId: enqBody.id });
+  const lead = await c1.json();
+  if (lead?.id) created.leadIds.push(lead.id);
+  check('create lead from enquiry → filled in, source ENQUIRY, stage NEW', c1.status === 201 && lead.companyName === `E2E Lead Co ${stamp}` && lead.contactEmail === `lead-${stamp}@example.com` && lead.source === 'ENQUIRY' && lead.stage === 'NEW');
+  const c2 = await req('/leads', admin.bearer, 'POST', { enquiryId: enqBody.id }).then((r) => r.json());
+  check('same enquiry again → returns existing lead', c2.id === lead.id && c2.existing === true);
+
+  const act = await req(`/leads/${lead.id}/activities`, admin.bearer, 'POST', { type: 'CALL', outcome: 'Wants a quote', body: 'Spoke to ops manager', nextActionAt: new Date(Date.now() + 86400e3).toISOString() });
+  check('log activity (call) → 201, outbound by default', act.status === 201 && (await act.json()).direction === 'outbound');
+  check('empty activity refused (400)', (await req(`/leads/${lead.id}/activities`, admin.bearer, 'POST', { type: 'NOTE' })).status === 400);
+
+  const st = await req(`/leads/${lead.id}/stage`, admin.bearer, 'PATCH', { stage: 'CONTACTED', note: 'First call done' });
+  const stBody = await st.json();
+  check('change stage → CONTACTED with STAGE_CHANGE activity', st.status === 200 && stBody.stage === 'CONTACTED' && stBody.activities.some((a) => a.type === 'STAGE_CHANGE' && a.meta?.to === 'CONTACTED'));
+  check('LOST without reason refused (400)', (await req(`/leads/${lead.id}/stage`, admin.bearer, 'PATCH', { stage: 'LOST' })).status === 400);
+  check('stage change audited', !!(await p.auditLog.findFirst({ where: { entity: 'Lead', entityId: lead.id, action: 'lead.stage_changed' } })));
+
+  // Linked client at LEAD → PROSPECT once contacted; never ACTIVE from a lead.
+  const company = await p.client.create({ data: { name: `E2E Lead Client ${stamp}`, status: 'LEAD' } });
+  created.clientIds.push(company.id);
+  const cl = await req('/leads', admin.bearer, 'POST', { clientId: company.id }).then((r) => r.json());
+  if (cl?.id) created.leadIds.push(cl.id);
+  check('create lead from client → source CLIENT, linked', cl.source === 'CLIENT' && cl.clientId === company.id);
+  await req(`/leads/${cl.id}/stage`, admin.bearer, 'PATCH', { stage: 'QUALIFIED' });
+  check('linked client LEAD → PROSPECT', (await p.client.findUnique({ where: { id: company.id }, select: { status: true } })).status === 'PROSPECT');
+  await req(`/leads/${cl.id}/stage`, admin.bearer, 'PATCH', { stage: 'WON' });
+  check('WON does not make client ACTIVE', (await p.client.findUnique({ where: { id: company.id }, select: { status: true } })).status === 'PROSPECT');
+
+  const list = await req(`/leads?q=${encodeURIComponent(`E2E Lead Co ${stamp}`)}`, admin.bearer, 'GET').then((r) => r.json());
+  check('list + search finds the lead', Array.isArray(list) && list.some((l) => l.id === lead.id));
+  const sum = await req('/leads/summary', admin.bearer, 'GET').then((r) => r.json());
+  check('summary has stage counts', typeof sum?.counts?.CONTACTED === 'number');
+}
+
 // ── Run everything ──
 try {
   await flow('Full journey: client books → worker accepts → timesheet approved', fullJourney);
@@ -323,6 +371,7 @@ try {
   await flow('Operational alerts', alerts);
   await flow('Reliability appeal', reliability);
   await flow('WordPress enquiry webhook', enquiry);
+  await flow('CRM leads + activity log', leads);
   log(`\n${allPassed() ? '✅ ALL E2E FLOWS PASSED' : '❌ SOME CHECKS FAILED'}`);
 } finally {
   await p.$disconnect();

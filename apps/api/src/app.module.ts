@@ -27,6 +27,7 @@ import { ReliabilityModule } from './reliability/reliability.module';
 import { DocumentCheckModule } from './documents/document-check.module';
 import { AccountModule } from './account/account.module';
 import { QuotesModule } from './quotes/quotes.module';
+import { LeadsModule } from './leads/leads.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -62,6 +63,7 @@ import { HealthController } from './health.controller';
     StaffModule,
     MatchingModule,
     QuotesModule,
+    LeadsModule,
     ApplicationsModule,
     ReliabilityModule,
     DocumentCheckModule,
