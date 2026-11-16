@@ -11,6 +11,24 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { ReliabilityService } from '../reliability/reliability.service';
 
+const REQUIRED_DOCS = ['SELFIE', 'RIGHT_TO_WORK', 'ID', 'CV'];
+const EXPIRY_WARN_MS = 30 * 86400000;
+
+/** Missing/rejected required doc, expired or expiring (≤30d), or awaiting verification — newest upload per type only. */
+function hasComplianceIssue(docs: { type: string; status: string; expiryDate: Date | null; createdAt: Date }[]): boolean {
+  const latest = new Map<string, (typeof docs)[number]>();
+  for (const d of docs) {
+    const cur = latest.get(d.type);
+    if (!cur || d.createdAt > cur.createdAt) latest.set(d.type, d);
+  }
+  if (REQUIRED_DOCS.some((t) => !latest.get(t) || latest.get(t)!.status === 'REJECTED')) return true;
+  const now = Date.now();
+  return Array.from(latest.values()).some((d) =>
+    d.status !== 'REJECTED' &&
+    (d.status === 'EXPIRED' || d.status === 'PENDING' || (d.expiryDate != null && d.expiryDate.getTime() - now <= EXPIRY_WARN_MS)),
+  );
+}
+
 @Injectable()
 export class StatsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -43,10 +61,14 @@ export class StatsService {
       this.prisma.timesheet.count(),
       this.prisma.timesheet.count({ where: { status: TimesheetStatus.SUBMITTED } }),
       this.prisma.enquiry.count({ where: { status: EnquiryStatus.NEW, spam: false } }),
-      // Candidates needing a compliance decision (drives the sidebar badge).
-      this.prisma.candidate.count({
-        where: { status: { in: [CandidateStatus.NEW, CandidateStatus.SCREENING, CandidateStatus.INACTIVE, CandidateStatus.REJECTED] } },
-      }),
+      // Bookable workers with a document problem (drives the Compliance badge).
+      // Same rules as apps/admin/src/lib/compliance.ts — keep them in sync.
+      this.prisma.candidate
+        .findMany({
+          where: { archivedAt: null, status: { in: [CandidateStatus.COMPLIANT, CandidateStatus.ACTIVE] } },
+          select: { documents: { select: { type: true, status: true, expiryDate: true, createdAt: true } } },
+        })
+        .then((ws) => ws.filter((w) => hasComplianceIssue(w.documents)).length),
       // Inbound messages from candidates/clients not yet read by staff.
       this.prisma.message.count({ where: { senderIsStaff: false, readAt: null } }),
       // Account-deletion requests still awaiting an admin (drives its badge).

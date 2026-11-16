@@ -77,6 +77,12 @@ const complianceMap: Record<string, { tone: Tone; label: string }> = {
   expiring: { tone: 'warning', label: 'Expiring' },
   missing: { tone: 'error', label: 'Missing' },
   expired: { tone: 'error', label: 'Expired' },
+  // Candidate pipeline statuses (lowercased CandidateStatus).
+  new: { tone: 'info', label: 'New' },
+  screening: { tone: 'warning', label: 'Screening' },
+  active: { tone: 'success', label: 'Active' },
+  inactive: { tone: 'neutral', label: 'Inactive' },
+  rejected: { tone: 'error', label: 'Rejected' },
 };
 export function ComplianceBadge({ status }: { status: string }) {
   const m = complianceMap[status] ?? { tone: 'neutral' as Tone, label: status };

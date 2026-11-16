@@ -6,6 +6,16 @@ import { apiFetch } from '@/lib/api';
 import { Card, Avatar, Badge, ComplianceBadge, DataTable, type Column } from '@/components/ui';
 import { Modal, Field, TextInput, Button } from '@/components/Modal';
 import * as Ic from '@/components/icons';
+import { PIPELINE_STATUSES } from '@/lib/compliance';
+
+// This page is the pre-approval pipeline only. Once approved (COMPLIANT/ACTIVE)
+// a person moves to Workers; their documents are then watched on Compliance.
+const TABS = [
+  { key: 'progress', label: 'Registering', match: (c: { status: string; submittedAt?: string | null }) => c.status !== 'REJECTED' && !c.submittedAt },
+  { key: 'review', label: 'Awaiting review', match: (c: { status: string; submittedAt?: string | null }) => c.status !== 'REJECTED' && !!c.submittedAt },
+  { key: 'rejected', label: 'Rejected', match: (c: { status: string }) => c.status === 'REJECTED' },
+  { key: 'all', label: 'All', match: () => true },
+];
 
 type Doc = { type: string };
 type Candidate = {
@@ -65,6 +75,7 @@ export default function CandidatesPage() {
   const [chasing, setChasing] = useState(false);
   const [notifying, setNotifying] = useState(false);
   const [sectorFilter, setSectorFilter] = useState('');
+  const [tab, setTab] = useState('all');
 
   const load = () => apiFetch<Candidate[]>('/candidates?take=500').then(setRows).catch((e) => setError(e.message)).finally(() => setLoading(false));
   // Auto-refresh the list every 15s so new sign-ups and completed registrations
@@ -159,8 +170,12 @@ export default function CandidatesPage() {
       },
     },
     { key: 'review', header: 'Review', render: (r) => r.submittedAt ? <Badge tone="warning">Awaiting review</Badge> : <span className="dim">—</span> },
-    { key: 'status', header: 'Compliance', render: (r) => <ComplianceBadge status={r.status.toLowerCase()} /> },
+    { key: 'status', header: 'Status', render: (r) => <ComplianceBadge status={r.status.toLowerCase()} /> },
   ];
+
+  const pipeline = rows.filter((r) => PIPELINE_STATUSES.includes(r.status));
+  const approvedCount = rows.length - pipeline.length;
+  const tabCount = (k: string) => pipeline.filter(TABS.find((t) => t.key === k)!.match).length;
 
   return (
     <Card
@@ -183,12 +198,25 @@ export default function CandidatesPage() {
         </span>
       }
     >
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+        {TABS.map((t) => (
+          <button key={t.key} onClick={() => setTab(t.key)} style={{ height: 30, padding: '0 12px', borderRadius: 999, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', border: '1px solid var(--border-subtle)', background: tab === t.key ? 'var(--navy-900)' : 'var(--surface-card)', color: tab === t.key ? '#fff' : 'var(--text-secondary)' }}>
+            {t.label} <span style={{ opacity: 0.7, fontVariantNumeric: 'tabular-nums' }}>{tabCount(t.key)}</span>
+          </button>
+        ))}
+        {approvedCount > 0 && (
+          <Link href="/dashboard/workers" className="dim" style={{ marginLeft: 'auto', fontSize: 12.5 }}>
+            {approvedCount} approved {approvedCount === 1 ? 'person is' : 'people are'} on Workers →
+          </Link>
+        )}
+      </div>
       {(() => {
-        const shown = sectorFilter ? rows.filter((r) => r.preferredSectors?.includes(sectorFilter)) : rows;
+        const inTab = pipeline.filter(TABS.find((t) => t.key === tab)!.match);
+        const shown = sectorFilter ? inTab.filter((r) => r.preferredSectors?.includes(sectorFilter)) : inTab;
         return error ? <p style={{ color: 'var(--error-600)', fontSize: 13 }}>{error}</p>
           : loading ? <p className="dim">Loading…</p>
-          : rows.length === 0 ? <p className="dim">No candidates yet.</p>
-          : shown.length === 0 ? <p className="dim">No candidates looking for {sectorFilter}.</p>
+          : pipeline.length === 0 ? <p className="dim">No candidates in the pipeline — everyone has been approved or there are no sign-ups yet.</p>
+          : shown.length === 0 ? <p className="dim">No candidates in this view{sectorFilter ? ` looking for ${sectorFilter}` : ''}.</p>
           : <DataTable columns={cols} rows={shown} />;
       })()}
 
