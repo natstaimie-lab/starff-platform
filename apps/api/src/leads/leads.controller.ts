@@ -5,7 +5,8 @@ import { LeadActivityType, LeadStage, Role } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { LeadsService } from './leads.service';
-import { ChangeStageDto, ConvertLeadDto, CreateLeadDto, LogActivityDto, UpdateLeadDto } from './dto/lead.dto';
+import { AiDraftDto, ChangeStageDto, ConvertLeadDto, CreateLeadDto, LogActivityDto, SendLeadEmailDto, UpdateLeadDto } from './dto/lead.dto';
+import { AiSalesService } from './ai-sales.service';
 
 class ArchiveDto {
   @IsBoolean() archived: boolean;
@@ -21,7 +22,7 @@ class ArchiveDto {
 @Roles(Role.ADMIN, Role.RECRUITER)
 @Controller('leads')
 export class LeadsController {
-  constructor(private readonly leads: LeadsService) {}
+  constructor(private readonly leads: LeadsService, private readonly aiSales: AiSalesService) {}
 
   @Get()
   list(
@@ -104,6 +105,20 @@ export class LeadsController {
   @HttpCode(200)
   convert(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: ConvertLeadDto) {
     return this.leads.convert(id, dto, u.id);
+  }
+
+  /** AI salesperson: draft a follow-up email + call script for this lead. Saves and sends nothing. */
+  @Post(':id/ai-draft')
+  @HttpCode(200)
+  aiDraft(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: AiDraftDto) {
+    return this.aiSales.draftFollowUp(id, u.id, dto.instructions);
+  }
+
+  /** Send an email to the lead's contact and log it (used for AI drafts after review). */
+  @Post(':id/email')
+  @HttpCode(200)
+  sendEmail(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: SendLeadEmailDto) {
+    return this.leads.sendEmail(id, dto, u);
   }
 
   @Patch(':id/archive')

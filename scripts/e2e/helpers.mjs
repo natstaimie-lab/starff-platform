@@ -72,6 +72,9 @@ export async function cleanup(created) {
   for (const lid of (created.leadIds ?? []).filter(Boolean)) {
     await p.lead.delete({ where: { id: lid } }).catch(() => {});
   }
+  // Employer enquiries auto-create a lead: remove the ones made from this flow's enquiries (exact ids).
+  const eids = (created.enquiryIds ?? []).filter(Boolean);
+  if (eids.length) await p.lead.deleteMany({ where: { enquiryId: { in: eids } } }).catch(() => {});
   for (const jid of created.jobIds) {
     await p.timesheet.deleteMany({ where: { shift: { jobId: jid } } }).catch(() => {});
     await p.shift.deleteMany({ where: { jobId: jid } }).catch(() => {});
