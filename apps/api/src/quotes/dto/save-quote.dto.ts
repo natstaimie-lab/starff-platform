@@ -38,3 +38,12 @@ export class SaveQuoteDto {
 export class QuoteStatusDto {
   @IsIn(Object.values(QuoteStatus)) status: QuoteStatus;
 }
+
+export class SendQuoteDto {
+  /** Who gets the quote. Defaults to the quote's contact email. */
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(5) @IsEmail({}, { each: true }) to?: string[];
+  @IsOptional() @IsArray() @ArrayMaxSize(5) @IsEmail({}, { each: true }) cc?: string[];
+  @IsOptional() @IsString() @MaxLength(200) subject?: string;
+  /** The covering message. A friendly default is used if left out. */
+  @IsOptional() @IsString() @MaxLength(5000) message?: string;
+}
