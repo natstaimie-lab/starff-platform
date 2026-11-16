@@ -483,6 +483,7 @@ model Client {
   jobs          Job[]
   invoices      Invoice[]
   quotes        Quote[]
+  leads         Lead[]
 
   @@index([status])
 }
@@ -766,6 +767,7 @@ model Enquiry {
 
   spam        Boolean       @default(false) // flagged by the spam filter / honeypot
   spamReason  String?       // why it was flagged (for review)
+  lead        Lead?         // CRM lead created from this enquiry
 
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -1028,4 +1030,101 @@ model QuoteLine {
   profit          Decimal @db.Decimal(12, 2)
 
   @@index([quoteId])
+}
+
+// ══════════════════════════════════════════════
+// LEADS — sales pipeline + activity log (CRM Phase 2)
+// A lead is a company we are trying to win as a client. It can start from a
+// website enquiry (enquiryId), from an existing Client still at LEAD/PROSPECT
+// (clientId), or be added by hand / by the AI salesperson. Every call, email
+// and note goes in LeadActivity; stage changes are logged there too, so the
+// activity list is the full story of the lead.
+// ══════════════════════════════════════════════
+
+enum LeadStage {
+  NEW // not contacted yet
+  CONTACTED // we've reached out / spoken
+  QUALIFIED // real need, right fit, decision-maker known
+  QUOTED // a quote has gone out
+  WON // became a client
+  LOST // not going ahead (lostReason says why)
+}
+
+enum LeadSource {
+  ENQUIRY // website form (Enquiry)
+  CLIENT // existing Client record at LEAD/PROSPECT
+  MANUAL // added by staff
+  AI // added by the AI salesperson
+  REFERRAL
+  OUTBOUND // cold outreach / prospect list
+}
+
+enum LeadActivityType {
+  CALL
+  EMAIL
+  NOTE
+  MEETING
+  STAGE_CHANGE // written by the API when the stage moves
+}
+
+model Lead {
+  id     String     @id @default(cuid())
+  stage  LeadStage  @default(NEW)
+  source LeadSource @default(MANUAL)
+
+  companyName    String
+  contactName    String?
+  contactEmail   String?
+  contactPhone   String?
+  contactRole    String?
+  sector         String?
+  city           String?
+  postcode       String?
+  estimatedValue Decimal? @db.Decimal(12, 2) // rough £ per month, if known
+  notes          String?  @db.Text
+
+  clientId  String?
+  client    Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  enquiryId String?  @unique // one lead per enquiry
+  enquiry   Enquiry? @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
+
+  ownerId        String?   @db.Uuid // staff member responsible
+  createdById    String?   @db.Uuid
+  createdByAi    Boolean   @default(false)
+  nextActionAt   DateTime? // when to follow up next
+  lastActivityAt DateTime?
+  stageChangedAt DateTime  @default(now())
+  lostReason     String?
+  archivedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  activities LeadActivity[]
+
+  @@index([stage])
+  @@index([clientId])
+  @@index([ownerId])
+  @@index([nextActionAt])
+  @@index([contactEmail])
+}
+
+model LeadActivity {
+  id     String @id @default(cuid())
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  type      LeadActivityType
+  direction String? // "inbound" | "outbound" for calls and emails
+  subject   String?
+  body      String?          @db.Text
+  outcome   String? // e.g. "no answer", "call back Tuesday"
+  meta      Json? // stage change from/to, email ids, etc.
+
+  occurredAt  DateTime @default(now())
+  createdById String?  @db.Uuid
+  byAi        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([leadId, occurredAt])
 }
