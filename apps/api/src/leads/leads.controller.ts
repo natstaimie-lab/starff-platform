@@ -94,6 +94,12 @@ export class LeadsController {
    * portal login and emails it, copies the accepted quote's rates as agreed
    * rates, and marks the lead Won.
    */
+  /** Duplicate check for the convert box: possible existing clients for this lead. */
+  @Get(':id/convert-check')
+  convertCheck(@Param('id') id: string, @Query('email') email?: string) {
+    return this.leads.convertCheck(id, email);
+  }
+
   @Post(':id/convert')
   @HttpCode(200)
   convert(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: ConvertLeadDto) {

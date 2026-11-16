@@ -398,6 +398,31 @@ async function leads(created) {
   const cprof = cvb.clientId ? await req(`/clients/${cvb.clientId}`, admin.bearer, 'GET').then((r) => r.json()) : {};
   check('client profile lists the agreed rates', cprof.agreedRates?.length === 1);
 
+  // Duplicate check on convert: same company name (tidied) or an email already on a client.
+  const mkLead = async (body) => { const l = await req('/leads', admin.bearer, 'POST', body).then((r) => r.json()); if (l?.id) created.leadIds.push(l.id); return l; };
+  const dupe = await mkLead({ companyName: `e2e lead co ${stamp} limited`, contactName: 'Dee Upe', contactEmail: `e2e-dupe-${stamp}@starff.test` });
+  const chk = await req(`/leads/${dupe.id}/convert-check`, admin.bearer, 'GET').then((r) => r.json());
+  check('convert-check finds the existing client by company name', chk.matches?.some((m) => m.clientId === cvb.clientId && m.reasons.includes('company')));
+  const blocked = await req(`/leads/${dupe.id}/convert`, admin.bearer, 'POST', { sendInvite: false });
+  const blockedBody = await blocked.json();
+  check('convert without a choice is stopped (409 POSSIBLE_DUPLICATE)', blocked.status === 409 && blockedBody.code === 'POSSIBLE_DUPLICATE' && blockedBody.matches?.some((m) => m.clientId === cvb.clientId));
+  check('nothing was created by the stopped convert', (await p.client.count({ where: { name: `e2e lead co ${stamp} limited` } })) === 0);
+  const linkExisting = await req(`/leads/${dupe.id}/convert`, admin.bearer, 'POST', { clientId: cvb.clientId, sendInvite: false });
+  const leb = await linkExisting.json();
+  if (leb.contactUserId) created.authUsers.push(leb.contactUserId);
+  check('choose existing client → linked, no new client', linkExisting.status === 200 && leb.clientCreated === false && leb.clientId === cvb.clientId
+    && (await p.lead.findUnique({ where: { id: dupe.id }, select: { clientId: true, stage: true } })).clientId === cvb.clientId);
+  const dupe2 = await mkLead({ companyName: `E2E Lead Co ${stamp}`, contactName: 'New Co', contactEmail: `e2e-dupe2-${stamp}@starff.test` });
+  const forceNew = await req(`/leads/${dupe2.id}/convert`, admin.bearer, 'POST', { createNew: true, sendInvite: false });
+  const fnb = await forceNew.json();
+  if (fnb.clientId) created.clientIds.push(fnb.clientId);
+  if (fnb.contactUserId) created.authUsers.push(fnb.contactUserId);
+  const fnAudit = await p.auditLog.findFirst({ where: { entity: 'Lead', entityId: dupe2.id, action: 'lead.converted' } });
+  check('"it\'s a new client" → creates one and records the override', forceNew.status === 200 && fnb.clientCreated === true && fnb.clientId !== cvb.clientId && Array.isArray(fnAudit?.meta?.duplicateOverride));
+  const byEmail = await mkLead({ companyName: `Totally Different ${stamp}`, contactName: 'Lead Tester', contactEmail: loginEmail });
+  const chk2 = await req(`/leads/${byEmail.id}/convert-check`, admin.bearer, 'GET').then((r) => r.json());
+  check('convert-check finds the client by login email', chk2.matches?.[0]?.clientId === cvb.clientId && chk2.matches[0].reasons.includes('email'));
+
   const list = await req(`/leads?q=${encodeURIComponent(`E2E Lead Co ${stamp}`)}`, admin.bearer, 'GET').then((r) => r.json());
   check('list + search finds the lead', Array.isArray(list) && list.some((l) => l.id === lead.id));
   const sum = await req('/leads/summary', admin.bearer, 'GET').then((r) => r.json());
