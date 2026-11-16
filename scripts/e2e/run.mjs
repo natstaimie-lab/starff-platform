@@ -484,6 +484,51 @@ async function aiSales(created) {
   }
 }
 
+// ── CRM Phase 4b: AI approvals queue (no model calls, no real leads drafted, no email sent).
+async function aiQueue(created) {
+  const admin = await makeUser(created, 'ADMIN', 'adm');
+  const clientUser = await makeUser(created, 'CLIENT', 'cli');
+  const stamp = Date.now();
+  const forDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date());
+  const mk = async (name, extra = {}) => {
+    const l = await p.lead.create({ data: { companyName: `E2E Queue ${name} ${stamp}`, contactEmail: `q-${name}-${stamp}@example.com`, source: 'MANUAL', nextActionAt: new Date(), ...extra } });
+    created.leadIds.push(l.id);
+    const d = await p.aiDraft.create({ data: { leadId: l.id, forDay, subject: `Hello ${name}`, body: 'Test body', nextFollowUpDays: 3, warnings: [] } });
+    return { l, d };
+  };
+
+  check('queue needs login (401)', (await fetch(`${API}/ai-sales/drafts`)).status === 401);
+  check('clients cannot see the queue (403)', (await req('/ai-sales/drafts', clientUser.bearer, 'GET')).status === 403);
+  check('run needs login (401)', (await fetch(`${API}/ai-sales/run`, { method: 'POST' })).status === 401);
+
+  const a = await mk('a');
+  const b = await mk('b');
+  const c = await mk('c');
+  const list = await req('/ai-sales/drafts', admin.bearer, 'GET').then((r) => r.json());
+  check('pending drafts listed with their lead', Array.isArray(list) && [a, b, c].every(({ d }) => list.some((x) => x.id === d.id && x.lead?.companyName)));
+  const sum = await req('/ai-sales/summary', admin.bearer, 'GET').then((r) => r.json());
+  check('summary counts pending', sum.pending >= 3 && typeof sum.dailyCap === 'number');
+  check('one draft per lead per day (unique)', await p.aiDraft.create({ data: { leadId: a.l.id, forDay, subject: 'x', body: 'x' } }).then(() => false, () => true));
+
+  const next = new Date(Date.now() + 9 * 864e5).toISOString().slice(0, 10);
+  const sk = await req(`/ai-sales/drafts/${a.d.id}/skip`, admin.bearer, 'POST', { reason: 'Not now', nextActionAt: next });
+  const aAfter = await p.lead.findUnique({ where: { id: a.l.id } });
+  check('skip → SKIPPED and follow-up pushed', sk.status === 200 && (await p.aiDraft.findUnique({ where: { id: a.d.id } })).status === 'SKIPPED' && aAfter.nextActionAt.toISOString().slice(0, 10) === next);
+  check('acting on a skipped draft → 409', (await req(`/ai-sales/drafts/${a.d.id}/send`, admin.bearer, 'POST', { subject: 's', body: 'b' })).status === 409);
+
+  await req(`/leads/${b.l.id}/stage`, admin.bearer, 'PATCH', { stage: 'LOST', reason: 'Went elsewhere' });
+  check('lead lost → its draft goes out of date', (await p.aiDraft.findUnique({ where: { id: b.d.id } })).status === 'STALE');
+  await req(`/leads/${c.l.id}/archive`, admin.bearer, 'PATCH', { archived: true });
+  check('lead archived → its draft goes out of date', (await p.aiDraft.findUnique({ where: { id: c.d.id } })).status === 'STALE');
+  const list2 = await req('/ai-sales/drafts', admin.bearer, 'GET').then((r) => r.json());
+  check('out-of-date drafts leave the queue', !list2.some((x) => [a.d.id, b.d.id, c.d.id].includes(x.id)));
+  const doneList = await req('/ai-sales/drafts?status=done', admin.bearer, 'GET').then((r) => r.json());
+  check('history shows skipped + out of date', [a.d.id, b.d.id, c.d.id].every((id) => doneList.some((x) => x.id === id)));
+
+  const leadView = await req(`/leads/${a.l.id}`, admin.bearer, 'GET').then((r) => r.json());
+  check('lead detail carries pending drafts (none after skip)', Array.isArray(leadView.aiDrafts) && leadView.aiDrafts.length === 0);
+}
+
 // ── Run everything ──
 try {
   await flow('Full journey: client books → worker accepts → timesheet approved', fullJourney);
@@ -497,6 +542,7 @@ try {
   await flow('WordPress enquiry webhook', enquiry);
   await flow('CRM leads + activity log', leads);
   await flow('CRM AI salesperson (auto leads + AI draft)', aiSales);
+  await flow('CRM AI approvals queue', aiQueue);
   log(`\n${allPassed() ? '✅ ALL E2E FLOWS PASSED' : '❌ SOME CHECKS FAILED'}`);
 } finally {
   await p.$disconnect();

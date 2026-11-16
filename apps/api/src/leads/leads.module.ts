@@ -4,11 +4,12 @@ import { LeadsService } from './leads.service';
 import { RegistrationModule } from '../registration/registration.module';
 import { AiSalesService } from './ai-sales.service';
 import { LeadMailer } from './lead-mailer';
+import { AiSalesController } from './ai-sales.controller';
 
 /** CRM Phase 2: leads pipeline + activity log (calls, emails, notes). */
 @Module({
   imports: [RegistrationModule],
-  controllers: [LeadsController],
+  controllers: [LeadsController, AiSalesController],
   providers: [LeadsService, AiSalesService, LeadMailer],
   exports: [LeadsService],
 })

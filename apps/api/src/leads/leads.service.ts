@@ -4,10 +4,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { RegistrationService } from '../registration/registration.service';
 import type { ChangeStageDto, ConvertLeadDto, CreateLeadDto, LogActivityDto, SendLeadEmailDto, UpdateLeadDto } from './dto/lead.dto';
-import { clientStatusForStage, followUpBucket, londonDay, stageChangeError, stageForClientStatus } from './lead-stages';
+import { clientStatusForStage, followUpBucket, londonDay, optedOut, stageChangeError, stageForClientStatus } from './lead-stages';
 import { findClientMatches, type MatchReason } from './client-match';
 import { LeadMailer } from './lead-mailer';
-import { optedOut } from './ai-sales.service';
 
 const listSelect = {
   client: { select: { id: true, name: true, status: true } },
@@ -22,6 +21,7 @@ const detailInclude = {
     orderBy: { createdAt: 'desc' },
     select: { id: true, number: true, status: true, title: true, total: true, profit: true, validUntil: true, sentAt: true, decidedAt: true, createdAt: true, _count: { select: { lines: true } } },
   },
+  aiDrafts: { where: { status: 'PENDING' }, orderBy: { createdAt: 'desc' }, take: 1, select: { id: true, subject: true, createdAt: true } },
 } satisfies Prisma.LeadInclude;
 
 const blank = (s?: string | null) => (s?.trim() ? s.trim() : undefined);
@@ -101,12 +101,20 @@ export class LeadsService {
     }
   }
 
+  /** Pending AI drafts for a lead are out of date once it's emailed, won, lost or archived. */
+  async staleDrafts(leadId: string, exceptDraftId?: string) {
+    await this.prisma.aiDraft.updateMany({
+      where: { leadId, status: 'PENDING', ...(exceptDraftId ? { id: { not: exceptDraftId } } : {}) },
+      data: { status: 'STALE', decidedAt: new Date() },
+    }).catch(() => {});
+  }
+
   /**
    * Send a one-to-one email to the lead's contact (typed by staff, or drafted
    * by the AI salesperson and approved by staff), log it on the timeline,
    * set the next follow-up and move a NEW lead to CONTACTED.
    */
-  async sendEmail(id: string, dto: SendLeadEmailDto, user: { id: string; email?: string }) {
+  async sendEmail(id: string, dto: SendLeadEmailDto, user: { id: string; email?: string }, fromDraftId?: string) {
     const lead = await this.prisma.lead.findUnique({ where: { id } });
     if (!lead) throw new NotFoundException('Lead not found');
     if (lead.archivedAt) throw new BadRequestException('This lead is archived. Restore it first.');
@@ -122,11 +130,11 @@ export class LeadsService {
 
     const now = new Date();
     const aiDrafted = dto.aiDrafted ?? false;
-    await this.prisma.$transaction([
+    const [activity] = await this.prisma.$transaction([
       this.prisma.leadActivity.create({
         data: {
           leadId: id, type: LeadActivityType.EMAIL, direction: 'outbound', subject, body: message,
-          meta: { resendId: sent.id ?? null, to: lead.contactEmail, aiDrafted, edited: dto.edited ?? null, approvedBy: aiDrafted ? user.id : null },
+          meta: { resendId: sent.id ?? null, to: lead.contactEmail, aiDrafted, edited: dto.edited ?? null, approvedBy: aiDrafted ? user.id : null, aiDraftId: fromDraftId ?? null },
           occurredAt: now, createdById: user.id, byAi: aiDrafted,
         },
       }),
@@ -137,12 +145,13 @@ export class LeadsService {
     ]);
     await this.audit.log({
       actorId: user.id, action: 'lead.email_sent', entity: 'Lead', entityId: id,
-      meta: { to: lead.contactEmail, subject, resendId: sent.id ?? null, aiDrafted, edited: dto.edited ?? null },
+      meta: { to: lead.contactEmail, subject, resendId: sent.id ?? null, aiDrafted, edited: dto.edited ?? null, aiDraftId: fromDraftId ?? null },
     });
+    await this.staleDrafts(id, fromDraftId);
     if (lead.stage === LeadStage.NEW) {
       await this.changeStage(id, { stage: LeadStage.CONTACTED, note: 'First email sent.', byAi: aiDrafted }, user.id);
     }
-    return { sent: true, resendId: sent.id ?? null, to: lead.contactEmail };
+    return { sent: true, resendId: sent.id ?? null, to: lead.contactEmail, activityId: activity.id };
   }
 
   list(f: { stage?: LeadStage; q?: string; ownerId?: string; clientId?: string; dueBefore?: Date; includeArchived?: boolean }) {
@@ -368,6 +377,7 @@ export class LeadsService {
       ops.push(this.prisma.client.update({ where: { id: lead.client.id }, data: { status: nextClientStatus } }));
     }
     await this.prisma.$transaction(ops);
+    if (dto.stage === 'WON' || dto.stage === 'LOST') await this.staleDrafts(id);
 
     await this.audit.log({
       actorId: userId,
@@ -389,6 +399,7 @@ export class LeadsService {
   async setArchived(id: string, archived: boolean, userId: string) {
     await this.get(id);
     const lead = await this.prisma.lead.update({ where: { id }, data: { archivedAt: archived ? new Date() : null } });
+    if (archived) await this.staleDrafts(id);
     await this.audit.log({ actorId: userId, action: archived ? 'lead.archived' : 'lead.restored', entity: 'Lead', entityId: id });
     return lead;
   }

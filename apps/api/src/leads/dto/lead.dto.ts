@@ -101,3 +101,15 @@ export class AiDraftDto {
   /** Optional steer, e.g. "mention Christmas cover" or "they asked for 5 pickers in Dagenham". */
   @IsOptional() @IsString() @MaxLength(1000) instructions?: string;
 }
+
+export class SendAiDraftDto {
+  @IsString() @MaxLength(200) subject: string;
+  @IsString() @MaxLength(10000) body: string;
+  @IsOptional() @IsDateString() nextActionAt?: string;
+}
+
+export class SkipAiDraftDto {
+  @IsOptional() @IsString() @MaxLength(300) reason?: string;
+  /** Push the lead's next follow-up to this date so it leaves Today. */
+  @IsOptional() @IsDateString() nextActionAt?: string;
+}
