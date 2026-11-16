@@ -41,3 +41,41 @@ export function clientStatusForStage(stage: LeadStageName, current: ClientStatus
 export function stageForClientStatus(status: ClientStatusName): LeadStageName {
   return status === 'LEAD' ? 'NEW' : 'CONTACTED';
 }
+
+/**
+ * Start and end (exclusive) of the London calendar day containing `now`, as UTC
+ * instants. Follow-ups are judged by the UK day, so a lead due "today" stays due
+ * until midnight in London whatever the server's own time zone is.
+ */
+export function londonDay(now: Date = new Date()): { start: Date; end: Date } {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' })
+      .formatToParts(now).map((p) => [p.type, p.value]),
+  );
+  const y = Number(parts.year), m = Number(parts.month), d = Number(parts.day);
+  const offsetAt = (utcMs: number) => {
+    const tz = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', timeZoneName: 'shortOffset' })
+      .formatToParts(new Date(utcMs)).find((p) => p.type === 'timeZoneName')?.value ?? 'GMT';
+    const mm = tz.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
+    return mm ? (mm[1] === '-' ? -1 : 1) * (Number(mm[2]) * 60 + Number(mm[3] ?? 0)) : 0;
+  };
+  // Midnight London = midnight UTC minus London's offset at that moment.
+  const startGuess = Date.UTC(y, m - 1, d);
+  const start = startGuess - offsetAt(startGuess) * 60_000;
+  const endGuess = Date.UTC(y, m - 1, d + 1);
+  const end = endGuess - offsetAt(endGuess) * 60_000;
+  return { start: new Date(start), end: new Date(end) };
+}
+
+export type FollowUpBucket = 'overdue' | 'today' | 'upcoming' | 'later' | 'none';
+
+/** Which Today-list group an open lead's next follow-up falls in. `upcoming` = the next 7 days. */
+export function followUpBucket(nextActionAt: Date | null, now: Date = new Date()): FollowUpBucket {
+  if (!nextActionAt) return 'none';
+  const { start, end } = londonDay(now);
+  const t = nextActionAt.getTime();
+  if (t < start.getTime()) return 'overdue';
+  if (t < end.getTime()) return 'today';
+  if (t < end.getTime() + 7 * 86_400_000) return 'upcoming';
+  return 'later';
+}

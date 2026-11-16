@@ -3,7 +3,7 @@ import { LeadActivityType, LeadSource, LeadStage, Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { ChangeStageDto, CreateLeadDto, LogActivityDto, UpdateLeadDto } from './dto/lead.dto';
-import { clientStatusForStage, stageChangeError, stageForClientStatus } from './lead-stages';
+import { clientStatusForStage, followUpBucket, londonDay, stageChangeError, stageForClientStatus } from './lead-stages';
 
 const listSelect = {
   client: { select: { id: true, name: true, status: true } },
@@ -164,6 +164,7 @@ export class LeadsService {
     if (dto.notes !== undefined) data.notes = blank(dto.notes) ?? null;
     if (dto.ownerId !== undefined) data.ownerId = dto.ownerId;
     if (dto.nextActionAt !== undefined) data.nextActionAt = new Date(dto.nextActionAt);
+    if (dto.clearNextAction) data.nextActionAt = null;
     if (dto.clientId !== undefined) data.clientId = dto.clientId || null;
 
     const lead = await this.prisma.lead.update({ where: { id }, data, include: listSelect });
@@ -282,9 +283,35 @@ export class LeadsService {
     const rows = await this.prisma.lead.groupBy({ by: ['stage'], where: { archivedAt: null }, _count: { _all: true } });
     const counts = Object.fromEntries(Object.values(LeadStage).map((s) => [s, 0])) as Record<LeadStage, number>;
     for (const r of rows) counts[r.stage] = r._count._all;
+    // Due = follow-up date is today (London) or earlier, same as the Today list.
     const due = await this.prisma.lead.count({
-      where: { archivedAt: null, stage: { notIn: ['WON', 'LOST'] }, nextActionAt: { lte: new Date() } },
+      where: { archivedAt: null, stage: { notIn: ['WON', 'LOST'] }, nextActionAt: { lt: londonDay().end } },
     });
     return { counts, followUpsDue: due };
+  }
+
+  /**
+   * The Today list: every open lead (not won, lost or archived) grouped by its
+   * next follow-up — overdue, today, the next 7 days, later, and no follow-up
+   * set. The last group is how prospects slip through the cracks, so it's shown
+   * too. Each lead carries its latest activity so you know where you left off.
+   */
+  async today() {
+    const now = new Date();
+    const leads = await this.prisma.lead.findMany({
+      where: { archivedAt: null, stage: { notIn: ['WON', 'LOST'] } },
+      include: {
+        client: { select: { id: true, name: true, status: true } },
+        activities: { orderBy: { occurredAt: 'desc' }, take: 1, select: { type: true, subject: true, outcome: true, occurredAt: true } },
+      },
+      orderBy: [{ nextActionAt: { sort: 'asc', nulls: 'last' } }, { updatedAt: 'desc' }],
+      take: 1000,
+    });
+    const groups = { overdue: [], today: [], upcoming: [], later: [], none: [] } as Record<ReturnType<typeof followUpBucket>, unknown[]>;
+    for (const { activities, ...l } of leads) {
+      groups[followUpBucket(l.nextActionAt, now)].push({ ...l, lastActivity: activities[0] ?? null });
+    }
+    const { start, end } = londonDay(now);
+    return { day: { start, end }, ...groups };
   }
 }

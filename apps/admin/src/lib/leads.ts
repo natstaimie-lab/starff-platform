@@ -73,8 +73,11 @@ export const fmtDateTime = (d: string) =>
 export const gbp = (v: string | number) => '£' + Number(v).toLocaleString('en-GB', { maximumFractionDigits: 0 });
 
 /** Follow-up date is today or earlier, and the lead is still open. */
-export const isDue = (l: Pick<Lead, 'nextActionAt' | 'stage'>) =>
-  !!l.nextActionAt && l.stage !== 'WON' && l.stage !== 'LOST' && new Date(l.nextActionAt).getTime() <= Date.now();
+export const isDue = (l: Pick<Lead, 'nextActionAt' | 'stage'>) => {
+  if (!l.nextActionAt || l.stage === 'WON' || l.stage === 'LOST') return false;
+  const endOfToday = new Date(); endOfToday.setHours(24, 0, 0, 0);
+  return new Date(l.nextActionAt).getTime() < endOfToday.getTime();
+};
 
 /** yyyy-mm-dd for a date input, from an ISO string. */
 export const toDateInput = (d: string | null) => (d ? new Date(d).toISOString().slice(0, 10) : '');

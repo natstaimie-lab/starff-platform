@@ -39,6 +39,8 @@ export class CreateLeadDto extends LeadDetailsDto {
 
 export class UpdateLeadDto extends LeadDetailsDto {
   @IsOptional() @IsString() @MaxLength(200) companyName?: string;
+  /** Remove the next follow-up date (e.g. nothing more to chase for now). */
+  @IsOptional() @IsBoolean() clearNextAction?: boolean;
   @IsOptional() @IsString() clientId?: string;
 }
 

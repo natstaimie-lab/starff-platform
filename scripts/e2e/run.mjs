@@ -367,6 +367,18 @@ async function leads(created) {
   check('editing without leadId keeps the link', qe.status === 200 && (await qe.json()).leadId === lead.id);
   check('quote for unknown lead refused (400)', (await req('/quotes', admin.bearer, 'POST', { leadId: 'nope', prospectName: 'X', lines: [{ description: 'x', payRate: 13, hoursPerShift: 8 }] })).status === 400);
 
+  // Today list: overdue / due today / no follow-up buckets, and clearing the date.
+  const inToday = async (id) => { const t = await req('/leads/today', admin.bearer, 'GET').then((r) => r.json()); return ['overdue', 'today', 'upcoming', 'later', 'none'].find((k) => t[k]?.some((l) => l.id === id)); };
+  await req(`/leads/${lead.id}`, admin.bearer, 'PATCH', { nextActionAt: new Date(Date.now() - 3 * 86400e3).toISOString().slice(0, 10) });
+  check('Today list: past date → overdue', (await inToday(lead.id)) === 'overdue');
+  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date());
+  await req(`/leads/${lead.id}`, admin.bearer, 'PATCH', { nextActionAt: todayStr });
+  check('Today list: today\'s date → today', (await inToday(lead.id)) === 'today');
+  const tl = await req('/leads/today', admin.bearer, 'GET').then((r) => r.json());
+  check('Today list rows carry the last activity', tl.today.find((l) => l.id === lead.id)?.lastActivity?.subject != null);
+  await req(`/leads/${lead.id}`, admin.bearer, 'PATCH', { clearNextAction: true });
+  check('clear follow-up → "no follow-up set"', (await inToday(lead.id)) === 'none');
+
   const list = await req(`/leads?q=${encodeURIComponent(`E2E Lead Co ${stamp}`)}`, admin.bearer, 'GET').then((r) => r.json());
   check('list + search finds the lead', Array.isArray(list) && list.some((l) => l.id === lead.id));
   const sum = await req('/leads/summary', admin.bearer, 'GET').then((r) => r.json());
