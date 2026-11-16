@@ -5,7 +5,9 @@ import { AuditService } from '../audit/audit.service';
 import { RateSettingsService } from './rate-settings.service';
 import { calculateQuote } from './quote-calculator';
 import { toQuoteSettings } from './to-quote-settings';
-import type { QuoteLineDto, SaveQuoteDto } from './dto/save-quote.dto';
+import type { QuoteLineDto, SaveQuoteDto, SendQuoteDto } from './dto/save-quote.dto';
+import { buildQuotePdf, quoteFilename } from './quote-pdf';
+import { QuoteMailer } from './quote-mailer';
 
 const DEFAULT_VALID_DAYS = 30;
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -32,6 +34,7 @@ export class QuotesService {
     private readonly prisma: PrismaService,
     private readonly rates: RateSettingsService,
     private readonly audit: AuditService,
+    private readonly mailer: QuoteMailer,
   ) {}
 
   /** Adds `expired`: a DRAFT or SENT quote whose valid-until date has passed. */
@@ -220,5 +223,81 @@ export class QuotesService {
       meta: { number: existing.number, from: existing.status, to: status },
     });
     return this.present(q);
+  }
+
+  // ── PDF + email ────────────────────────────────────────────────────────────
+
+  private async pdfFor(q: QuoteWithLines) {
+    const companyName = q.client?.name ?? q.prospectName ?? 'Client';
+    const buffer = await buildQuotePdf({
+      number: q.number, title: q.title, companyName, contactName: q.contactName,
+      createdAt: q.createdAt, validUntil: q.validUntil, total: Number(q.total),
+      lines: q.lines.map((l) => ({
+        description: l.description, temps: l.temps, shifts: l.shifts, hoursPerShift: Number(l.hoursPerShift),
+        shiftType: l.shiftType, chargeRate: Number(l.chargeRate), totalHours: Number(l.totalHours), total: Number(l.total),
+      })),
+    });
+    return { buffer, filename: quoteFilename(q.number), companyName };
+  }
+
+  /** The client-facing PDF (charge rates and totals only). */
+  async pdf(id: string) {
+    const q = await this.prisma.quote.findUnique({ where: { id }, include });
+    if (!q) throw new NotFoundException('Quote not found');
+    const { buffer, filename } = await this.pdfFor(q);
+    return { buffer, filename };
+  }
+
+  /** The default covering email, for the admin to edit before sending. */
+  async emailDraft(id: string, actorId?: string) {
+    const q = await this.get(id);
+    const sender = actorId ? await this.prisma.user.findUnique({ where: { id: actorId }, select: { firstName: true, lastName: true, email: true } }) : null;
+    const company = q.client?.name ?? q.prospectName ?? '';
+    const first = q.contactName?.trim().split(/\s+/)[0];
+    const valid = q.validUntil.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+    return {
+      to: q.contactEmail ? [q.contactEmail] : [],
+      subject: `Your Starff quote ${q.number}${q.title ? ` — ${q.title}` : ''}`,
+      message: `${first ? `Hi ${first},` : 'Hello,'}\n\nThank you for considering Starff${company ? ` for ${company}` : ''}. Please find your quote attached.\n\nThe quote is valid until ${valid}. If you have any questions or would like to go ahead, just reply to this email and we'll get your team booked in.`,
+      from: this.mailer.from,
+      replyTo: this.mailer.replyTo(sender?.email),
+      senderEmail: sender?.email ?? null,
+    };
+  }
+
+  /** Email the PDF to the client and mark the quote as Sent. */
+  async send(id: string, dto: SendQuoteDto, actorId?: string) {
+    const q = await this.prisma.quote.findUnique({ where: { id }, include });
+    if (!q) throw new NotFoundException('Quote not found');
+    if (q.status !== 'DRAFT' && q.status !== 'SENT') {
+      throw new BadRequestException(`This quote is ${q.status.toLowerCase()} — move it back to Sent or Draft before emailing it again.`);
+    }
+    if (this.present(q).expired) {
+      throw new BadRequestException('This quote has passed its valid-until date. Move it to Draft, update the date, then send it.');
+    }
+    const draft = await this.emailDraft(id, actorId);
+    const to = (dto.to?.length ? dto.to : draft.to).map((e) => e.trim()).filter(Boolean);
+    if (!to.length) throw new BadRequestException('Add an email address to send the quote to.');
+    const sender = actorId ? await this.prisma.user.findUnique({ where: { id: actorId }, select: { firstName: true, lastName: true, email: true } }) : null;
+    const senderName = [sender?.firstName, sender?.lastName].filter(Boolean).join(' ') || null;
+
+    const { buffer, filename } = await this.pdfFor(q);
+    const result = await this.mailer.send({
+      to, cc: dto.cc, senderEmail: sender?.email, senderName,
+      subject: dto.subject?.trim() || draft.subject,
+      message: dto.message?.trim() || draft.message,
+      pdf: buffer, filename,
+    });
+
+    const updated = await this.prisma.quote.update({
+      where: { id },
+      data: { status: 'SENT', sentAt: new Date(), decidedAt: null },
+      include,
+    });
+    await this.audit.log({
+      actorId, action: 'quote.sent', entity: 'Quote', entityId: id,
+      meta: { number: q.number, to, cc: dto.cc ?? [], from: this.mailer.from, resendId: result.id ?? null, total: Number(q.total) },
+    });
+    return { ...this.present(updated), emailedTo: to };
   }
 }

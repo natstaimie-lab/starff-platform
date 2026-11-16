@@ -3,7 +3,9 @@
 import { Fragment, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
+import { supabase } from '@/lib/supabaseClient';
 import { Card, Badge } from '@/components/ui';
+import { Modal, Field, TextInput, Button } from '@/components/Modal';
 
 type QuoteLine = {
   id: string; description: string; payRate: string; chargeRate: string; hoursPerShift: string;
@@ -22,6 +24,10 @@ const TONE: Record<string, 'neutral' | 'info' | 'success' | 'error' | 'warning'>
 /** Status changes the API allows (mirrors NEXT in quotes.service.ts). */
 const NEXT: Record<string, string[]> = { DRAFT: ['SENT', 'ACCEPTED', 'DECLINED'], SENT: ['DRAFT', 'ACCEPTED', 'DECLINED'], ACCEPTED: ['SENT'], DECLINED: ['SENT'] };
 
+type EmailDraft = { to: string[]; subject: string; message: string; from: string; replyTo: string; senderEmail: string | null };
+type SendForm = { quote: Quote; to: string; cc: string; subject: string; message: string; from: string; replyTo: string; senderEmail: string | null };
+const splitEmails = (s: string) => s.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
+
 const gbp = (v: string | number) => '£' + Number(v).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
 
@@ -31,6 +37,10 @@ export default function SavedQuotesPage() {
   const [filter, setFilter] = useState<string>('');
   const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [send, setSend] = useState<SendForm | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
+  const [toast, setToast] = useState('');
 
   const load = () => apiFetch<Quote[]>('/quotes').then(setQuotes).catch((e) => setError(e?.message || 'Could not load quotes'));
   useEffect(() => { load(); }, []);
@@ -43,6 +53,50 @@ export default function SavedQuotesPage() {
     } catch (e: any) { alert(e?.message || 'Could not change the status'); } finally { setBusy(null); }
   }
 
+  /** Opens the PDF in a new tab (fetched with the login token, as the API needs it). */
+  async function viewPdf(q: Quote) {
+    const tab = window.open('', '_blank');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/quotes/${q.id}/pdf`, { headers: { Authorization: `Bearer ${session?.access_token ?? ''}` } });
+      if (!res.ok) throw new Error('Could not make the PDF.');
+      const url = URL.createObjectURL(await res.blob());
+      if (tab) tab.location.href = url; else window.location.href = url;
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e: any) { tab?.close(); alert(e?.message || 'Could not make the PDF.'); }
+  }
+
+  async function openSend(q: Quote) {
+    setSendError('');
+    try {
+      const d = await apiFetch<EmailDraft>(`/quotes/${q.id}/email-draft`);
+      setSend({ quote: q, to: d.to.join(', '), cc: '', subject: d.subject, message: d.message, from: d.from, replyTo: d.replyTo, senderEmail: d.senderEmail });
+    } catch (e: any) { alert(e?.message || 'Could not prepare the email'); }
+  }
+
+  async function doSend() {
+    if (!send) return;
+    const to = splitEmails(send.to);
+    if (!to.length) { setSendError('Add at least one email address.'); return; }
+    setSending(true); setSendError('');
+    try {
+      const updated = await apiFetch<Quote & { emailedTo: string[] }>(`/quotes/${send.quote.id}/send`, {
+        method: 'POST',
+        body: JSON.stringify({ to, cc: splitEmails(send.cc), subject: send.subject, message: send.message }),
+      });
+      setQuotes((qs) => qs!.map((x) => (x.id === updated.id ? updated : x)));
+      setSend(null);
+      setToast(`${updated.number} emailed to ${updated.emailedTo.join(', ')}`);
+      setTimeout(() => setToast(''), 6000);
+    } catch (e: any) {
+      const m = String(e?.message || 'Could not send');
+      const json = m.match(/\{.*\}$/);
+      let msg = m;
+      if (json) { try { msg = JSON.parse(json[0]).message ?? m; } catch { /* keep raw */ } }
+      setSendError(Array.isArray(msg) ? msg.join(' ') : msg);
+    } finally { setSending(false); }
+  }
+
   const shown = (quotes ?? []).filter((q) => !filter || (filter === 'EXPIRED' ? q.expired : q.status === filter && !q.expired));
   const count = (s: string) => (quotes ?? []).filter((q) => (s === 'EXPIRED' ? q.expired : q.status === s && !q.expired)).length;
 
@@ -53,6 +107,34 @@ export default function SavedQuotesPage() {
   );
 
   return (
+    <>
+    {toast && <div role="status" style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1100, background: 'var(--ink-900, #0B1F3A)', color: '#fff', padding: '12px 16px', borderRadius: 10, fontSize: 13.5, fontWeight: 600, boxShadow: '0 10px 30px rgba(11,31,58,.25)' }}>✓ {toast}</div>}
+    {send && (
+      <Modal
+        title={`Email ${send.quote.number} to the client`}
+        subtitle="The branded PDF is attached. You get a copy, and replies come to you."
+        width={560}
+        onClose={() => !sending && setSend(null)}
+        footer={<>
+          <Button variant="outline" onClick={() => viewPdf(send.quote)}>Preview PDF</Button>
+          <Button variant="outline" disabled={sending} onClick={() => setSend(null)}>Cancel</Button>
+          <Button disabled={sending} onClick={doSend}>{sending ? 'Sending…' : 'Send quote'}</Button>
+        </>}
+      >
+        <Field label="To"><TextInput value={send.to} onChange={(e) => setSend({ ...send, to: e.target.value })} placeholder="name@company.co.uk" /></Field>
+        <Field label="Cc (optional)"><TextInput value={send.cc} onChange={(e) => setSend({ ...send, cc: e.target.value })} placeholder="Separate several with commas" /></Field>
+        <Field label="Subject"><TextInput value={send.subject} maxLength={200} onChange={(e) => setSend({ ...send, subject: e.target.value })} /></Field>
+        <Field label="Message">
+          <textarea value={send.message} rows={8} maxLength={5000} onChange={(e) => setSend({ ...send, message: e.target.value })}
+            style={{ width: '100%', padding: 10, border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', fontFamily: 'var(--font-sans)', fontSize: 14, lineHeight: 1.5, background: 'var(--surface-card)', color: 'var(--text-primary)' }} />
+        </Field>
+        <div className="dim" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
+          From <b>{send.from}</b> · replies to <b>{send.replyTo}</b>{send.senderEmail ? <> · copy to <b>{send.senderEmail}</b></> : null}
+          <br />Sending marks the quote as <b>Sent</b>.
+        </div>
+        {sendError && <p role="alert" style={{ color: 'var(--error-600, #c0392b)', fontSize: 13.5, margin: 0 }}>{sendError}</p>}
+      </Modal>
+    )}
     <Card
       title="Saved quotes"
       subtitle="A draft or sent quote shows as expired once its valid-until date has passed"
@@ -114,9 +196,17 @@ export default function SavedQuotesPage() {
                           <span className="dim" style={{ fontSize: 12.5 }}>
                             Created {fmtDate(q.createdAt)}{q.contactEmail ? ` · ${q.contactEmail}` : ''}{q.notes ? ` · ${q.notes}` : ''}
                           </span>
-                          {q.status === 'DRAFT'
-                            ? <Link href={`/dashboard/quotes?edit=${q.id}`} className="link" style={{ fontWeight: 600, fontSize: 13 }}>Edit draft →</Link>
-                            : <span className="dim" style={{ fontSize: 12.5 }}>Move back to Draft to edit</span>}
+                          <div className="fx ac" style={{ gap: 14, flexWrap: 'wrap' }}>
+                            {q.status === 'DRAFT'
+                              ? <Link href={`/dashboard/quotes?edit=${q.id}`} className="link" style={{ fontWeight: 600, fontSize: 13 }}>Edit draft</Link>
+                              : <span className="dim" style={{ fontSize: 12.5 }}>Move back to Draft to edit</span>}
+                            <button className="link" style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }} onClick={() => viewPdf(q)}>View PDF</button>
+                            {(q.status === 'DRAFT' || q.status === 'SENT') && !q.expired && (
+                              <button className="aibtn" style={{ height: 34, background: 'var(--blue-500)', color: '#fff', border: 'none' }} onClick={() => openSend(q)}>
+                                {q.status === 'SENT' ? 'Email again' : 'Email to client'}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -127,5 +217,6 @@ export default function SavedQuotesPage() {
           </table>
         )}
     </Card>
+    </>
   );
 }
