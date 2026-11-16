@@ -36,7 +36,8 @@ export type Activity = {
 
 export type LeadQuote = {
   id: string; number: string; status: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'DECLINED'; title: string | null;
-  total: string; profit: string; validUntil: string; sentAt: string | null; createdAt: string;
+  total: string; profit: string; validUntil: string; sentAt: string | null; decidedAt: string | null; createdAt: string;
+  _count?: { lines: number };
 };
 
 export type LeadDetail = Lead & {

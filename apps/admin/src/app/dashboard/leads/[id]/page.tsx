@@ -15,6 +15,9 @@ const LOG_TYPES = ['CALL', 'EMAIL', 'NOTE', 'MEETING'] as const;
 type LogForm = { type: (typeof LOG_TYPES)[number]; direction: 'outbound' | 'inbound'; subject: string; body: string; outcome: string; nextActionAt: string };
 const EMPTY_LOG: LogForm = { type: 'CALL', direction: 'outbound', subject: '', body: '', outcome: '', nextActionAt: '' };
 
+type ConvertForm = { quoteId: string; firstName: string; lastName: string; email: string; phone: string; sendInvite: boolean; error: string };
+type ConvertResult = { clientId: string; clientCreated: boolean; invited: boolean; quoteNumber: string | null; ratesCopied: number };
+
 type EditForm = { companyName: string; contactName: string; contactEmail: string; contactPhone: string; contactRole: string; sector: string; city: string; postcode: string; estimatedValue: string; nextActionAt: string; notes: string };
 
 export default function LeadDetailPage() {
@@ -29,6 +32,9 @@ export default function LeadDetailPage() {
   const [stageBusy, setStageBusy] = useState(false);
   const [stageError, setStageError] = useState('');
   const [edit, setEdit] = useState<EditForm | null>(null);
+  const [conv, setConv] = useState<ConvertForm | null>(null);
+  const [convBusy, setConvBusy] = useState(false);
+  const [converted, setConverted] = useState<ConvertResult | null>(null);
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState('');
 
@@ -86,6 +92,29 @@ export default function LeadDetailPage() {
     } catch (e) { setEditError(apiError(e, 'Could not save')); } finally { setEditBusy(false); }
   }
 
+  function openConvert() {
+    if (!lead) return;
+    const [first, ...rest] = (lead.contactName ?? '').trim().split(/\s+/);
+    const accepted = lead.quotes.filter((q) => q.status === 'ACCEPTED');
+    setConv({ quoteId: accepted[0]?.id ?? '', firstName: first ?? '', lastName: rest.join(' '), email: lead.contactEmail ?? '', phone: lead.contactPhone ?? '', sendInvite: true, error: '' });
+  }
+
+  async function doConvert() {
+    if (!conv) return;
+    if (!conv.firstName.trim() || !conv.lastName.trim() || !conv.email.trim()) { setConv({ ...conv, error: 'Add the contact\'s first name, last name and email. They get the portal login.' }); return; }
+    setConvBusy(true);
+    try {
+      const body: Record<string, unknown> = {
+        contactFirstName: conv.firstName.trim(), contactLastName: conv.lastName.trim(), contactEmail: conv.email.trim(), sendInvite: conv.sendInvite,
+      };
+      if (conv.phone.trim()) body.contactPhone = conv.phone.trim();
+      if (conv.quoteId) body.quoteId = conv.quoteId;
+      const r = await apiFetch<ConvertResult>(`/leads/${id}/convert`, { method: 'POST', body: JSON.stringify(body) });
+      setConv(null); setConverted(r);
+      await load();
+    } catch (e) { setConv({ ...conv, error: apiError(e, 'Could not convert') }); } finally { setConvBusy(false); }
+  }
+
   async function toggleArchive() {
     if (!lead) return;
     const archived = !lead.archivedAt;
@@ -107,6 +136,43 @@ export default function LeadDetailPage() {
 
   return (
     <>
+      {conv && (() => {
+        const accepted = lead.quotes.filter((q) => q.status === 'ACCEPTED');
+        const setC = (k: keyof ConvertForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setConv({ ...conv, [k]: e.target.value, error: '' });
+        return (
+          <Modal title={`Convert ${lead.companyName} to a client`} width={560} onClose={() => !convBusy && setConv(null)}
+            subtitle={lead.client ? `Uses the existing client record: ${lead.client.name}` : 'Creates a new client record'}
+            footer={<><Button variant="outline" disabled={convBusy} onClick={() => setConv(null)}>Cancel</Button><Button disabled={convBusy} onClick={doConvert}>{convBusy ? 'Converting…' : 'Convert to client'}</Button></>}>
+            <ol className="cv-steps">
+              <li>{lead.client ? 'Links the lead to the existing client.' : 'Creates the client (status Prospect until you approve their onboarding).'}</li>
+              <li>Sets up a client-portal login for the contact below{conv.sendInvite ? ' and emails them the activation link' : ''}.</li>
+              <li>{conv.quoteId ? 'Copies the accepted quote\'s rates as their agreed rates.' : 'No agreed rates copied (no accepted quote chosen).'}</li>
+              <li>Marks the lead Won.</li>
+            </ol>
+            <Field label="Agreed rates from">
+              <SelectInput value={conv.quoteId} onChange={setC('quoteId')}>
+                {accepted.map((q) => <option key={q.id} value={q.id}>{q.number}{q.title ? ` · ${q.title}` : ''} · £{Number(q.total).toLocaleString('en-GB', { minimumFractionDigits: 2 })}{q._count ? ` · ${q._count.lines} ${q._count.lines === 1 ? 'role' : 'roles'}` : ''}</option>)}
+                <option value="">No quote, don&apos;t copy rates</option>
+              </SelectInput>
+            </Field>
+            {accepted.length === 0 && (
+              <p className="cv-warn">This lead has no accepted quote. To copy agreed rates, mark the quote <b>Accepted</b> in <Link href="/dashboard/quotes/saved" className="link">Saved quotes</Link> first, or convert without rates.</p>
+            )}
+            <div className="lead-grid2">
+              <Field label="Contact first name"><TextInput value={conv.firstName} onChange={setC('firstName')} maxLength={100} /></Field>
+              <Field label="Contact last name"><TextInput value={conv.lastName} onChange={setC('lastName')} maxLength={100} /></Field>
+              <Field label="Login email"><TextInput type="email" value={conv.email} onChange={setC('email')} /></Field>
+              <Field label="Phone (optional)"><TextInput value={conv.phone} onChange={setC('phone')} maxLength={50} /></Field>
+            </div>
+            <label className="cv-check">
+              <input type="checkbox" checked={conv.sendInvite} onChange={(e) => setConv({ ...conv, sendInvite: e.target.checked })} />
+              Email the client-portal invite now
+            </label>
+            {conv.error && <p role="alert" className="lead-error">{conv.error}</p>}
+          </Modal>
+        );
+      })()}
+
       {stageForm && (
         <Modal title={`Move to ${STAGE_LABEL[stageForm.stage]}`} subtitle={`${lead.companyName} is ${STAGE_LABEL[lead.stage]} now`} onClose={() => !stageBusy && setStageForm(null)}
           footer={<><Button variant="outline" disabled={stageBusy} onClick={() => setStageForm(null)}>Cancel</Button><Button disabled={stageBusy} onClick={saveStage}>{stageBusy ? 'Saving…' : 'Change stage'}</Button></>}>
@@ -145,6 +211,17 @@ export default function LeadDetailPage() {
 
       <div style={{ marginBottom: 12 }}><Link href="/dashboard/leads" className="link">← All leads</Link></div>
 
+      {converted && (
+        <div role="status" className="cv-done">
+          <div>
+            <b>Converted.</b> {converted.clientCreated ? 'New client created' : 'Linked to the existing client'}
+            {converted.invited ? ', portal invite emailed' : ', portal login set up (invite not emailed)'}
+            {converted.ratesCopied ? `, ${converted.ratesCopied} agreed ${converted.ratesCopied === 1 ? 'rate' : 'rates'} copied from ${converted.quoteNumber}` : converted.quoteNumber ? `, agreed rates from ${converted.quoteNumber} were already on file` : ', no agreed rates copied'}.
+          </div>
+          <Link href={`/dashboard/clients/${converted.clientId}`} className="aibtn" style={{ textDecoration: 'none' }}>Open client →</Link>
+        </div>
+      )}
+
       <div className="lead-layout">
         <div className="lead-side">
           <Card
@@ -173,6 +250,7 @@ export default function LeadDetailPage() {
             </div>
             {lead.notes && <p style={{ whiteSpace: 'pre-wrap', fontSize: 13.5, marginBottom: 0 }}>{lead.notes}</p>}
             <div className="fx ac" style={{ gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+              {!(lead.stage === 'WON' && lead.client) && !lead.archivedAt && <Button onClick={openConvert}>Convert to client</Button>}
               <Button variant="outline" onClick={openEdit}>Edit details</Button>
               <Button variant="outline" onClick={toggleArchive}>{lead.archivedAt ? 'Restore' : 'Archive'}</Button>
             </div>

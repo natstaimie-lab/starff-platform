@@ -19,7 +19,14 @@ type Client = {
   agreementAccepted?: boolean; agreementAcceptedAt?: string | null; signatureName?: string | null; signedAt?: string | null;
   submittedAt?: string | null; registrationSource?: string | null; createdAt?: string | null;
   contacts: Contact[]; sites: Site[]; jobs: { id: string }[];
+  agreedRates?: AgreedRate[];
 };
+type AgreedRate = {
+  id: string; role: string; shiftType: string; payRate: string; chargeRate: string; marginPerHour: string;
+  agreedAt: string; quote: { id: string; number: string } | null;
+};
+const SHIFT_LABEL: Record<string, string> = { standard: 'Standard', night: 'Night', weekend: 'Weekend', bank_holiday: 'Bank holiday' };
+const gbp2 = (v: string) => '£' + Number(v).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const statusTone: Record<string, string> = { ACTIVE: 'success', LEAD: 'info', PROSPECT: 'warning', ON_HOLD: 'warning', CLOSED: 'neutral' };
 const fmt = (s?: string | null) => (s ? new Date(s).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
@@ -224,6 +231,26 @@ export default function ClientProfile() {
                 </div>
               </div>
             ))}
+          </Card>
+
+          <Card title="Agreed rates" subtitle={c.agreedRates?.length ? `From quote ${c.agreedRates[0].quote?.number ?? ''}, agreed ${fmt(c.agreedRates[0].agreedAt)}` : 'Copied from their accepted quote when a lead is converted'}>
+            {!c.agreedRates?.length ? <p className="dim" style={{ margin: 0, fontSize: 13 }}>No agreed rates yet.</p> : (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="tbl" style={{ width: '100%' }}>
+                  <thead><tr><th>Role</th><th>Shift</th><th style={{ textAlign: 'right' }}>Pay</th><th style={{ textAlign: 'right' }}>Charge</th></tr></thead>
+                  <tbody>
+                    {c.agreedRates.map((r) => (
+                      <tr key={r.id}>
+                        <td style={{ fontWeight: 600 }}>{r.role}</td>
+                        <td className="dim">{SHIFT_LABEL[r.shiftType] ?? r.shiftType}</td>
+                        <td className="mono" style={{ textAlign: 'right' }}>{gbp2(r.payRate)}/hr</td>
+                        <td className="mono" style={{ textAlign: 'right', fontWeight: 700 }}>{gbp2(r.chargeRate)}/hr</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </Card>
 
           <Card title="Terms & agreement">

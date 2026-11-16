@@ -842,3 +842,10 @@ a.link:hover {
 .td-btn:disabled { opacity: .6; cursor: default; }
 .pb-choice.is-on { background: var(--blue-500); border-color: var(--blue-500); color: #fff; }
 @media (max-width: 640px) { .td-row { grid-template-columns: 1fr; } .td-side { align-items: flex-start; } .td-actions { justify-content: flex-start; } }
+
+/* ── CRM convert to client ── */
+.cv-steps { margin: 0; padding-left: 20px; list-style: decimal; font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); }
+.cv-warn { margin: 0; font-size: 13px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--warning-50, #FFF7ED); border: 1px solid var(--orange-500); color: var(--text-primary); }
+.cv-check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.cv-check input { width: 18px; height: 18px; accent-color: var(--blue-500); }
+.cv-done { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 16px; margin-bottom: 12px; border-radius: var(--radius-lg); border: 1px solid #16A34A; border-left: 4px solid #16A34A; background: var(--surface-card); font-size: 13.5px; }

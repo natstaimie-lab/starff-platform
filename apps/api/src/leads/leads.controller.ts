@@ -5,7 +5,7 @@ import { LeadActivityType, LeadStage, Role } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { LeadsService } from './leads.service';
-import { ChangeStageDto, CreateLeadDto, LogActivityDto, UpdateLeadDto } from './dto/lead.dto';
+import { ChangeStageDto, ConvertLeadDto, CreateLeadDto, LogActivityDto, UpdateLeadDto } from './dto/lead.dto';
 
 class ArchiveDto {
   @IsBoolean() archived: boolean;
@@ -87,6 +87,17 @@ export class LeadsController {
   @Patch(':id/stage')
   changeStage(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: ChangeStageDto) {
     return this.leads.changeStage(id, dto, u.id);
+  }
+
+  /**
+   * Convert to client: creates (or reuses) the client, sets up the contact's
+   * portal login and emails it, copies the accepted quote's rates as agreed
+   * rates, and marks the lead Won.
+   */
+  @Post(':id/convert')
+  @HttpCode(200)
+  convert(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: ConvertLeadDto) {
+    return this.leads.convert(id, dto, u.id);
   }
 
   @Patch(':id/archive')
