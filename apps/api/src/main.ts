@@ -14,7 +14,8 @@ if (!(globalThis as { WebSocket?: unknown }).WebSocket) {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // rawBody: signed webhooks (Resend inbound) are verified against the exact bytes received.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 
   // Behind Railway's proxy — trust the first hop so req.ip is the real client
   // IP (from X-Forwarded-For). Rate limiting keys on this, so without it every

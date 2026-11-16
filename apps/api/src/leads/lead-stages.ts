@@ -80,6 +80,32 @@ export function followUpBucket(nextActionAt: Date | null, now: Date = new Date()
   return 'later';
 }
 
-/** A lead that has asked not to be contacted (Lost with an unsubscribe-type reason). Nothing is drafted or sent to them. */
-export const optedOut = (lead: { stage: string; lostReason: string | null }) =>
-  lead.stage === 'LOST' && /unsubscrib|opt(ed)?[ -]?out|do not (contact|email)|don'?t (contact|email)|remove me/i.test(lead.lostReason ?? '');
+/**
+ * A lead that has asked not to be contacted: unsubscribed (e.g. replied
+ * "unsubscribe"), or Lost with an unsubscribe-type reason. Nothing is drafted
+ * or sent to them.
+ */
+export const optedOut = (lead: { stage: string; lostReason: string | null; unsubscribedAt?: Date | null }) =>
+  !!lead.unsubscribedAt
+  || (lead.stage === 'LOST' && /unsubscrib|opt(ed)?[ -]?out|do not (contact|email)|don'?t (contact|email)|remove me/i.test(lead.lostReason ?? ''));
+
+/** Words in a reply that mean "stop emailing me". Checked before any AI, so it works with the AI off. */
+export const UNSUBSCRIBE_RX = /\b(unsubscribe|unsubscribed|remove me|take me off|opt(?:ed)? ?out|stop (?:emailing|contacting|sending)|do not (?:email|contact)|don'?t (?:email|contact)|no more emails)\b/i;
+
+/**
+ * Keep only the new part of an email reply: cut at the quoted thread
+ * ("On … wrote:", "-----Original Message-----", "From: …" header blocks, or ">" lines).
+ */
+export function stripQuoted(text: string): string {
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const out: string[] = [];
+  for (const line of lines) {
+    const t = line.trim();
+    if (/^On .+wrote:?$/i.test(t) || /^-{2,}\s*Original Message\s*-{2,}$/i.test(t) || /^_{5,}$/.test(t)) break;
+    if (/^From:\s.+/i.test(t) && out.some((l) => l.trim())) break;
+    if (t.startsWith('>')) continue;
+    out.push(line);
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+

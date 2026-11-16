@@ -395,6 +395,27 @@ export class LeadsService {
     return this.get(id);
   }
 
+  /** Staff mark a lead as "don't email" (e.g. asked on the phone), or undo it. Applies to every lead with the same email. */
+  async setUnsubscribed(id: string, unsubscribed: boolean, note: string | undefined, userId: string) {
+    const lead = await this.get(id);
+    const ids = lead.contactEmail
+      ? (await this.prisma.lead.findMany({ where: { contactEmail: lead.contactEmail }, select: { id: true } })).map((l) => l.id)
+      : [id];
+    const now = new Date();
+    for (const lid of ids) {
+      await this.prisma.lead.update({
+        where: { id: lid },
+        data: unsubscribed ? { unsubscribedAt: now, unsubscribeNote: blank(note) ?? 'Marked by staff' } : { unsubscribedAt: null, unsubscribeNote: null },
+      });
+      await this.prisma.leadActivity.create({
+        data: { leadId: lid, type: LeadActivityType.NOTE, subject: unsubscribed ? 'Marked as do-not-email' : 'Emails allowed again', body: blank(note), occurredAt: now, createdById: userId },
+      });
+      if (unsubscribed) await this.staleDrafts(lid);
+      await this.audit.log({ actorId: userId, action: unsubscribed ? 'lead.unsubscribed' : 'lead.resubscribed', entity: 'Lead', entityId: lid, meta: { via: 'staff', note: blank(note) ?? null } });
+    }
+    return this.get(id);
+  }
+
   /** Hide a lead from lists (recoverable). */
   async setArchived(id: string, archived: boolean, userId: string) {
     await this.get(id);

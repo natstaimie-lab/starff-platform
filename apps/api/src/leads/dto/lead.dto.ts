@@ -106,10 +106,20 @@ export class SendAiDraftDto {
   @IsString() @MaxLength(200) subject: string;
   @IsString() @MaxLength(10000) body: string;
   @IsOptional() @IsDateString() nextActionAt?: string;
+  /** Reply drafts: also move the lead to the AI's suggested stage. */
+  @IsOptional() @IsBoolean() applyStage?: boolean;
 }
 
 export class SkipAiDraftDto {
   @IsOptional() @IsString() @MaxLength(300) reason?: string;
   /** Push the lead's next follow-up to this date so it leaves Today. */
   @IsOptional() @IsDateString() nextActionAt?: string;
+  /** Reply drafts: still move the lead to the AI's suggested stage (e.g. Lost after a clear no). */
+  @IsOptional() @IsBoolean() applyStage?: boolean;
+}
+
+export class UnsubscribeLeadDto {
+  /** true = stop all emails to this lead (e.g. they asked on the phone); false = undo. */
+  @IsBoolean() unsubscribed: boolean;
+  @IsOptional() @IsString() @MaxLength(300) note?: string;
 }
