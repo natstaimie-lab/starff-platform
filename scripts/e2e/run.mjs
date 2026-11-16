@@ -356,6 +356,17 @@ async function leads(created) {
   await req(`/leads/${cl.id}/stage`, admin.bearer, 'PATCH', { stage: 'WON' });
   check('WON does not make client ACTIVE', (await p.client.findUnique({ where: { id: company.id }, select: { status: true } })).status === 'PROSPECT');
 
+  // Quote made for the lead: linked, listed on the lead, and logged in its activity.
+  const qr = await req('/quotes', admin.bearer, 'POST', { leadId: lead.id, prospectName: lead.companyName, contactEmail: lead.contactEmail, lines: [{ description: 'E2E picker', payRate: 13, hoursPerShift: 8 }] });
+  const quote = await qr.json();
+  if (quote?.id) created.quoteIds.push(quote.id);
+  check('create quote for lead → linked', qr.status === 201 && quote.leadId === lead.id && quote.lead?.companyName === lead.companyName);
+  const withQ = await req(`/leads/${lead.id}`, admin.bearer, 'GET').then((r) => r.json());
+  check('lead shows the quote + "drafted" activity', withQ.quotes?.some((q) => q.id === quote.id) && withQ.activities?.some((a) => a.subject === `Quote ${quote.number} drafted`));
+  const qe = await req(`/quotes/${quote.id}`, admin.bearer, 'PATCH', { prospectName: lead.companyName, lines: [{ description: 'E2E picker', payRate: 14, hoursPerShift: 8 }] });
+  check('editing without leadId keeps the link', qe.status === 200 && (await qe.json()).leadId === lead.id);
+  check('quote for unknown lead refused (400)', (await req('/quotes', admin.bearer, 'POST', { leadId: 'nope', prospectName: 'X', lines: [{ description: 'x', payRate: 13, hoursPerShift: 8 }] })).status === 400);
+
   const list = await req(`/leads?q=${encodeURIComponent(`E2E Lead Co ${stamp}`)}`, admin.bearer, 'GET').then((r) => r.json());
   check('list + search finds the lead', Array.isArray(list) && list.some((l) => l.id === lead.id));
   const sum = await req('/leads/summary', admin.bearer, 'GET').then((r) => r.json());

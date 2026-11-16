@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { Card } from '@/components/ui';
 import { SECTORS, SECTOR_ROLES, type Sector } from '@/lib/sectors';
+import { apiError, type Lead } from '@/lib/leads';
 import { calculateQuote, type QuoteResult, type QuoteSettings, type ShiftType } from '@/lib/quoteCalculator';
 
 /** Rate settings as stored by the API (percentages as 12.07, not 0.1207). */
@@ -59,6 +60,7 @@ type Line = {
 type ClientOpt = { id: string; name: string };
 type SavedQuote = {
   id: string; number: string; status: string; clientId: string | null; prospectName: string | null;
+  leadId: string | null; lead: { id: string; companyName: string } | null;
   contactName: string | null; contactEmail: string | null; title: string | null; notes: string | null;
   validUntil: string;
   lines: { description: string; payRate: string; marginPerHour: string; hoursPerShift: string; shifts: number; temps: number; shiftType: ShiftType; pensionEnrolled: boolean }[];
@@ -114,6 +116,8 @@ export default function QuotesPage() {
   const [clients, setClients] = useState<ClientOpt[]>([]);
   const [details, setDetails] = useState<Details>({ clientId: '', prospectName: '', contactName: '', contactEmail: '', title: '', validUntil: in30Days(), notes: '' });
   const [editing, setEditing] = useState<{ id: string; number: string } | null>(null);
+  // The CRM lead this quote is for (opened via ?lead=<id>, or kept from the draft being edited).
+  const [forLead, setForLead] = useState<{ id: string; companyName: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const router = useRouter();
@@ -128,10 +132,27 @@ export default function QuotesPage() {
       .catch((e) => setLoadError(e?.message || 'Could not load rate settings'));
     apiFetch<ClientOpt[]>('/clients').then((cs) => setClients(cs.map((c) => ({ id: c.id, name: c.name })))).catch(() => {});
     // ?edit=<id> opens a saved draft for editing.
-    const editId = new URLSearchParams(window.location.search).get('edit');
+    const params = new URLSearchParams(window.location.search);
+    const editId = params.get('edit');
+    // ?lead=<id> starts a new quote filled in from that CRM lead.
+    const leadId = params.get('lead');
+    if (leadId && !editId) {
+      apiFetch<Lead>(`/leads/${leadId}`).then((l) => {
+        setForLead({ id: l.id, companyName: l.companyName });
+        setDetails((d) => ({
+          ...d,
+          clientId: l.clientId ?? '',
+          prospectName: l.clientId ? '' : l.companyName,
+          contactName: l.contactName ?? '',
+          contactEmail: l.contactEmail ?? '',
+        }));
+        if (l.sector && (SECTORS as readonly string[]).includes(l.sector)) setSector(l.sector as Sector);
+      }).catch((e) => setSaveError(apiError(e, 'Could not open that lead')));
+    }
     if (editId) {
       apiFetch<SavedQuote>(`/quotes/${editId}`).then((q) => {
         setEditing({ id: q.id, number: q.number });
+        if (q.lead) setForLead(q.lead);
         setDetails({
           clientId: q.clientId ?? '', prospectName: q.prospectName ?? '', contactName: q.contactName ?? '',
           contactEmail: q.contactEmail ?? '', title: q.title ?? '', validUntil: q.validUntil.slice(0, 10), notes: q.notes ?? '',
@@ -233,12 +254,14 @@ export default function QuotesPage() {
       title: details.title.trim() || undefined,
       notes: details.notes.trim() || undefined,
       validUntil: details.validUntil || undefined,
+      ...(forLead ? { leadId: forLead.id } : {}),
       lines,
     };
     setSaving(true);
     try {
       await apiFetch(editing ? `/quotes/${editing.id}` : '/quotes', { method: editing ? 'PATCH' : 'POST', body: JSON.stringify(body) });
-      router.push('/dashboard/quotes/saved');
+      // Back to the lead when the quote was made for one, so it shows under Quotes there.
+      router.push(forLead ? `/dashboard/leads/${forLead.id}` : '/dashboard/quotes/saved');
     } catch (e: any) {
       setSaveError(e?.message || 'Could not save the quote');
     } finally { setSaving(false); }
@@ -252,6 +275,12 @@ export default function QuotesPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {forLead && (
+        <div role="status" className="qc-lead">
+          <span>Quote for lead <Link href={`/dashboard/leads/${forLead.id}`} className="link" style={{ fontWeight: 700 }}>{forLead.companyName}</Link>. The company and contact are filled in below; saving takes you back to the lead.</span>
+          {!editing && <button className="link" style={{ background: 'none', border: 0, cursor: 'pointer', font: 'inherit', fontSize: 12.5 }} onClick={() => setForLead(null)}>Don&apos;t link to this lead</button>}
+        </div>
+      )}
       {/* Calculator + breakdown share the full width; they stack on narrow screens. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, alignItems: 'start' }}>
       <Card title="Booking details" subtitle="Change any figure — the breakdown updates as you type">

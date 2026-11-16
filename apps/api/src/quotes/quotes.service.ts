@@ -22,6 +22,7 @@ const NEXT: Record<QuoteStatus, QuoteStatus[]> = {
 
 const include = {
   client: { select: { id: true, name: true } },
+  lead: { select: { id: true, companyName: true } },
   lines: { orderBy: { position: 'asc' } },
 } satisfies Prisma.QuoteInclude;
 
@@ -101,7 +102,13 @@ export class QuotesService {
       const c = await this.prisma.client.findUnique({ where: { id: dto.clientId }, select: { id: true } });
       if (!c) throw new BadRequestException('Client not found');
     }
+    if (dto.leadId) {
+      const l = await this.prisma.lead.findUnique({ where: { id: dto.leadId }, select: { id: true } });
+      if (!l) throw new BadRequestException('Lead not found');
+    }
     return {
+      // Only touch the link when leadId is sent, so an edit without it keeps the link.
+      ...(dto.leadId !== undefined ? { leadId: dto.leadId || null } : {}),
       clientId: dto.clientId ?? null,
       prospectName: dto.clientId ? null : prospect!,
       contactName: dto.contactName?.trim() || null,
@@ -143,8 +150,15 @@ export class QuotesService {
         });
         await this.audit.log({
           actorId, action: 'quote.created', entity: 'Quote', entityId: q.id,
-          meta: { number: q.number, total: totals.total, lines: lines.length },
+          meta: { number: q.number, total: totals.total, lines: lines.length, leadId: q.leadId },
         });
+        if (q.leadId) {
+          await this.logOnLead(q.leadId, actorId, {
+            type: 'NOTE', subject: `Quote ${q.number} drafted`,
+            outcome: `£${totals.total.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} for ${lines.length} ${lines.length === 1 ? 'role' : 'roles'}`,
+            meta: { quoteId: q.id, number: q.number },
+          });
+        }
         return this.present(q);
       } catch (e) {
         if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002' && attempt < 2) continue;
@@ -298,6 +312,32 @@ export class QuotesService {
       actorId, action: 'quote.sent', entity: 'Quote', entityId: id,
       meta: { number: q.number, to, cc: dto.cc ?? [], from: this.mailer.from, resendId: result.id ?? null, total: Number(q.total) },
     });
+    if (q.leadId) {
+      await this.logOnLead(q.leadId, actorId, {
+        type: 'EMAIL', direction: 'outbound', subject: `Quote ${q.number} sent`,
+        body: `Emailed to ${to.join(', ')}${dto.cc?.length ? ` (cc ${dto.cc.join(', ')})` : ''}.`,
+        meta: { quoteId: q.id, number: q.number, resendId: result.id ?? null },
+      });
+    }
     return { ...this.present(updated), emailedTo: to };
+  }
+
+  /**
+   * Put a line on the lead's activity log (quote drafted / sent). Best-effort:
+   * a failure here must never undo the quote action. Doesn't change the stage —
+   * staff move the lead themselves.
+   */
+  private async logOnLead(
+    leadId: string,
+    actorId: string | undefined,
+    a: { type: 'NOTE' | 'EMAIL'; direction?: string; subject: string; body?: string; outcome?: string; meta: Prisma.InputJsonValue },
+  ) {
+    try {
+      const now = new Date();
+      await this.prisma.$transaction([
+        this.prisma.leadActivity.create({ data: { leadId, ...a, occurredAt: now, createdById: actorId ?? null } }),
+        this.prisma.lead.update({ where: { id: leadId }, data: { lastActivityAt: now } }),
+      ]);
+    } catch { /* lead may have been removed; the quote action still stands */ }
   }
 }

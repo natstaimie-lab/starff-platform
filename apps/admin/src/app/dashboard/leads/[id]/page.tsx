@@ -7,8 +7,8 @@ import { apiFetch } from '@/lib/api';
 import { Card, Badge } from '@/components/ui';
 import { Modal, Field, TextInput, SelectInput, Button } from '@/components/Modal';
 import {
-  STAGES, STAGE_LABEL, STAGE_TONE, SOURCE_LABEL, ACTIVITY_LABEL, type LeadDetail, type Stage,
-  apiError, fmtDate, fmtDateTime, gbp, isDue, toDateInput,
+  STAGES, STAGE_LABEL, STAGE_TONE, SOURCE_LABEL, ACTIVITY_LABEL, QUOTE_LABEL, QUOTE_TONE, type LeadDetail, type Stage,
+  apiError, fmtDate, fmtDateTime, gbp, isDue, quoteExpired, toDateInput,
 } from '@/lib/leads';
 
 const LOG_TYPES = ['CALL', 'EMAIL', 'NOTE', 'MEETING'] as const;
@@ -174,13 +174,44 @@ export default function LeadDetailPage() {
             {lead.notes && <p style={{ whiteSpace: 'pre-wrap', fontSize: 13.5, marginBottom: 0 }}>{lead.notes}</p>}
             <div className="fx ac" style={{ gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
               <Button variant="outline" onClick={openEdit}>Edit details</Button>
-              <Link href="/dashboard/quotes" className="aibtn" style={{ textDecoration: 'none', height: 40, display: 'inline-flex', alignItems: 'center' }}>Build a quote</Link>
               <Button variant="outline" onClick={toggleArchive}>{lead.archivedAt ? 'Restore' : 'Archive'}</Button>
             </div>
           </Card>
         </div>
 
         <div className="lead-main">
+          <Card
+            title="Quotes"
+            subtitle={lead.quotes.length ? `${lead.quotes.length} for this lead, newest first` : 'No quotes for this lead yet'}
+            action={<Link href={`/dashboard/quotes?lead=${lead.id}`} className="aibtn" style={{ textDecoration: 'none' }}>+ Create quote</Link>}
+          >
+            {lead.quotes.length === 0 ? (
+              <p className="dim" style={{ margin: 0 }}>Create quote opens the calculator with {lead.companyName}&apos;s details filled in. Saving brings you back here.</p>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="tbl" style={{ width: '100%' }}>
+                  <thead><tr><th>Quote</th><th>Status</th><th>Valid until</th><th style={{ textAlign: 'right' }}>Total</th><th style={{ textAlign: 'right' }}>Profit</th><th /></tr></thead>
+                  <tbody>
+                    {lead.quotes.map((q) => (
+                      <tr key={q.id}>
+                        <td><div style={{ fontWeight: 700 }}>{q.number}</div>{q.title && <div className="dim" style={{ fontSize: 12 }}>{q.title}</div>}</td>
+                        <td>{quoteExpired(q) ? <Badge tone="warning">Expired</Badge> : <Badge tone={QUOTE_TONE[q.status]}>{QUOTE_LABEL[q.status]}</Badge>}</td>
+                        <td>{fmtDate(q.validUntil)}</td>
+                        <td className="mono" style={{ textAlign: 'right', fontWeight: 700 }}>£{Number(q.total).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="mono" style={{ textAlign: 'right' }}>£{Number(q.profit).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          {q.status === 'DRAFT'
+                            ? <Link href={`/dashboard/quotes?edit=${q.id}`} className="link" style={{ fontSize: 12.5 }}>Edit draft</Link>
+                            : <Link href="/dashboard/quotes/saved" className="link" style={{ fontSize: 12.5 }}>Saved quotes</Link>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
           <Card title="Log activity" subtitle="Record a call, email, note or meeting">
             <div className="fx ac" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 12 }} role="tablist">
               {LOG_TYPES.map((t) => (

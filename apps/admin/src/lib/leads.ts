@@ -25,7 +25,7 @@ export type Lead = {
   nextActionAt: string | null; lastActivityAt: string | null; stageChangedAt: string; lostReason: string | null;
   archivedAt: string | null; createdAt: string;
   client: { id: string; name: string; status: string } | null;
-  _count?: { activities: number };
+  _count?: { activities: number; quotes?: number };
 };
 
 export type Activity = {
@@ -34,9 +34,23 @@ export type Activity = {
   occurredAt: string; byAi: boolean;
 };
 
+export type LeadQuote = {
+  id: string; number: string; status: 'DRAFT' | 'SENT' | 'ACCEPTED' | 'DECLINED'; title: string | null;
+  total: string; profit: string; validUntil: string; sentAt: string | null; createdAt: string;
+};
+
 export type LeadDetail = Lead & {
   enquiry: { id: string; type: string; status: string; message: string | null; createdAt: string } | null;
   activities: Activity[];
+  quotes: LeadQuote[];
+};
+
+export const QUOTE_LABEL: Record<LeadQuote['status'], string> = { DRAFT: 'Draft', SENT: 'Sent', ACCEPTED: 'Accepted', DECLINED: 'Declined' };
+export const QUOTE_TONE: Record<LeadQuote['status'], 'neutral' | 'info' | 'success' | 'error'> = { DRAFT: 'neutral', SENT: 'info', ACCEPTED: 'success', DECLINED: 'error' };
+/** Same rule as the API: a draft or sent quote is expired after its valid-until day ends. */
+export const quoteExpired = (q: Pick<LeadQuote, 'status' | 'validUntil'>) => {
+  const end = new Date(q.validUntil); end.setUTCHours(23, 59, 59, 999);
+  return (q.status === 'DRAFT' || q.status === 'SENT') && end.getTime() < Date.now();
 };
 
 /** Turn an apiFetch error ("API 400: {json}") into the API's plain message. */
