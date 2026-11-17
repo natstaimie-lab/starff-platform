@@ -160,6 +160,66 @@ export class NotificationsService {
     }
   }
 
+
+  /**
+   * Keep the Resend "Candidates (opted in)" segment in step with a worker's
+   * job-alerts opt-in. Opted in → upsert the contact and add it to the segment;
+   * opted out → take it out of the segment (the contact itself is kept, so any
+   * unsubscribe history in Resend survives). Best-effort: never throws, and
+   * no-ops when RESEND_API_KEY isn't set.
+   */
+  async syncJobAlerts(input: { email: string; firstName?: string; lastName?: string; optedIn: boolean }) {
+    const key = process.env.RESEND_API_KEY;
+    const segmentId = process.env.RESEND_CANDIDATES_SEGMENT_ID || 'f60fdb73-0589-4fa0-8542-5a428fb16216';
+    const email = (input.email ?? '').trim().toLowerCase();
+    if (!email || email.endsWith('@candidate.local')) return { synced: false };
+    if (!key) {
+      this.logger.log(`[job-alerts sync skipped: RESEND_API_KEY not set] ${email}`);
+      return { synced: false };
+    }
+    const headers = { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' };
+    const base = 'https://api.resend.com/contacts';
+    const who = encodeURIComponent(email);
+    try {
+      if (input.optedIn) {
+        // Create the contact already in the segment; if it exists, update the
+        // name and add it to the segment instead.
+        const created = await fetch(base, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            email,
+            first_name: input.firstName || undefined,
+            last_name: input.lastName || undefined,
+            segments: [{ id: segmentId }],
+          }),
+        });
+        if (!created.ok) {
+          await fetch(`${base}/${who}`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ first_name: input.firstName || undefined, last_name: input.lastName || undefined }),
+          }).catch(() => undefined);
+          const added = await fetch(`${base}/${who}/segments/${segmentId}`, { method: 'POST', headers });
+          if (!added.ok) {
+            const detail = await added.text().catch(() => '');
+            throw new Error(`Resend ${added.status} ${detail}`.trim());
+          }
+        }
+      } else {
+        const removed = await fetch(`${base}/${who}/segments/${segmentId}`, { method: 'DELETE', headers });
+        // 404 = they were never in the segment / no contact — nothing to do.
+        if (!removed.ok && removed.status !== 404) {
+          const detail = await removed.text().catch(() => '');
+          throw new Error(`Resend ${removed.status} ${detail}`.trim());
+        }
+      }
+      return { synced: true };
+    } catch (e) {
+      this.logger.error(`job-alerts sync failed → ${email}: ${(e as Error).message}`);
+      return { synced: false, error: (e as Error).message };
+    }
+  }
   /**
    * Tell every active staff member that a new worker or employer has signed up,
    * including where they came from. Best-effort — never throws, never blocks the

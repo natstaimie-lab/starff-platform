@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEmail,
   IsEnum,
@@ -7,7 +8,7 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { DocumentType, RegistrationSource } from '@prisma/client';
 
 export class RegisterDocumentDto {
@@ -65,6 +66,22 @@ export class RegisterCandidateDto {
   @IsArray()
   @IsString({ each: true })
   preferredSectors?: string[];
+
+  /**
+   * Optional "Send me job alerts by email" opt-in. Must default to off (UK
+   * PECR/GDPR). Accepts true/"true"/"1"/"on"/"yes" (and a CF7 checkbox array)
+   * so the website webhook can pass the raw form value.
+   */
+  @IsOptional()
+  @Transform(({ value }) => {
+    const v = Array.isArray(value) ? value[0] : value;
+    if (typeof v === 'boolean') return v;
+    if (v === undefined || v === null) return undefined;
+    return ['true', '1', 'on', 'yes', 'y'].includes(String(v).trim().toLowerCase())
+      || /job alerts/i.test(String(v));
+  })
+  @IsBoolean()
+  marketingConsent?: boolean;
 
   @IsOptional()
   @IsEnum(RegistrationSource)

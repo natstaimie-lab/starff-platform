@@ -48,6 +48,8 @@ export default function RegisterPage() {
   const router = useRouter();
   const [f, setF] = useState({ firstName: '', lastName: '', email: '', password: '', phone: '', postcode: '', dob: '', rtw: '' });
   const [sectors, setSectors] = useState<string[]>([]);
+  // Job alerts opt-in must start unticked — a pre-ticked box isn't valid consent (UK GDPR/PECR).
+  const [jobAlerts, setJobAlerts] = useState(false);
   const [error, setError] = useState('');
   const [suggestion, setSuggestion] = useState('');
   const [msg, setMsg] = useState('');
@@ -91,7 +93,7 @@ export default function RegisterPage() {
       options: { data: {
         firstName: f.firstName, lastName: f.lastName, preferredSectors: sectors,
         phone: f.phone.trim(), postcode: f.postcode.trim().toUpperCase(),
-        dateOfBirth: iso, rightToWorkType: f.rtw,
+        dateOfBirth: iso, rightToWorkType: f.rtw, marketingConsent: jobAlerts,
       } },
     });
     setLoading(false);
@@ -171,6 +173,11 @@ export default function RegisterPage() {
                 );
               })}
             </div>
+
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13.5, marginBottom: 20, cursor: 'pointer' }}>
+              <input type="checkbox" checked={jobAlerts} onChange={(e) => setJobAlerts(e.target.checked)} style={{ marginTop: 2, width: 16, height: 16, accentColor: 'var(--orange-500)' }} />
+              <span>Send me job alerts by email <span className="mut">(optional — unsubscribe any time)</span></span>
+            </label>
 
             {error && <p style={{ color: 'var(--error-600)', fontSize: 13, background: 'var(--error-100)', borderRadius: 8, padding: '8px 12px', marginBottom: 16 }}>{error}</p>}
             {suggestion && (

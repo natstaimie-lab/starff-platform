@@ -81,4 +81,10 @@ export class CreateCandidateDto {
   @IsArray()
   @IsString({ each: true })
   preferredSectors?: string[];
+
+  // Optional "Send me job alerts by email" opt-in from the sign-up form.
+  // Unticked by default; synced to the Resend "Candidates (opted in)" segment.
+  @IsOptional()
+  @IsBoolean()
+  marketingConsent?: boolean;
 }

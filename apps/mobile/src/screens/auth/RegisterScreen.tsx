@@ -317,7 +317,7 @@ export function RegisterScreen({ navigation, route }: Props) {
               <AgreeRow on={terms} set={setTerms} onRead={() => setViewDoc('terms')}>I accept Starff’s <Text style={styles.b}>Terms &amp; Conditions</Text> of engagement.</AgreeRow>
               <AgreeRow on={privacy} set={setPrivacy} onRead={() => setViewDoc('privacy')}>I have read the <Text style={styles.b}>Privacy Policy</Text>.</AgreeRow>
               <AgreeRow on={gdpr} set={setGdpr} onRead={() => setViewDoc('gdpr')}>I give explicit <Text style={styles.b}>GDPR consent</Text> for identity, right-to-work &amp; DBS checks.</AgreeRow>
-              <AgreeRow on={alerts} set={setAlerts}>Email me shift alerts and news from Starff <Text style={{ color: '#8FA1BC' }}>(optional — unsubscribe any time)</Text>.</AgreeRow>
+              <AgreeRow on={alerts} set={setAlerts}>Send me job alerts by email <Text style={{ color: '#8FA1BC' }}>(optional — unsubscribe any time)</Text>.</AgreeRow>
             </View>
             <Text style={styles.fieldLabel}>E-SIGNATURE</Text>
             <View style={{ marginTop: 6 }}>
