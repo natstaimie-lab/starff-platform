@@ -6,6 +6,7 @@
  * See docs/MOBILE.md for the full screen → endpoint integration map.
  */
 import { apiFetch, idempotencyKey } from '@/lib/api';
+import type { ShiftPosition } from '@/lib/shiftLocation';
 import type {
   AiReply,
   CandidateInvitation,
@@ -66,9 +67,14 @@ export const candidateApi = {
 
   /** Shift check-in actions. */
   acknowledgeShift: (id: string) => apiFetch(`/me/shifts/${id}/acknowledge`, { method: 'POST', idempotencyKey: idempotencyKey('ack', id) }),
-  checkInShift: (id: string, photoPath?: string) =>
-    apiFetch(`/me/shifts/${id}/check-in`, { method: 'POST', body: photoPath ? { photoPath } : {}, idempotencyKey: idempotencyKey('checkin', id) }),
-  checkOutShift: (id: string) => apiFetch(`/me/shifts/${id}/check-out`, { method: 'POST', idempotencyKey: idempotencyKey('checkout', id) }),
+  checkInShift: (id: string, photoPath?: string, pos?: ShiftPosition | null) =>
+    apiFetch(`/me/shifts/${id}/check-in`, {
+      method: 'POST',
+      body: { ...(photoPath ? { photoPath } : {}), ...(pos ?? {}) },
+      idempotencyKey: idempotencyKey('checkin', id),
+    }),
+  checkOutShift: (id: string, pos?: ShiftPosition | null) =>
+    apiFetch(`/me/shifts/${id}/check-out`, { method: 'POST', body: { ...(pos ?? {}) }, idempotencyKey: idempotencyKey('checkout', id) }),
   reportLate: (id: string) => apiFetch(`/me/shifts/${id}/report-late`, { method: 'POST' }),
 
   /** GET /me/shifts/:id/journey — live door-to-gate durations (Google Routes) or estimates. */

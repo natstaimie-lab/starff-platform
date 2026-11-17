@@ -14,8 +14,35 @@ type Shift = {
   site?: { name: string };
   candidate?: { firstName: string; lastName: string };
   checkInAt?: string | null;
+  checkOutAt?: string | null;
   checkInPhotoUrl?: string | null;
+  checkInLat?: number | null;
+  checkInLng?: number | null;
+  checkInDistanceM?: number | null;
+  checkOutLat?: number | null;
+  checkOutLng?: number | null;
+  checkOutDistanceM?: number | null;
 };
+
+// Matches SITE_RADIUS_M in apps/api/src/me/site-distance.ts.
+const SITE_RADIUS_M = 500;
+
+/** One line per check-in / check-out: time, and how far the phone was from the site. */
+function LocationLine({ label, at, lat, lng, dist }: { label: string; at?: string | null; lat?: number | null; lng?: number | null; dist?: number | null }) {
+  if (!at) return null;
+  const hasPos = typeof lat === 'number' && typeof lng === 'number';
+  const far = typeof dist === 'number' && dist > SITE_RADIUS_M;
+  const distText = typeof dist === 'number' ? (dist < 1000 ? `${dist} m from site` : `${(dist / 1000).toFixed(1)} km from site`) : hasPos ? 'site postcode unknown' : 'no location';
+  return (
+    <span className="fx ac" style={{ gap: 6, fontSize: 12.5 }}>
+      <b style={{ fontWeight: 600 }}>{label} {hhmm(at)}</b>
+      <Badge tone={(far || !hasPos ? 'warning' : 'success') as any}>{distText}</Badge>
+      {hasPos && (
+        <a href={`https://www.google.com/maps?q=${lat},${lng}`} target="_blank" rel="noreferrer" style={{ color: 'var(--orange-600)', fontWeight: 600 }}>Map</a>
+      )}
+    </span>
+  );
+}
 
 type CheckInPhoto = {
   checkedInAt: string | null;
@@ -99,6 +126,12 @@ function ShiftCard({ s }: { s: Shift }) {
         <span className="fx ac" style={{ gap: 5 }}><Ic.HardHat width={15} /> {s.candidate ? `${s.candidate.firstName} ${s.candidate.lastName}` : 'Unassigned'}</span>
         <span className="fx ac" style={{ gap: 5 }}><Ic.Building width={15} /> {s.job.client.name}</span>
       </div>
+      {s.checkInAt ? (
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+          <LocationLine label="In" at={s.checkInAt} lat={s.checkInLat} lng={s.checkInLng} dist={s.checkInDistanceM} />
+          <LocationLine label="Out" at={s.checkOutAt} lat={s.checkOutLat} lng={s.checkOutLng} dist={s.checkOutDistanceM} />
+        </div>
+      ) : null}
       {s.checkInPhotoUrl ? <CheckInPhotoPanel shiftId={s.id} /> : null}
     </div>
   );

@@ -16,6 +16,24 @@ import {
   workerAgreementSnapshot,
 } from './worker-documents';
 import { DocumentCheckService } from '../documents/document-check.service';
+import { metresBetween, postcodeCentre } from './site-distance';
+
+/**
+ * The times a timesheet is paid on, from the worker's real check-in/out:
+ * - start: the later of the booked start and the actual check-in (arriving
+ *   early isn't paid; arriving late is deducted);
+ * - end: the actual check-out (staying late shows on the timesheet for staff
+ *   to approve or adjust).
+ * Falls back to the booked times when the worker didn't check in/out in the app.
+ * Times are rounded down to the whole minute.
+ */
+export function workedTimes(shift: { startAt: Date; endAt: Date; checkInAt: Date | null; checkOutAt: Date | null }) {
+  const toMinute = (d: Date) => new Date(Math.floor(d.getTime() / 60000) * 60000);
+  const clockIn = shift.checkInAt && shift.checkInAt > shift.startAt ? toMinute(shift.checkInAt) : shift.startAt;
+  let clockOut = shift.checkOutAt ? toMinute(shift.checkOutAt) : shift.endAt;
+  if (clockOut < clockIn) clockOut = clockIn;
+  return { clockIn, clockOut };
+}
 
 @Injectable()
 export class MeService {
@@ -81,6 +99,22 @@ export class MeService {
     return { candidate, shift };
   }
 
+  /** Phone position → stored fields + distance from the site postcode (site, else client). */
+  private async locationFields(shiftId: string, loc: { lat?: number; lng?: number; accuracy?: number }) {
+    if (typeof loc.lat !== 'number' || typeof loc.lng !== 'number') return null;
+    const s = await this.prisma.shift.findUnique({
+      where: { id: shiftId },
+      select: { site: { select: { postcode: true } }, job: { select: { client: { select: { postcode: true } } } } },
+    });
+    const centre = await postcodeCentre(s?.site?.postcode ?? s?.job?.client?.postcode);
+    return {
+      lat: loc.lat,
+      lng: loc.lng,
+      accuracyM: typeof loc.accuracy === 'number' ? Math.round(loc.accuracy) : null,
+      distanceM: centre ? metresBetween({ lat: loc.lat, lng: loc.lng }, centre) : null,
+    };
+  }
+
   /** Worker confirms they'll attend a booked shift. */
   async acknowledgeShift(userId: string, shiftId: string) {
     const { candidate, shift } = await this.ownShift(userId, shiftId);
@@ -102,7 +136,12 @@ export class MeService {
    * uploaded to the worker's own storage folder — to re-confirm identity each
    * shift. Admin compares it against the verified identity selfie; nothing here
    * auto-approves or auto-blocks. */
-  async checkIn(userId: string, shiftId: string, photoPath?: string) {
+  async checkIn(
+    userId: string,
+    shiftId: string,
+    dto: { photoPath?: string; lat?: number; lng?: number; accuracy?: number },
+  ) {
+    const { photoPath } = dto;
     const { candidate, shift } = await this.ownShift(userId, shiftId);
     if (shift.status === ShiftStatus.CANCELLED) throw new BadRequestException('This shift was cancelled');
     // The photo must sit in the caller's own folder — never accept a path that
@@ -110,6 +149,7 @@ export class MeService {
     if (photoPath && (!photoPath.startsWith(`${userId}/`) || photoPath.includes('..'))) {
       throw new BadRequestException('Invalid check-in photo');
     }
+    const loc = await this.locationFields(shiftId, dto);
     await this.prisma.shift.update({
       where: { id: shiftId },
       data: {
@@ -117,22 +157,37 @@ export class MeService {
         acknowledgedAt: shift.acknowledgedAt ?? new Date(),
         status: ShiftStatus.IN_PROGRESS,
         ...(photoPath ? { checkInPhotoUrl: photoPath } : {}),
+        // Only the first check-in's location counts, like its time.
+        ...(loc && !shift.checkInAt
+          ? { checkInLat: loc.lat, checkInLng: loc.lng, checkInAccuracyM: loc.accuracyM, checkInDistanceM: loc.distanceM }
+          : {}),
       },
     });
-    await this.audit.log({ actorId: candidate.userId, action: 'shift.checked_in', entity: 'Shift', entityId: shiftId, meta: { jobId: shift.jobId, photo: !!photoPath } });
+    await this.audit.log({
+      actorId: candidate.userId, action: 'shift.checked_in', entity: 'Shift', entityId: shiftId,
+      meta: { jobId: shift.jobId, photo: !!photoPath, location: !!loc, distanceM: loc?.distanceM ?? null },
+    });
     await this.prisma.job.update({ where: { id: shift.jobId }, data: { status: 'IN_PROGRESS' } }).catch(() => {});
     return { ok: true };
   }
 
   /** Worker checks out — completes the shift. */
-  async checkOut(userId: string, shiftId: string) {
+  async checkOut(userId: string, shiftId: string, dto: { lat?: number; lng?: number; accuracy?: number } = {}) {
     const { candidate, shift } = await this.ownShift(userId, shiftId);
     if (shift.status === ShiftStatus.CANCELLED) throw new BadRequestException('This shift was cancelled');
+    const loc = await this.locationFields(shiftId, dto);
     await this.prisma.shift.update({
       where: { id: shiftId },
-      data: { checkOutAt: new Date(), status: ShiftStatus.COMPLETED },
+      data: {
+        checkOutAt: new Date(),
+        status: ShiftStatus.COMPLETED,
+        ...(loc ? { checkOutLat: loc.lat, checkOutLng: loc.lng, checkOutAccuracyM: loc.accuracyM, checkOutDistanceM: loc.distanceM } : {}),
+      },
     });
-    await this.audit.log({ actorId: candidate.userId, action: 'shift.checked_out', entity: 'Shift', entityId: shiftId, meta: { jobId: shift.jobId } });
+    await this.audit.log({
+      actorId: candidate.userId, action: 'shift.checked_out', entity: 'Shift', entityId: shiftId,
+      meta: { jobId: shift.jobId, location: !!loc, distanceM: loc?.distanceM ?? null },
+    });
     return { ok: true };
   }
 
@@ -439,16 +494,17 @@ export class MeService {
     if (existing?.status === TimesheetStatus.APPROVED) {
       throw new BadRequestException('This timesheet has already been approved');
     }
-    const hours = Math.max(0, (shift.endAt.getTime() - shift.startAt.getTime()) / 3600000 - shift.breakMinutes / 60);
+    const { clockIn, clockOut } = workedTimes(shift);
+    const hours = Math.max(0, (clockOut.getTime() - clockIn.getTime()) / 3600000 - shift.breakMinutes / 60);
     return this.prisma.timesheet.upsert({
       where: { shiftId },
-      update: { status: TimesheetStatus.SUBMITTED, hoursWorked: Number(hours.toFixed(2)) },
+      update: { status: TimesheetStatus.SUBMITTED, clockIn, clockOut, hoursWorked: Number(hours.toFixed(2)) },
       create: {
         shiftId,
         candidateId: candidate.id,
         status: TimesheetStatus.SUBMITTED,
-        clockIn: shift.startAt,
-        clockOut: shift.endAt,
+        clockIn,
+        clockOut,
         breakMinutes: shift.breakMinutes,
         hoursWorked: Number(hours.toFixed(2)),
       },

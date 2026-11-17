@@ -55,14 +55,14 @@
         "expo-image-picker",
         {
           "photosPermission": "Starff needs access to your photos so you can upload document images and a profile photo.",
-          "cameraPermission": "Starff uses the camera so you can photograph and upload compliance documents.",
+          "cameraPermission": "Starff uses the camera so you can photograph compliance documents and take a selfie when you check in to a shift.",
           "microphonePermission": false
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Starff uses the camera to photograph your ID, driving licence and selfie for verification.",
+          "cameraPermission": "Starff uses the camera to photograph your ID, driving licence and selfie for verification, and for a quick selfie when you check in to a shift.",
           "recordAudioAndroid": false
         }
       ],
@@ -82,6 +82,12 @@
           "resizeMode": "contain",
           "backgroundColor": "#0B1F3A",
           "imageWidth": 200
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Starff checks your location when you check in and out of a shift, to confirm you're at the work site."
         }
       ]
     ],
