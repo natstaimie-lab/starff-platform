@@ -114,3 +114,19 @@ pings it. If every login fails at once, check whether the project is paused.
 - `ENCRYPTION_KEY` is required: `Candidate.nationalInsurance` and bank fields are
   encrypted at rest by Prisma middleware (`apps/api/src/prisma/field-crypto.ts`).
 - A physical phone can't reach `localhost` — use the machine's LAN IP or a tunnel.
+
+## Finishing work (owner's workflow)
+
+The owner is a solo founder and a beginner developer.
+
+- **Branch + pull request, always.** Never commit straight to `main`.
+- **Offer to merge.** Once the pull request is open and its checks have
+  passed, ask: "Want me to merge it now?" Merge only if the owner says yes in
+  this session. Otherwise give short, numbered merge steps (open the PR link →
+  **Merge pull request** → **Confirm merge**).
+- **Tick it off.** When the task is done (PR merged, or the job finished),
+  mark the matching task done on the **Starff Role Board** artifact
+  (https://claude.ai/artifact/PaoL3S5qNAjtKWWvKFhi6r): set `done: true` on that
+  task in the page's `<script type="application/json" id="state">` block,
+  change nothing else, and confirm in one line. If the board can't be reached
+  from this session, say so and name the task to tick off by hand.
