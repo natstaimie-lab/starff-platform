@@ -23,6 +23,13 @@ export class ShiftsController {
     return this.shifts.findAll();
   }
 
+  /** Short-lived links to the worker's clock-in selfie and their verified
+   * identity selfie, so staff can compare the two side by side. */
+  @Get(':id/check-in-photo')
+  checkInPhoto(@Param('id') id: string) {
+    return this.shifts.checkInPhoto(id);
+  }
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateShiftDto) {
     return this.shifts.update(id, dto);

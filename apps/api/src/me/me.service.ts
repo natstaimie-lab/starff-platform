@@ -98,15 +98,28 @@ export class MeService {
     return { ok: true };
   }
 
-  /** Worker checks in on the day. */
-  async checkIn(userId: string, shiftId: string) {
+  /** Worker checks in on the day. The app sends `photoPath` — a selfie it just
+   * uploaded to the worker's own storage folder — to re-confirm identity each
+   * shift. Admin compares it against the verified identity selfie; nothing here
+   * auto-approves or auto-blocks. */
+  async checkIn(userId: string, shiftId: string, photoPath?: string) {
     const { candidate, shift } = await this.ownShift(userId, shiftId);
     if (shift.status === ShiftStatus.CANCELLED) throw new BadRequestException('This shift was cancelled');
+    // The photo must sit in the caller's own folder — never accept a path that
+    // points at another worker's files.
+    if (photoPath && (!photoPath.startsWith(`${userId}/`) || photoPath.includes('..'))) {
+      throw new BadRequestException('Invalid check-in photo');
+    }
     await this.prisma.shift.update({
       where: { id: shiftId },
-      data: { checkInAt: shift.checkInAt ?? new Date(), acknowledgedAt: shift.acknowledgedAt ?? new Date(), status: ShiftStatus.IN_PROGRESS },
+      data: {
+        checkInAt: shift.checkInAt ?? new Date(),
+        acknowledgedAt: shift.acknowledgedAt ?? new Date(),
+        status: ShiftStatus.IN_PROGRESS,
+        ...(photoPath ? { checkInPhotoUrl: photoPath } : {}),
+      },
     });
-    await this.audit.log({ actorId: candidate.userId, action: 'shift.checked_in', entity: 'Shift', entityId: shiftId, meta: { jobId: shift.jobId } });
+    await this.audit.log({ actorId: candidate.userId, action: 'shift.checked_in', entity: 'Shift', entityId: shiftId, meta: { jobId: shift.jobId, photo: !!photoPath } });
     await this.prisma.job.update({ where: { id: shift.jobId }, data: { status: 'IN_PROGRESS' } }).catch(() => {});
     return { ok: true };
   }

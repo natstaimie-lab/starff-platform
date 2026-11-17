@@ -22,6 +22,7 @@ import { colors, radius } from '@/theme/tokens';
 import { useApi } from '@/lib/useApi';
 import { candidateApi } from '@/lib/endpoints';
 import { ApiError } from '@/lib/api';
+import { captureCheckInPhoto } from '@/lib/checkInPhoto';
 import type { CandidateProfile, CandidateStatus, CandidateInvitation, Shift } from '@/lib/types';
 
 const REQUIRED = [
@@ -114,6 +115,19 @@ export function CandidateHomeScreen() {
     }
   };
 
+  // Clock-in re-confirms identity: selfie first, then the check-in carries its path.
+  const checkIn = async (id: string) => {
+    let photoPath: string | null;
+    try {
+      photoPath = await captureCheckInPhoto(id);
+    } catch (err) {
+      Alert.alert('Photo upload failed', (err as Error).message || 'Please try again.');
+      return;
+    }
+    if (!photoPath) return;
+    doShift(id, () => candidateApi.checkInShift(id, photoPath!), 'Checked in. Have a great shift!');
+  };
+
   const submitDue = (s: Shift) =>
     Alert.alert('Submit timesheet?', `Submit your hours for ${s.job?.title ?? 'this shift'}? Starff will review and approve them.`, [
       { text: 'Cancel', style: 'cancel' },
@@ -185,7 +199,7 @@ export function CandidateHomeScreen() {
                   shift={s}
                   last={i === activeShifts.length - 1}
                   busy={busy === s.id}
-                  onCheckIn={() => doShift(s.id, () => candidateApi.checkInShift(s.id), 'Checked in. Have a great shift!')}
+                  onCheckIn={() => checkIn(s.id)}
                   onCheckOut={() => doShift(s.id, () => candidateApi.checkOutShift(s.id), 'Checked out. Submit your timesheet when ready.')}
                   onLate={() => doShift(s.id, () => candidateApi.reportLate(s.id), "We've let Starff know you're running late.")}
                 />

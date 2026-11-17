@@ -667,6 +667,10 @@ model Shift {
   acknowledgedAt   DateTime?  // worker confirmed they'll attend
   checkInAt        DateTime?  // worker checked in on the day
   checkOutAt       DateTime?  // worker checked out
+  // Selfie taken in the app at clock-in, re-confirming identity each shift.
+  // Path in the private `candidate-documents` bucket; admin compares it to the
+  // worker's verified identity selfie. Null for check-ins made before this existed.
+  checkInPhotoUrl  String?
   lateReportedAt   DateTime?  // worker flagged running late
   absentReportedAt DateTime?  // client reported the worker absent
 

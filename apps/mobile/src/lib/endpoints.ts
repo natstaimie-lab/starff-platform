@@ -66,7 +66,8 @@ export const candidateApi = {
 
   /** Shift check-in actions. */
   acknowledgeShift: (id: string) => apiFetch(`/me/shifts/${id}/acknowledge`, { method: 'POST', idempotencyKey: idempotencyKey('ack', id) }),
-  checkInShift: (id: string) => apiFetch(`/me/shifts/${id}/check-in`, { method: 'POST', idempotencyKey: idempotencyKey('checkin', id) }),
+  checkInShift: (id: string, photoPath?: string) =>
+    apiFetch(`/me/shifts/${id}/check-in`, { method: 'POST', body: photoPath ? { photoPath } : {}, idempotencyKey: idempotencyKey('checkin', id) }),
   checkOutShift: (id: string) => apiFetch(`/me/shifts/${id}/check-out`, { method: 'POST', idempotencyKey: idempotencyKey('checkout', id) }),
   reportLate: (id: string) => apiFetch(`/me/shifts/${id}/report-late`, { method: 'POST' }),
 
