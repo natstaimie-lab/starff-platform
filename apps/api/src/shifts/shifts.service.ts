@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ShiftStatus } from '@prisma/client';
+import { createClient } from '@supabase/supabase-js';
+import { DocumentStatus, DocumentType, ShiftStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateShiftDto } from './dto/create-shift.dto';
 import { UpdateShiftDto } from './dto/update-shift.dto';
@@ -46,6 +47,40 @@ export class ShiftsService {
         candidate: { select: { id: true, firstName: true, lastName: true } },
       },
     });
+  }
+
+  /** Signed (5-minute) URLs for the clock-in selfie and the worker's identity
+   * selfie — the latest VERIFIED one, else the latest uploaded. */
+  async checkInPhoto(id: string) {
+    const shift = await this.prisma.shift.findUnique({
+      where: { id },
+      select: { checkInAt: true, checkInPhotoUrl: true, candidateId: true },
+    });
+    if (!shift) throw new NotFoundException('Shift not found');
+    if (!shift.checkInPhotoUrl) throw new NotFoundException('No check-in photo for this shift');
+
+    const selfies = shift.candidateId
+      ? await this.prisma.candidateDocument.findMany({
+          where: { candidateId: shift.candidateId, type: DocumentType.SELFIE },
+          orderBy: { createdAt: 'desc' },
+          select: { fileUrl: true, status: true },
+        })
+      : [];
+    const selfie = selfies.find((d) => d.status === DocumentStatus.VERIFIED) ?? selfies[0] ?? null;
+
+    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: { persistSession: false },
+    });
+    const sign = async (path: string) => {
+      const { data, error } = await supabase.storage.from('candidate-documents').createSignedUrl(path, 300);
+      return error ? null : data.signedUrl;
+    };
+    return {
+      checkedInAt: shift.checkInAt,
+      checkInPhotoUrl: await sign(shift.checkInPhotoUrl),
+      identitySelfieUrl: selfie ? await sign(selfie.fileUrl) : null,
+      identitySelfieVerified: selfie?.status === DocumentStatus.VERIFIED,
+    };
   }
 
   async update(id: string, dto: UpdateShiftDto) {

@@ -13,7 +13,62 @@ type Shift = {
   job: { title: string; client: { name: string } };
   site?: { name: string };
   candidate?: { firstName: string; lastName: string };
+  checkInAt?: string | null;
+  checkInPhotoUrl?: string | null;
 };
+
+type CheckInPhoto = {
+  checkedInAt: string | null;
+  checkInPhotoUrl: string | null;
+  identitySelfieUrl: string | null;
+  identitySelfieVerified: boolean;
+};
+
+/** Clock-in selfie next to the worker's identity selfie, so staff can compare them. */
+function CheckInPhotoPanel({ shiftId }: { shiftId: string }) {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<CheckInPhoto | null>(null);
+  const [err, setErr] = useState('');
+
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    // Signed links expire after 5 minutes, so fetch fresh each time it opens.
+    if (next) {
+      setData(null); setErr('');
+      apiFetch<CheckInPhoto>(`/shifts/${shiftId}/check-in-photo`).then(setData).catch((e) => setErr(e.message));
+    }
+  };
+
+  const img = (url: string | null, label: string, note?: string) => (
+    <figure style={{ margin: 0, flex: 1, minWidth: 0 }}>
+      <div style={{ aspectRatio: '3 / 4', borderRadius: 'var(--radius-md)', background: 'var(--surface-sunken)', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {url ? <img src={url} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span className="dim" style={{ fontSize: 12 }}>Not available</span>}
+      </div>
+      <figcaption style={{ fontSize: 12, marginTop: 6, fontWeight: 600 }}>{label}{note ? <span className="dim" style={{ fontWeight: 400 }}> · {note}</span> : null}</figcaption>
+    </figure>
+  );
+
+  return (
+    <div>
+      <button onClick={toggle} style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--orange-600)', background: 'none', border: 0, padding: 0, cursor: 'pointer' }}>
+        {open ? 'Hide check-in photo' : 'View check-in photo'}
+      </button>
+      {open && (
+        <div style={{ marginTop: 10 }}>
+          {err ? <p style={{ color: 'var(--error-600)', fontSize: 12.5 }}>{err}</p>
+            : !data ? <p className="dim" style={{ fontSize: 12.5 }}>Loading…</p>
+            : (
+              <div style={{ display: 'flex', gap: 12 }}>
+                {img(data.checkInPhotoUrl, 'At check-in', data.checkedInAt ? hhmm(data.checkedInAt) : undefined)}
+                {img(data.identitySelfieUrl, 'Identity selfie', data.identitySelfieUrl ? (data.identitySelfieVerified ? 'verified' : 'not yet verified') : undefined)}
+              </div>
+            )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const tone: Record<string, string> = {
   OPEN: 'warning', ASSIGNED: 'info', CONFIRMED: 'success', IN_PROGRESS: 'info',
@@ -44,6 +99,7 @@ function ShiftCard({ s }: { s: Shift }) {
         <span className="fx ac" style={{ gap: 5 }}><Ic.HardHat width={15} /> {s.candidate ? `${s.candidate.firstName} ${s.candidate.lastName}` : 'Unassigned'}</span>
         <span className="fx ac" style={{ gap: 5 }}><Ic.Building width={15} /> {s.job.client.name}</span>
       </div>
+      {s.checkInPhotoUrl ? <CheckInPhotoPanel shiftId={s.id} /> : null}
     </div>
   );
 }

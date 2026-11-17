@@ -8,6 +8,7 @@ import { useApi } from '@/lib/useApi';
 import { candidateApi } from '@/lib/endpoints';
 import { offerWakeReminder } from '@/lib/shiftReminder';
 import { ApiError } from '@/lib/api';
+import { captureCheckInPhoto } from '@/lib/checkInPhoto';
 import type { CandidateProfile, Shift } from '@/lib/types';
 
 const STATUS_PILL: Record<string, any> = {
@@ -28,7 +29,12 @@ export function CandidateBookingsScreen() {
     setBusy(id + action);
     try {
       if (action === 'ack') await candidateApi.acknowledgeShift(id);
-      else if (action === 'in') await candidateApi.checkInShift(id);
+      else if (action === 'in') {
+        // Clock-in re-confirms identity with a selfie; backing out cancels the check-in.
+        const photoPath = await captureCheckInPhoto(id);
+        if (!photoPath) return;
+        await candidateApi.checkInShift(id, photoPath);
+      }
       else if (action === 'out') await candidateApi.checkOutShift(id);
       else { await candidateApi.reportLate(id); Alert.alert('Thanks', "We've let the team know you're running late."); }
       reload();
