@@ -162,6 +162,56 @@ export class NotificationsService {
 
 
   /**
+   * Fire a Resend automation event (e.g. `worker.registered`, `employer.added`)
+   * for one email address — at most ONCE per event+email, so a resumed sign-up,
+   * an enquiry later converted to a client, or a retried webhook never sends the
+   * welcome twice. The send is recorded in the audit log, which is also the
+   * dedupe record. Employer events are skipped for anyone who has asked us not
+   * to email them (Lead.unsubscribedAt). Best-effort: never throws, and no-ops
+   * when RESEND_API_KEY isn't set.
+   */
+  async sendResendEvent(input: { event: 'worker.registered' | 'employer.added'; email: string; payload?: Record<string, unknown> }) {
+    const email = (input.email ?? '').trim().toLowerCase();
+    if (!email || email.endsWith('@candidate.local') || email.endsWith('@placeholder.starff')) return { sent: false };
+    const key = process.env.RESEND_API_KEY;
+    if (!key) {
+      this.logger.log(`[resend event skipped: RESEND_API_KEY not set] ${input.event} → ${email}`);
+      return { sent: false };
+    }
+    const entityId = `${input.event}:${email}`;
+    try {
+      const already = await this.prisma.auditLog.findFirst({
+        where: { entity: 'ResendEvent', entityId, action: 'resend.event.sent' },
+        select: { id: true },
+      });
+      if (already) return { sent: false, duplicate: true };
+      if (input.event === 'employer.added') {
+        const optedOut = await this.prisma.lead.findFirst({
+          where: { contactEmail: { equals: email, mode: 'insensitive' }, unsubscribedAt: { not: null } },
+          select: { id: true },
+        });
+        if (optedOut) return { sent: false, unsubscribed: true };
+      }
+      const res = await fetch('https://api.resend.com/events/send', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event: input.event, email, payload: input.payload ?? {} }),
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => '');
+        throw new Error(`Resend ${res.status} ${detail}`.trim());
+      }
+      await this.prisma.auditLog.create({
+        data: { action: 'resend.event.sent', entity: 'ResendEvent', entityId, meta: { event: input.event } },
+      });
+      return { sent: true };
+    } catch (e) {
+      this.logger.error(`resend event ${input.event} failed → ${email}: ${(e as Error).message}`);
+      return { sent: false, error: (e as Error).message };
+    }
+  }
+
+  /**
    * Keep the Resend "Candidates (opted in)" segment in step with a worker's
    * job-alerts opt-in. Opted in → upsert the contact and add it to the segment;
    * opted out → take it out of the segment (the contact itself is kept, so any

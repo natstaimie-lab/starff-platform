@@ -254,6 +254,8 @@ export class RegistrationService {
     // Job alerts opt-in → Resend "Candidates (opted in)" segment (best-effort).
     if (optIn) {
       await this.notifications.syncJobAlerts({ email, firstName, lastName, optedIn: true });
+      // Starts the Resend "Worker welcome" automation (sent once per email).
+      await this.notifications.sendResendEvent({ event: 'worker.registered', email, payload: { firstName, source } });
     }
 
     // Alert staff that a new worker has registered from the website (best-effort).
@@ -439,6 +441,8 @@ export class RegistrationService {
 
     // Alert staff that a new employer has registered from the website.
     if (isNewClient) {
+      // Starts the Resend "Employer welcome" automation (sent once per email).
+      await this.notifications.sendResendEvent({ event: 'employer.added', email, payload: { firstName, companyName: client.name, source } });
       await this.notifications.notifyStaffSignup({
         name: client.name,
         audience: 'employer',
