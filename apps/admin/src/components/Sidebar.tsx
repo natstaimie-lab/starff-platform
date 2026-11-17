@@ -22,6 +22,7 @@ const sections: Section[] = [
       { key: 'leads', label: 'Leads', href: '/dashboard/leads', icon: <Ic.TrendUp /> },
       { key: 'followups', label: 'Follow-ups today', href: '/dashboard/leads/today', icon: <Ic.Bell /> },
       { key: 'aiapprovals', label: 'AI approvals', href: '/dashboard/leads/approvals', icon: <Ic.Sparkle /> },
+      { key: 'suggested', label: 'Suggested leads', href: '/dashboard/leads/suggested', icon: <Ic.Search /> },
     ],
   },
   {
@@ -99,6 +100,10 @@ export function Sidebar() {
       // AI salesperson drafts waiting for a decision.
       apiFetch<{ pending: number }>('/ai-sales/summary')
         .then((s) => setBadges((b) => ({ ...b, aiapprovals: s.pending })))
+        .catch(() => {});
+      // Apollo suggestions waiting for accept / reject.
+      apiFetch<{ pending: number }>('/prospecting/summary')
+        .then((s) => setBadges((b) => ({ ...b, suggested: s.pending })))
         .catch(() => {});
     };
     loadBadges();

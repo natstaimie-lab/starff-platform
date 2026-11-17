@@ -7,12 +7,14 @@ import { LeadMailer } from './lead-mailer';
 import { AiSalesController } from './ai-sales.controller';
 import { InboundController } from './inbound.controller';
 import { InboundService } from './inbound.service';
+import { ProspectingController } from './prospecting.controller';
+import { ProspectingService } from './prospecting.service';
 
 /** CRM Phase 2: leads pipeline + activity log (calls, emails, notes). */
 @Module({
   imports: [RegistrationModule],
-  controllers: [LeadsController, AiSalesController, InboundController],
-  providers: [LeadsService, AiSalesService, LeadMailer, InboundService],
+  controllers: [LeadsController, AiSalesController, InboundController, ProspectingController],
+  providers: [LeadsService, AiSalesService, LeadMailer, InboundService, ProspectingService],
   exports: [LeadsService],
 })
 export class LeadsModule {}
