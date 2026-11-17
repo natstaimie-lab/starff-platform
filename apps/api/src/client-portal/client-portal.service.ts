@@ -114,6 +114,10 @@ export class ClientPortalService {
       source: 'MOBILE',
       link: `/dashboard/clients/${client.id}`,
     });
+    // Starts the Resend "Employer welcome" automation (sent once per email).
+    if (email) {
+      await this.notifications.sendResendEvent({ event: 'employer.added', email, payload: { firstName: dto.firstName ?? '', companyName: client.name, source: 'MOBILE' } });
+    }
     return { client, contact };
   }
 

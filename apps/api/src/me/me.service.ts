@@ -681,6 +681,17 @@ export class MeService {
           lastName: candidate.lastName,
           optedIn: !!dto.marketingConsent,
         });
+        // The app records the sign-up opt-in here just after creating the
+        // profile. A first opt-in within a day of registering counts as
+        // "registered and opted in" and starts the Resend welcome (once only).
+        const isNewSignup = Date.now() - candidate.createdAt.getTime() < 24 * 60 * 60 * 1000;
+        if (dto.marketingConsent && !candidate.marketingConsentAt && isNewSignup) {
+          await this.notifications.sendResendEvent({
+            event: 'worker.registered',
+            email: user.email,
+            payload: { firstName: candidate.firstName, source: candidate.registrationSource ?? 'MOBILE' },
+          });
+        }
       }
     }
     return updated;

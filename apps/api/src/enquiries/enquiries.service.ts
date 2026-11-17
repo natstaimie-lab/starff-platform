@@ -163,6 +163,15 @@ export class EnquiriesService {
       });
     }
 
+    // Employer staffing request → Resend "Employer welcome" automation (once per email).
+    if (enquiry.email && enquiry.type === EnquiryType.POST_A_JOB) {
+      await this.notifications.sendResendEvent({
+        event: 'employer.added',
+        email: enquiry.email,
+        payload: { firstName: (enquiry.name ?? '').split(' ')[0], companyName: enquiry.company ?? '', source: 'WEBSITE' },
+      });
+    }
+
     return enquiry;
   }
 

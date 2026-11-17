@@ -116,6 +116,7 @@ export class CandidatesService {
       // Job alerts opt-in → Resend "Candidates (opted in)" segment (best-effort).
       if (dto.marketingConsent === true && realEmail) {
         await this.notifications.syncJobAlerts({ email: realEmail, firstName: dto.firstName, lastName: dto.lastName, optedIn: true });
+        await this.notifications.sendResendEvent({ event: 'worker.registered', email: realEmail, payload: { firstName: dto.firstName, source } });
       }
       // Alert staff a new worker just signed up (best-effort; never blocks).
       await this.notifications.notifyStaffSignup({
