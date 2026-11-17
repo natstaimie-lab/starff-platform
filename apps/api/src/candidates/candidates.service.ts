@@ -111,8 +111,12 @@ export class CandidatesService {
         staffFlags.push(`Possible duplicate of ${dup.name} (same ${dup.reason === 'phone' ? 'phone number' : 'name and date of birth'}) — check and archive one.`);
       }
       const candidate = await this.prisma.candidate.create({
-        data: { userId: dto.userId, firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone, city: dto.city, postcode: dto.postcode, dateOfBirth: dob, rightToWorkType: dto.rightToWorkType, headline: dto.headline, preferredSectors: cleanSectors(dto.preferredSectors), registrationSource: source },
+        data: { userId: dto.userId, firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone, city: dto.city, postcode: dto.postcode, dateOfBirth: dob, rightToWorkType: dto.rightToWorkType, headline: dto.headline, preferredSectors: cleanSectors(dto.preferredSectors), registrationSource: source, marketingConsent: dto.marketingConsent === true, marketingConsentAt: dto.marketingConsent === true ? new Date() : null },
       });
+      // Job alerts opt-in → Resend "Candidates (opted in)" segment (best-effort).
+      if (dto.marketingConsent === true && realEmail) {
+        await this.notifications.syncJobAlerts({ email: realEmail, firstName: dto.firstName, lastName: dto.lastName, optedIn: true });
+      }
       // Alert staff a new worker just signed up (best-effort; never blocks).
       await this.notifications.notifyStaffSignup({
         name: `${dto.firstName} ${dto.lastName}`,

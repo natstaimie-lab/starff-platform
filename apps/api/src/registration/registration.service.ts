@@ -167,6 +167,8 @@ export class RegistrationService {
     const lastName = dto.lastName.trim();
     const source = dto.source ?? RegistrationSource.WEBSITE;
     const dob = parseDob18(dto.dateOfBirth); // validates 18+ when provided
+    // Job alerts are opt-in only: anything but an explicit yes is a no.
+    const optIn = dto.marketingConsent === true;
 
     // 1. Match an existing platform user by email (idempotent front door).
     let user = await this.prisma.user.findUnique({ where: { email } });
@@ -224,6 +226,10 @@ export class RegistrationService {
             dateOfBirth: existing.dateOfBirth ?? dob,
             rightToWorkType: existing.rightToWorkType ?? dto.rightToWorkType,
             headline: existing.headline ?? dto.sector,
+            // A repeat sign-up may opt IN; it never silently opts someone out.
+            ...(optIn && !existing.marketingConsent
+              ? { marketingConsent: true, marketingConsentAt: new Date() }
+              : {}),
           },
         })
       : await this.prisma.candidate.create({
@@ -240,8 +246,15 @@ export class RegistrationService {
             preferredSectors: cleanSectors(dto.preferredSectors),
             status: CandidateStatus.NEW,
             registrationSource: source,
+            marketingConsent: optIn,
+            marketingConsentAt: optIn ? new Date() : null,
           },
         });
+
+    // Job alerts opt-in → Resend "Candidates (opted in)" segment (best-effort).
+    if (optIn) {
+      await this.notifications.syncJobAlerts({ email, firstName, lastName, optedIn: true });
+    }
 
     // Alert staff that a new worker has registered from the website (best-effort).
     if (!existing) {

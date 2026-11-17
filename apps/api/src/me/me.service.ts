@@ -669,7 +669,21 @@ export class MeService {
       data.signedAt = name ? (candidate.signedAt ?? now) : null;
     }
 
-    return this.prisma.candidate.update({ where: { id: candidate.id }, data });
+    const updated = await this.prisma.candidate.update({ where: { id: candidate.id }, data });
+
+    // Opt-in changed → keep the Resend "Candidates (opted in)" segment in step.
+    if (dto.marketingConsent !== undefined && !!dto.marketingConsent !== candidate.marketingConsent) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+      if (user?.email) {
+        await this.notifications.syncJobAlerts({
+          email: user.email,
+          firstName: candidate.firstName,
+          lastName: candidate.lastName,
+          optedIn: !!dto.marketingConsent,
+        });
+      }
+    }
+    return updated;
   }
 
   // ── Worker documents (Terms of Engagement, KID, 48-hour opt-out) ──

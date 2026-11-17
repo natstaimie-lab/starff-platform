@@ -29,6 +29,7 @@ async function ensureProfile(): Promise<string> {
         postcode: (u.user_metadata?.postcode as string) ?? undefined,
         dateOfBirth: (u.user_metadata?.dateOfBirth as string) ?? undefined,
         rightToWorkType: (u.user_metadata?.rightToWorkType as string) ?? undefined,
+        marketingConsent: u.user_metadata?.marketingConsent === true,
         source: 'PORTAL',
       }),
     });
