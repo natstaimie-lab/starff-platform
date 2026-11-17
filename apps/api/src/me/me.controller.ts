@@ -4,7 +4,7 @@ import { Role } from '@prisma/client';
 import { MeService } from './me.service';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
-import { CheckInDto } from './dto/check-in.dto';
+import { CheckInDto, CheckOutDto } from './dto/check-in.dto';
 
 @ApiTags('me')
 @ApiBearerAuth()
@@ -47,12 +47,12 @@ export class MeController {
 
   @Post('shifts/:id/check-in')
   checkIn(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: CheckInDto) {
-    return this.me.checkIn(user.id, id, dto?.photoPath);
+    return this.me.checkIn(user.id, id, dto ?? {});
   }
 
   @Post('shifts/:id/check-out')
-  checkOut(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.me.checkOut(user.id, id);
+  checkOut(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: CheckOutDto) {
+    return this.me.checkOut(user.id, id, dto ?? {});
   }
 
   @Post('shifts/:id/report-late')

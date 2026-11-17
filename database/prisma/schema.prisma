@@ -671,6 +671,17 @@ model Shift {
   // Path in the private `candidate-documents` bucket; admin compares it to the
   // worker's verified identity selfie. Null for check-ins made before this existed.
   checkInPhotoUrl  String?
+  // Phone location at check-in / check-out (from the app's GPS), and how far
+  // that was from the site postcode. Null when the phone gave no location or the
+  // site has no postcode. Staff review these; nothing auto-blocks a worker.
+  checkInLat         Float?
+  checkInLng         Float?
+  checkInAccuracyM   Int?
+  checkInDistanceM   Int?
+  checkOutLat        Float?
+  checkOutLng        Float?
+  checkOutAccuracyM  Int?
+  checkOutDistanceM  Int?
   lateReportedAt   DateTime?  // worker flagged running late
   absentReportedAt DateTime?  // client reported the worker absent
 

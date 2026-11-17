@@ -23,6 +23,7 @@ import { useApi } from '@/lib/useApi';
 import { candidateApi } from '@/lib/endpoints';
 import { ApiError } from '@/lib/api';
 import { captureCheckInPhoto } from '@/lib/checkInPhoto';
+import { getShiftPosition } from '@/lib/shiftLocation';
 import type { CandidateProfile, CandidateStatus, CandidateInvitation, Shift } from '@/lib/types';
 
 const REQUIRED = [
@@ -115,8 +116,12 @@ export function CandidateHomeScreen() {
     }
   };
 
-  // Clock-in re-confirms identity: selfie first, then the check-in carries its path.
+  // Clock-in checks location (worker is at the site) and re-confirms identity
+  // with a selfie, then the check-in carries both. Location first, so a worker
+  // who won't share it isn't asked for a selfie for nothing.
   const checkIn = async (id: string) => {
+    const pos = await getShiftPosition();
+    if (pos === 'denied') return;
     let photoPath: string | null;
     try {
       photoPath = await captureCheckInPhoto(id);
@@ -125,7 +130,13 @@ export function CandidateHomeScreen() {
       return;
     }
     if (!photoPath) return;
-    doShift(id, () => candidateApi.checkInShift(id, photoPath!), 'Checked in. Have a great shift!');
+    doShift(id, () => candidateApi.checkInShift(id, photoPath!, pos), 'Checked in. Have a great shift!');
+  };
+
+  const checkOut = async (id: string) => {
+    const pos = await getShiftPosition();
+    if (pos === 'denied') return;
+    doShift(id, () => candidateApi.checkOutShift(id, pos), 'Checked out. Submit your timesheet when ready.');
   };
 
   const submitDue = (s: Shift) =>
@@ -200,7 +211,7 @@ export function CandidateHomeScreen() {
                   last={i === activeShifts.length - 1}
                   busy={busy === s.id}
                   onCheckIn={() => checkIn(s.id)}
-                  onCheckOut={() => doShift(s.id, () => candidateApi.checkOutShift(s.id), 'Checked out. Submit your timesheet when ready.')}
+                  onCheckOut={() => checkOut(s.id)}
                   onLate={() => doShift(s.id, () => candidateApi.reportLate(s.id), "We've let Starff know you're running late.")}
                 />
               ))}
