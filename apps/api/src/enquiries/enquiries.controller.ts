@@ -8,13 +8,13 @@ import {
   Patch,
   Post,
   Query,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { EnquiriesService } from './enquiries.service';
 import { CreateEnquiryDto } from './dto/create-enquiry.dto';
 import { Public } from '../auth/public.decorator';
+import { assertWebhookSecret } from '../auth/webhook-secret';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
 
@@ -33,9 +33,7 @@ export class EnquiriesController {
     @Body() dto: CreateEnquiryDto,
     @Headers('x-webhook-secret') secret?: string,
   ) {
-    if (secret !== process.env.WORDPRESS_WEBHOOK_SECRET) {
-      throw new UnauthorizedException('Bad webhook secret');
-    }
+    assertWebhookSecret(secret);
     return this.enquiries.create(dto);
   }
 

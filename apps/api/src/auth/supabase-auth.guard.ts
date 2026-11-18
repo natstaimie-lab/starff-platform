@@ -68,7 +68,11 @@ export class SupabaseAuthGuard implements CanActivate {
       if (alg === 'HS256' && process.env.SUPABASE_JWT_SECRET) {
         // Legacy symmetric verification.
         const secret = new TextEncoder().encode(process.env.SUPABASE_JWT_SECRET);
-        ({ payload } = await jwtVerify(token, secret));
+        // Issuer check rejects the project's anon/service keys (iss "supabase"),
+        // which are HS256-signed with the same secret but aren't user sessions.
+        ({ payload } = await jwtVerify(token, secret, {
+          issuer: `${process.env.SUPABASE_URL}/auth/v1`,
+        }));
       } else {
         // Modern asymmetric verification via Supabase's JWKS.
         ({ payload } = await jwtVerify(token, this.getJwks(), {
@@ -79,7 +83,10 @@ export class SupabaseAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid or expired token');
     }
 
-    const userId = payload.sub as string;
+    const userId = payload.sub;
+    if (!userId) {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
 
     // The database call can transiently fail if the Supabase pooler drops a
     // connection. Retry once (Prisma re-establishes on the next call); if it

@@ -41,8 +41,12 @@ export class CandidatesController {
   }
 
   // Any logged-in user (a new sign-up) can create their own candidate profile.
+  // Non-staff can only attach a profile to their OWN login: the body's userId is
+  // ignored and replaced with the caller's id. Staff (walk-ins) keep the old behaviour.
   @Post()
-  create(@Body() dto: CreateCandidateDto) {
+  create(@Body() dto: CreateCandidateDto, @CurrentUser() user: AuthUser) {
+    const isStaff = user.role === Role.ADMIN || user.role === Role.RECRUITER;
+    if (!isStaff) dto.userId = user.id;
     return this.candidates.create(dto);
   }
 
