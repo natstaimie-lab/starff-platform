@@ -4,7 +4,7 @@ import { AppBar, ScreenScroll } from '@/components/Screen';
 import { Button, LoadingState, ErrorState, EmptyState, Muted } from '@/components/ui';
 import { JobCard } from '@/components/cards';
 import { colors } from '@/theme/tokens';
-import { useApi } from '@/lib/useApi';
+import { useApi, useRefreshOnFocus } from '@/lib/useApi';
 import { candidateApi } from '@/lib/endpoints';
 import { ApiError } from '@/lib/api';
 import type { CandidateInvitation } from '@/lib/types';
@@ -28,6 +28,7 @@ const statusLabel: Record<string, string> = {
  */
 export function CandidateRolesScreen() {
   const offers = useApi<CandidateInvitation[]>(() => candidateApi.invitations(), []);
+  useRefreshOnFocus(offers.silentRefresh);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const respond = async (iv: CandidateInvitation, response: 'INTERESTED' | 'UNAVAILABLE' | 'INFO') => {
