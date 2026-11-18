@@ -11,7 +11,7 @@ import type { AuthStackParams } from '@/navigation/RootNavigator';
 type Props = NativeStackScreenProps<AuthStackParams, 'Login'>;
 
 export function LoginScreen({ navigation }: Props) {
-  const { signIn, resetPassword, biometricAvailable, biometricEnabled, authenticateBiometric } =
+  const { signIn, startDemo, resetPassword, biometricAvailable, biometricEnabled, authenticateBiometric } =
     useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -97,6 +97,10 @@ export function LoginScreen({ navigation }: Props) {
           loading={busy}
           iconRight="arrow-right"
         />
+
+        {__DEV__ ? (
+          <Button title="Demo candidate (dev only)" kind="ghost" onPress={startDemo} />
+        ) : null}
 
         <Pressable
           style={styles.altRow}

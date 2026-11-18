@@ -28,6 +28,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { apiFetch } from '@/lib/api';
 import { candidateApi, clientApi } from '@/lib/endpoints';
+import { DEMO_USER_ID, setDemo, isDemo } from '@/lib/demo';
 
 export type AppRole = 'candidate' | 'employer' | 'staff';
 export type StaffRole = 'ADMIN' | 'RECRUITER';
@@ -41,6 +42,8 @@ interface AuthContextValue {
   /** True once a session exists but before role resolution finishes. */
   resolvingRole: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  /** DEV ONLY: sign in as a fake demo candidate (no API, no database). */
+  startDemo: () => void;
   resetPassword: (email: string) => Promise<void>;
   signUpCandidate: (input: CandidateSignUp) => Promise<{ needsEmailConfirm: boolean }>;
   signUpEmployer: (input: EmployerSignUp) => Promise<{ needsEmailConfirm: boolean }>;
@@ -268,6 +271,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       resolvingRole,
       biometricAvailable,
       biometricEnabled,
+      startDemo() {
+        setDemo(true);
+        bootstrappedFor.current = DEMO_USER_ID;
+        setRole('candidate');
+        setSession({
+          access_token: 'demo',
+          refresh_token: 'demo',
+          token_type: 'bearer',
+          expires_in: 3600,
+          user: { id: DEMO_USER_ID, email: 'demo@starff.co.uk', user_metadata: { role: 'candidate' }, app_metadata: {}, aud: 'authenticated', created_at: new Date().toISOString() },
+        } as unknown as Session);
+      },
       async signIn(email, password) {
         const { error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
@@ -323,6 +338,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { needsEmailConfirm: !data.session };
       },
       async signOut() {
+        if (isDemo()) {
+          setDemo(false);
+          setSession(null);
+          setRole(null);
+          return;
+        }
         await supabase.auth.signOut();
         setRole(null);
         setStaffRole(null);

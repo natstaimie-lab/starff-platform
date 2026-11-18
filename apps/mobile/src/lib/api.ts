@@ -13,6 +13,7 @@
  */
 import { supabase } from '@/lib/supabase';
 import { config } from '@/config/env';
+import { demoFetch, isDemo } from '@/lib/demo';
 
 export class ApiError extends Error {
   constructor(
@@ -51,6 +52,7 @@ export async function apiFetch<T = unknown>(
   path: string,
   opts: RequestOptions = {},
 ): Promise<T> {
+  if (isDemo()) return demoFetch(path, opts) as Promise<T>;
   const { method = 'GET', body, idempotencyKey, timeoutMs = 20_000 } = opts;
 
   const controller = new AbortController();
