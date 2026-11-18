@@ -6,7 +6,7 @@ import { Card, Pill, Muted, SecHead, LoadingState, ErrorState, EmptyState } from
 import { Avatar, WeekStrip } from '@/components/cards';
 import { Icon } from '@/components/Icon';
 import { colors, radius } from '@/theme/tokens';
-import { useApi } from '@/lib/useApi';
+import { useApi, useRefreshOnFocus } from '@/lib/useApi';
 import { candidateApi } from '@/lib/endpoints';
 import type { Timesheet, TimesheetStatus } from '@/lib/types';
 
@@ -17,7 +17,8 @@ const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 export function CandidateHoursScreen() {
   const nav = useNavigation<any>();
-  const { data: me, loading, error, refreshing, refresh, reload } = useApi(() => candidateApi.me(), []);
+  const { data: me, loading, error, refreshing, refresh, reload, silentRefresh } = useApi(() => candidateApi.me(), []);
+  useRefreshOnFocus(silentRefresh);
 
   const timesheets = me?.timesheets ?? [];
   const totalHours = timesheets.reduce((s, t) => s + Number(t.hoursWorked ?? 0), 0);

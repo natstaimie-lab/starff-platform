@@ -3,7 +3,8 @@
  * every screen gets consistent loading spinners, error retry and pull-to-
  * refresh without repeating boilerplate.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { ApiError } from '@/lib/api';
 
 interface State<T> {
@@ -63,4 +64,25 @@ export function useApi<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
     refresh: () => load('refresh'),
     silentRefresh: () => load('silent'),
   };
+}
+
+/**
+ * Re-fetch quietly each time the screen comes back into focus (tab switch or
+ * back navigation). Tab screens stay mounted, so without this a list loaded
+ * once never picks up new offers or timesheets until a pull-to-refresh.
+ * The first focus is skipped because useApi already loads on mount.
+ */
+export function useRefreshOnFocus(...refreshers: (() => unknown)[]) {
+  const first = useRef(true);
+  const latest = useRef(refreshers);
+  latest.current = refreshers;
+  useFocusEffect(
+    useCallback(() => {
+      if (first.current) {
+        first.current = false;
+        return;
+      }
+      for (const r of latest.current) void r();
+    }, []),
+  );
 }

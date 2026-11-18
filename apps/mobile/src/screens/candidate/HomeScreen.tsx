@@ -19,7 +19,7 @@ import { Ring } from '@/components/Ring';
 import { DestCard } from '@/components/cards';
 import { Icon } from '@/components/Icon';
 import { colors, radius } from '@/theme/tokens';
-import { useApi } from '@/lib/useApi';
+import { useApi, useRefreshOnFocus } from '@/lib/useApi';
 import { candidateApi } from '@/lib/endpoints';
 import { ApiError } from '@/lib/api';
 import { captureCheckInPhoto } from '@/lib/checkInPhoto';
@@ -56,6 +56,7 @@ export function CandidateHomeScreen() {
   const nav = useNavigation<any>();
   const me = useApi(() => candidateApi.me(), []);
   const offers = useApi<CandidateInvitation[]>(() => candidateApi.invitations(), []);
+  useRefreshOnFocus(me.silentRefresh, offers.silentRefresh);
   const [busy, setBusy] = useState<string | null>(null);
 
   if (me.loading) return <Wrap><LoadingState label="Loading your dashboard…" /></Wrap>;
