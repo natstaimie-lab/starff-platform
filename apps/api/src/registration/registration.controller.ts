@@ -6,7 +6,6 @@ import {
   HttpCode,
   Param,
   Post,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -16,6 +15,7 @@ import { RegisterCandidateDto } from './dto/register-candidate.dto';
 import { RegisterClientDto } from './dto/register-client.dto';
 import { PrecheckCandidateDto } from './dto/precheck-candidate.dto';
 import { Public } from '../auth/public.decorator';
+import { assertWebhookSecret } from '../auth/webhook-secret';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
 
@@ -28,9 +28,7 @@ export class RegistrationController {
   // Same shared-secret pattern as the enquiries webhook so only our own
   // site/app can call them.
   private assertWebhook(secret?: string) {
-    if (secret !== process.env.WORDPRESS_WEBHOOK_SECRET) {
-      throw new UnauthorizedException('Bad webhook secret');
-    }
+    assertWebhookSecret(secret);
   }
 
   @Public()
