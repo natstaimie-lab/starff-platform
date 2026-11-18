@@ -12,7 +12,7 @@ import {
 } from '@/components/ui';
 import { Icon } from '@/components/Icon';
 import { colors } from '@/theme/tokens';
-import { useApi } from '@/lib/useApi';
+import { useApi, useRefreshOnFocus } from '@/lib/useApi';
 import { candidateApi, accountApi } from '@/lib/endpoints';
 import { useAuth } from '@/auth/AuthContext';
 import { PushToggleRow } from '@/components/PushToggleRow';
@@ -21,10 +21,12 @@ export function CandidateProfileScreen() {
   const nav = useNavigation<any>();
   const { signOut, biometricAvailable, biometricEnabled, setBiometricEnabled } =
     useAuth();
-  const { data: me, loading, error, refreshing, refresh, reload } = useApi(
+  const { data: me, loading, error, refreshing, refresh, reload, silentRefresh } = useApi(
     () => candidateApi.me(),
     [],
   );
+  // Also catches edits made on the Vetting / Personal details screens on return.
+  useRefreshOnFocus(silentRefresh);
 
   const initials =
     me ? `${me.firstName?.[0] ?? ''}${me.lastName?.[0] ?? ''}`.toUpperCase() : '';
