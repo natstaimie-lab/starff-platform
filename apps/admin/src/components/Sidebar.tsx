@@ -10,19 +10,27 @@ import * as Ic from './icons';
 type Item = { key: string; label: string; href: string; icon: ReactNode };
 type Section = { label?: string; items: Item[] };
 
+// Menu grouping only — every href below is an existing route; no page,
+// route or permission changes live here.
 const sections: Section[] = [
-  { items: [{ key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: <Ic.Grid /> }] },
   {
-    label: 'People',
+    label: 'Overview',
     items: [
-      { key: 'candidates', label: 'Candidates', href: '/dashboard/candidates', icon: <Ic.Users /> },
-      { key: 'workers', label: 'Workers', href: '/dashboard/workers', icon: <Ic.HardHat /> },
-      { key: 'clients', label: 'Clients', href: '/dashboard/clients', icon: <Ic.Building /> },
-      { key: 'enquiries', label: 'Enquiries', href: '/dashboard/enquiries', icon: <Ic.FileText /> },
-      { key: 'leads', label: 'Leads', href: '/dashboard/leads', icon: <Ic.TrendUp /> },
+      { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: <Ic.Grid /> },
+      { key: 'ai', label: 'AI Assistant', href: '/dashboard/ai', icon: <Ic.Sparkle /> },
+      { key: 'messages', label: 'Messages', href: '/dashboard/messages', icon: <Ic.Message /> },
+    ],
+  },
+  {
+    label: 'Sales & CRM',
+    items: [
       { key: 'followups', label: 'Follow-ups today', href: '/dashboard/leads/today', icon: <Ic.Bell /> },
-      { key: 'aiapprovals', label: 'AI approvals', href: '/dashboard/leads/approvals', icon: <Ic.Sparkle /> },
+      { key: 'pipeline', label: 'Pipeline', href: '/dashboard/leads/board', icon: <Ic.TrendUp /> },
+      { key: 'leads', label: 'Leads', href: '/dashboard/leads', icon: <Ic.User /> },
       { key: 'suggested', label: 'Suggested leads', href: '/dashboard/leads/suggested', icon: <Ic.Search /> },
+      { key: 'aiapprovals', label: 'AI approvals', href: '/dashboard/leads/approvals', icon: <Ic.Sparkle /> },
+      { key: 'quotes', label: 'Quotes', href: '/dashboard/quotes', icon: <Ic.PoundSterling /> },
+      { key: 'enquiries', label: 'Enquiries', href: '/dashboard/enquiries', icon: <Ic.FileText /> },
     ],
   },
   {
@@ -30,13 +38,15 @@ const sections: Section[] = [
     items: [
       { key: 'bookings', label: 'Job Bookings', href: '/dashboard/bookings', icon: <Ic.Briefcase /> },
       { key: 'shifts', label: 'Shifts', href: '/dashboard/shifts', icon: <Ic.Calendar /> },
+      { key: 'compliance', label: 'Compliance', href: '/dashboard/compliance', icon: <Ic.ClipboardCheck /> },
     ],
   },
   {
-    label: 'Compliance',
+    label: 'People',
     items: [
-      { key: 'compliance', label: 'Compliance', href: '/dashboard/compliance', icon: <Ic.ClipboardCheck /> },
-      { key: 'deletions', label: 'Account deletions', href: '/dashboard/deletions', icon: <Ic.AlertCircle /> },
+      { key: 'candidates', label: 'Candidates', href: '/dashboard/candidates', icon: <Ic.Users /> },
+      { key: 'workers', label: 'Workers', href: '/dashboard/workers', icon: <Ic.HardHat /> },
+      { key: 'clients', label: 'Clients', href: '/dashboard/clients', icon: <Ic.Building /> },
     ],
   },
   {
@@ -44,19 +54,13 @@ const sections: Section[] = [
     items: [
       { key: 'timesheets', label: 'Timesheets', href: '/dashboard/timesheets', icon: <Ic.Clock /> },
       { key: 'payroll', label: 'Payroll & Invoices', href: '/dashboard/payroll', icon: <Ic.Receipt /> },
-      { key: 'quotes', label: 'Quote Calculator', href: '/dashboard/quotes', icon: <Ic.PoundSterling /> },
     ],
   },
   {
-    label: 'Insights',
-    items: [
-      { key: 'ai', label: 'AI Assistant', href: '/dashboard/ai', icon: <Ic.Sparkle /> },
-      { key: 'messages', label: 'Messages', href: '/dashboard/messages', icon: <Ic.Message /> },
-    ],
-  },
-  {
+    label: 'Settings',
     items: [
       { key: 'staff', label: 'Staff & Access', href: '/dashboard/staff', icon: <Ic.Shield /> },
+      { key: 'deletions', label: 'Account deletions', href: '/dashboard/deletions', icon: <Ic.AlertCircle /> },
       { key: 'settings', label: 'Settings', href: '/dashboard/settings', icon: <Ic.Settings /> },
     ],
   },
